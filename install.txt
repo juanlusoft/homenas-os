@@ -1,0 +1,12 @@
+# 1) Desinstala el anterior (si quieres mantener limpio)
+cd homenas_frontend_lite
+sudo ./uninstall.sh
+
+# 2) Instala el nuevo paquete
+unzip homenas-frontend-lite-fixed.zip
+cd homenas_frontend_lite_fixed
+sudo ./install.sh
+
+# 3) Comprobar
+sudo systemctl status homenas-frontend-lite --no-pager -l
+curl -s http://127.0.0.1:9080/api/system
