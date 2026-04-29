@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { CheckCircle, XCircle, Minus, Thermometer, Wrench } from 'lucide-react'
+import { CheckCircle, XCircle, Minus, Thermometer, Wrench, Settings2 } from 'lucide-react'
 import { useDisks, useIoStats } from '../../hooks/useStorage'
 import { formatBytes } from '../../lib/utils'
 import type { Disk } from '@homenas/shared'
 import type { DiskIoStat } from '../../api/storage'
 import { useT } from '../../i18n/useT'
 import { DiskManageModal } from './DiskManageModal'
+import { PoolConfigModal } from './PoolConfigModal'
 
 function SmartHealthIcon({ smart }: { smart: Disk['smart'] }) {
   if (smart === null) {
@@ -44,14 +45,28 @@ function DiskRow({
   disk,
   io,
   onManage,
+  isSelected,
+  onToggleSelect,
 }: {
   disk: Disk
   io: DiskIoStat | undefined
   onManage: (disk: Disk) => void
+  isSelected: boolean
+  onToggleSelect: (name: string) => void
 }) {
   const isUnconfigured = disk.mountPoint === null && disk.fsType === null
   return (
-    <tr className="border-b border-black/5 dark:border-white/5 hover:bg-black/5 dark:bg-white/5 transition-colors">
+    <tr className={`border-b border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isSelected ? 'bg-indigo-500/5 dark:bg-indigo-500/10' : ''}`}>
+      <td className="pl-3 pr-1 py-3 w-8">
+        {isUnconfigured && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(disk.name)}
+            className="w-3.5 h-3.5 rounded border-gray-300 dark:border-white/20 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+          />
+        )}
+      </td>
       <td className="px-4 py-3">
         <span className="font-mono text-xs text-indigo-700 dark:text-indigo-300">{disk.device}</span>
       </td>
@@ -107,7 +122,7 @@ function DiskRow({
 function SkeletonRow() {
   return (
     <tr className="border-b border-black/5 dark:border-white/5">
-      {Array.from({ length: 10 }).map((_, i) => (
+      {Array.from({ length: 11 }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-4 bg-black/10 dark:bg-white/10 rounded animate-pulse" style={{ width: `${60 + (i * 13) % 40}%` }} />
         </td>
@@ -120,11 +135,33 @@ export function DisksCard() {
   const { data: disks, isLoading, error, refetch } = useDisks()
   const t = useT()
   const [managingDisk, setManagingDisk] = useState<Disk | null>(null)
+  const [selectedDisks, setSelectedDisks] = useState<Set<string>>(new Set())
+  const [showPoolModal, setShowPoolModal] = useState(false)
 
   // Derive disk IDs (e.g. /dev/sda → sda) for I/O stats
   const diskIds = disks?.map(d => d.name).filter(Boolean) ?? []
   const { data: ioData } = useIoStats(diskIds)
   const ioMap = new Map<string, DiskIoStat>((ioData?.disks ?? []).map(d => [d.diskId, d]))
+
+  const unconfiguredDisks = disks?.filter(d => d.mountPoint === null && d.fsType === null) ?? []
+  const selectedDiskObjects = unconfiguredDisks.filter(d => selectedDisks.has(d.name))
+
+  function toggleDisk(name: string) {
+    setSelectedDisks(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (selectedDisks.size === unconfiguredDisks.length) {
+      setSelectedDisks(new Set())
+    } else {
+      setSelectedDisks(new Set(unconfiguredDisks.map(d => d.name)))
+    }
+  }
 
   return (
     <>
@@ -136,14 +173,36 @@ export function DisksCard() {
           </svg>
           <h2 className="font-semibold text-gray-900 dark:text-white">{t.storage.disks}</h2>
           {disks && (
-            <span className="ml-auto text-xs text-gray-500 dark:text-white/40">{t.storage.disksCount(disks.length)}</span>
+            <span className="text-xs text-gray-500 dark:text-white/40">{t.storage.disksCount(disks.length)}</span>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            {selectedDisks.size > 0 && (
+              <button
+                onClick={() => setShowPoolModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                Configurar {selectedDisks.size} disco{selectedDisks.size !== 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 text-xs uppercase tracking-wider">
+                <th className="pl-3 pr-1 py-3 w-8">
+                  {unconfiguredDisks.length > 0 && (
+                    <input
+                      type="checkbox"
+                      checked={selectedDisks.size === unconfiguredDisks.length && unconfiguredDisks.length > 0}
+                      onChange={toggleAll}
+                      className="w-3.5 h-3.5 rounded border-gray-300 dark:border-white/20 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      title="Seleccionar todos los no configurados"
+                    />
+                  )}
+                </th>
                 <th className="px-4 py-3 text-left font-medium">{t.storage.device}</th>
                 <th className="px-4 py-3 text-left font-medium">{t.storage.model}</th>
                 <th className="px-4 py-3 text-left font-medium">{t.storage.size}</th>
@@ -160,14 +219,14 @@ export function DisksCard() {
               {isLoading && Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
               {error && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-6 text-center text-red-600 dark:text-red-400 text-sm">
+                  <td colSpan={11} className="px-4 py-6 text-center text-red-600 dark:text-red-400 text-sm">
                     {t.storage.failedToLoad}
                   </td>
                 </tr>
               )}
               {disks && disks.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-6 text-center text-gray-400 dark:text-white/30 text-sm">
+                  <td colSpan={11} className="px-4 py-6 text-center text-gray-400 dark:text-white/30 text-sm">
                     {t.storage.noDisks}
                   </td>
                 </tr>
@@ -178,6 +237,8 @@ export function DisksCard() {
                   disk={disk}
                   io={ioMap.get(disk.name)}
                   onManage={setManagingDisk}
+                  isSelected={selectedDisks.has(disk.name)}
+                  onToggleSelect={toggleDisk}
                 />
               ))}
             </tbody>
@@ -190,6 +251,18 @@ export function DisksCard() {
           disk={managingDisk}
           onClose={() => setManagingDisk(null)}
           onSuccess={() => { void refetch() }}
+        />
+      )}
+
+      {showPoolModal && selectedDiskObjects.length > 0 && (
+        <PoolConfigModal
+          disks={selectedDiskObjects}
+          onClose={() => setShowPoolModal(false)}
+          onSuccess={() => {
+            setSelectedDisks(new Set())
+            setShowPoolModal(false)
+            void refetch()
+          }}
         />
       )}
     </>
