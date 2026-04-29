@@ -294,7 +294,7 @@ export async function getFileInfo(inputPath: string): Promise<FileInfo> {
 export interface FileLocation {
   path: string   // absolute path with trailing slash
   label: string  // human-readable name
-  type: 'mergerfs' | 'generic'
+  type: 'mergerfs' | 'rclone' | 'generic'
 }
 
 /**
@@ -314,12 +314,17 @@ export async function getFileLocations(): Promise<FileLocation[]> {
       const mountPoint = parts[1]
 
       if (fsType === 'fuse.mergerfs' && mountPoint) {
-        // Decode octal-escaped spaces (\040) that /proc/mounts uses
         const decoded = mountPoint.replace(/\\040/g, ' ')
         const normalized = decoded.endsWith('/') ? decoded : `${decoded}/`
         const label = decoded.split('/').filter(Boolean).pop() ?? decoded
-
         locations.push({ path: normalized, label, type: 'mergerfs' })
+      }
+
+      if (fsType === 'fuse.rclone' && mountPoint) {
+        const decoded = mountPoint.replace(/\\040/g, ' ')
+        const normalized = decoded.endsWith('/') ? decoded : `${decoded}/`
+        const label = decoded.split('/').filter(Boolean).pop() ?? decoded
+        locations.push({ path: normalized, label, type: 'rclone' })
       }
     }
   } catch {

@@ -11,7 +11,7 @@ export interface FileEntry {
 export interface FileLocation {
   path: string
   label: string
-  type: 'mergerfs' | 'generic'
+  type: 'mergerfs' | 'rclone' | 'generic'
 }
 
 export interface FileInfo {
