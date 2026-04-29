@@ -10,9 +10,9 @@ function readAppVersion(): string {
   try {
     // WorkingDirectory = apps/backend → ../../package.json = repo root
     const pkg = JSON.parse(readFileSync(resolve(process.cwd(), '../../package.json'), 'utf-8')) as { version?: string }
-    return pkg.version ?? '3.0.0'
+    return pkg.version ?? '1.0.0'
   } catch {
-    return '3.0.0'
+    return '1.0.0'
   }
 }
 
