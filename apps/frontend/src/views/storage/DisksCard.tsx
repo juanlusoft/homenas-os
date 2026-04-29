@@ -54,7 +54,7 @@ function DiskRow({
   isSelected: boolean
   onToggleSelect: (name: string) => void
 }) {
-  const isUnconfigured = disk.mountPoint === null && disk.fsType === null
+  const isUnconfigured = disk.mountPoint === null
   return (
     <tr className={`border-b border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isSelected ? 'bg-indigo-500/5 dark:bg-indigo-500/10' : ''}`}>
       <td className="pl-3 pr-1 py-3 w-8">
@@ -143,7 +143,7 @@ export function DisksCard() {
   const { data: ioData } = useIoStats(diskIds)
   const ioMap = new Map<string, DiskIoStat>((ioData?.disks ?? []).map(d => [d.diskId, d]))
 
-  const unconfiguredDisks = disks?.filter(d => d.mountPoint === null && d.fsType === null) ?? []
+  const unconfiguredDisks = disks?.filter(d => d.mountPoint === null) ?? []
   const selectedDiskObjects = unconfiguredDisks.filter(d => selectedDisks.has(d.name))
 
   function toggleDisk(name: string) {
