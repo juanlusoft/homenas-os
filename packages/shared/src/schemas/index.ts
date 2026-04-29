@@ -1,0 +1,13 @@
+// Schemas Zod — single source of truth para frontend + backend
+export * from './auth.schema.js'
+export * from './system.schema.js'
+export * from './system-info.schema.js'
+export * from './storage.schema.js'
+export * from './docker.schema.js'
+export * from './network.schema.js'
+export * from './users.schema.js'
+export * from './scheduler.schema.js'
+export * from './backup.schema.js'
+export * from './cloudflare.schema.js'
+export * from './homestore.schema.js'
+export * from './active-backup.schema.js'

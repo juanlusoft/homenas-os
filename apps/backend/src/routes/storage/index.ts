@@ -1,0 +1,120 @@
+import type { FastifyInstance } from 'fastify'
+import { StartSnapRaidSchema, StartBadblocksSchema } from '@homenas/shared'
+import {
+  listDisks,
+  getIoStats,
+  getSnapRaidStatus,
+  startSnapRaid,
+  stopSnapRaid,
+  getMergerFSStatus,
+  drainMergerFSCache,
+  getBadblocksStatus,
+  startBadblocks,
+  stopBadblocks,
+} from '../../services/storage.service.js'
+
+export async function storageRoutes(fastify: FastifyInstance) {
+  const { requireAuth, requireAdmin } = fastify
+
+  // GET /api/storage/disks
+  fastify.get('/disks', {
+    preHandler: [requireAuth],
+  }, async (_request, reply) => {
+    const disks = await listDisks()
+    return reply.send(disks)
+  })
+
+  // GET /api/storage/disks/iostats — real-time R/W MB/s per disk
+  fastify.get<{ Querystring: { disks?: string } }>('/disks/iostats', {
+    preHandler: [requireAuth],
+  }, async (request, reply) => {
+    const diskIds = (request.query.disks ?? '').split(',').map(d => d.trim()).filter(Boolean)
+    if (diskIds.length === 0) return reply.send({ disks: [] })
+    return reply.send({ disks: getIoStats(diskIds) })
+  })
+
+  // GET /api/storage/snapraid/status
+  fastify.get('/snapraid/status', {
+    preHandler: [requireAuth],
+  }, async (_request, reply) => {
+    return reply.send(getSnapRaidStatus())
+  })
+
+  // POST /api/storage/snapraid/start
+  fastify.post('/snapraid/start', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (request, reply) => {
+    const result = StartSnapRaidSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.status(400).send({ error: 'Bad Request', message: result.error.message })
+    }
+
+    const { operation } = result.data
+    startSnapRaid(operation)
+    return reply.send({ started: true, operation })
+  })
+
+  // POST /api/storage/snapraid/stop
+  fastify.post('/snapraid/stop', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (_request, reply) => {
+    stopSnapRaid()
+    return reply.send({ stopped: true })
+  })
+
+  // GET /api/storage/mergerfs/status
+  fastify.get('/mergerfs/status', {
+    preHandler: [requireAuth],
+  }, async (_request, reply) => {
+    const status = await getMergerFSStatus()
+    return reply.send(status)
+  })
+
+  // POST /api/storage/mergerfs/drain — move cache disk contents to data disk
+  fastify.post('/mergerfs/drain', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (_request, reply) => {
+    try {
+      await drainMergerFSCache()
+      return reply.send({ ok: true })
+    } catch (err) {
+      return reply.status(500).send({ error: 'Storage Error', message: (err as Error).message })
+    }
+  })
+
+  // GET /api/storage/badblocks/status
+  fastify.get('/badblocks/status', {
+    preHandler: [requireAuth],
+  }, async (_request, reply) => {
+    return reply.send(getBadblocksStatus())
+  })
+
+  // POST /api/storage/badblocks/start
+  fastify.post('/badblocks/start', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (request, reply) => {
+    const result = StartBadblocksSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.status(400).send({ error: 'Bad Request', message: result.error.message })
+    }
+
+    const { device, writeMode } = result.data
+
+    try {
+      startBadblocks(device, writeMode)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      return reply.status(400).send({ error: 'Bad Request', message })
+    }
+
+    return reply.send({ started: true, device, writeMode })
+  })
+
+  // POST /api/storage/badblocks/stop
+  fastify.post('/badblocks/stop', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (_request, reply) => {
+    stopBadblocks()
+    return reply.send({ stopped: true })
+  })
+}
