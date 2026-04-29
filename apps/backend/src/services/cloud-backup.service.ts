@@ -83,9 +83,11 @@ interface RunningTransfer {
 let activeTransfer: RunningTransfer | null = null
 
 // ─── Rclone config path ───────────────────────────────────────────────────────
+// Use a path writable by the homenas service user, not root
 
-const RCLONE_CONF_DIR = '/root/.config/rclone'
+const RCLONE_CONF_DIR = '/opt/homenas-v3/data/rclone'
 const RCLONE_CONF_PATH = join(RCLONE_CONF_DIR, 'rclone.conf')
+const RCLONE_CONFIG_FLAG = ['--config', RCLONE_CONF_PATH]
 
 // ─── Service factory ──────────────────────────────────────────────────────────
 
@@ -251,7 +253,7 @@ export function createCloudBackupService(db: Database) {
   }
 
   async function getRemoteInfo(name: string): Promise<RemoteInfo> {
-    const result = await exec('rclone', ['about', `${name}:`, '--json'])
+    const result = await exec('rclone', [...RCLONE_CONFIG_FLAG, 'about', `${name}:`, '--json'])
     if (result.exitCode !== 0) {
       throw new Error(`rclone about failed: ${result.stderr}`)
     }
@@ -362,6 +364,7 @@ export function createCloudBackupService(db: Database) {
 
     // Build rclone args — NEVER shell strings
     const args: string[] = [
+      ...RCLONE_CONFIG_FLAG,
       job.operation,
       '--progress',
       '--stats-one-line',
