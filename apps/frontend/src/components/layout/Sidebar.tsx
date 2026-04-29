@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Cloud,
   Folder,
+  Globe,
   Loader2,
   Sun,
   Moon,
@@ -34,20 +35,21 @@ import { useT } from '../../i18n/useT'
 import { cn } from '../../lib/utils'
 
 const NAV_ROUTES = [
-  { key: 'dashboard'       as const, icon: LayoutDashboard, to: '/' },
-  { key: 'storage'         as const, icon: HardDrive,       to: '/storage' },
-  { key: 'files'           as const, icon: Folder,          to: '/files' },
-  { key: 'docker'          as const, icon: Container,       to: '/docker' },
-  { key: 'homestore'       as const, icon: ShoppingBag,     to: '/homestore' },
-  { key: 'network'         as const, icon: Network,         to: '/network' },
-  { key: 'syncthing'       as const, icon: RefreshCw,       to: '/syncthing' },
-  { key: 'cloudBackup'     as const, icon: Cloud,           to: '/cloud-backup' },
-  { key: 'activeBackup'    as const, icon: Shield,          to: '/active-backup' },
-  { key: 'activeDirectory' as const, icon: Building2,       to: '/active-directory' },
-  { key: 'users'           as const, icon: Users,           to: '/users' },
-  { key: 'backup'          as const, icon: Archive,         to: '/backup' },
-  { key: 'scheduler'       as const, icon: Calendar,        to: '/scheduler' },
-  { key: 'system'          as const, icon: Settings,        to: '/system' },
+  { key: 'dashboard'       as const, icon: LayoutDashboard,  to: '/' },
+  { key: 'storage'         as const, icon: HardDrive,        to: '/storage' },
+  { key: 'files'           as const, icon: Folder,           to: '/files' },
+  { key: 'networkDrives'   as const, icon: Globe, to: '/network-drives' },
+  { key: 'docker'          as const, icon: Container,        to: '/docker' },
+  { key: 'homestore'       as const, icon: ShoppingBag,      to: '/homestore' },
+  { key: 'network'         as const, icon: Network,          to: '/network' },
+  { key: 'syncthing'       as const, icon: RefreshCw,        to: '/syncthing' },
+  { key: 'cloudBackup'     as const, icon: Cloud,            to: '/cloud-backup' },
+  { key: 'activeBackup'    as const, icon: Shield,           to: '/active-backup' },
+  { key: 'activeDirectory' as const, icon: Building2,        to: '/active-directory' },
+  { key: 'users'           as const, icon: Users,            to: '/users' },
+  { key: 'backup'          as const, icon: Archive,          to: '/backup' },
+  { key: 'scheduler'       as const, icon: Calendar,         to: '/scheduler' },
+  { key: 'system'          as const, icon: Settings,         to: '/system' },
 ]
 
 export function Sidebar() {

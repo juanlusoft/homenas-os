@@ -232,6 +232,24 @@ const MIGRATIONS: Array<{ version: number; up: (db: Database.Database) => void }
       `)
     },
   },
+  {
+    version: 5,
+    up(db) {
+      // Network drives — rclone FUSE mounts managed via UI
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS network_drives (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT UNIQUE NOT NULL,
+          type TEXT NOT NULL,
+          config TEXT NOT NULL DEFAULT '{}',
+          mount_point TEXT NOT NULL,
+          is_mounted INTEGER NOT NULL DEFAULT 0,
+          auto_mount INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+      `)
+    },
+  },
 ]
 
 function runMigrations(db: Database.Database): void {
