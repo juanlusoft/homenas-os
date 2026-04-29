@@ -28,23 +28,20 @@ export function PoolConfigModal({ disks, onClose, onSuccess }: PoolConfigModalPr
   const [step, setStep] = useState<ModalStep>({ kind: 'select-action' })
 
   async function runAdd() {
-    const results: DiskResult[] = []
     setStep({ kind: 'progress', action: 'add', current: 0, total: disks.length, results: [] })
-    for (let i = 0; i < disks.length; i++) {
-      const disk = disks[i]
-      try {
-        const r = await storageApi.addDiskToPool(disk.name)
-        const msg = r.poolUpdated
-          ? `Añadido al pool → ${r.mountPoint}`
-          : `Montado en ${r.mountPoint} (sin pool MergerFS activo)`
-        results.push({ disk: disk.device, ok: true, msg })
-      } catch (err) {
-        results.push({ disk: disk.device, ok: false, msg: (err as Error).message })
-      }
-      setStep({ kind: 'progress', action: 'add', current: i + 1, total: disks.length, results: [...results] })
+    try {
+      const response = await storageApi.bulkAddToPool({ devices: disks.map(d => d.device) })
+      const results: DiskResult[] = response.results.map(r => ({
+        disk: r.device,
+        ok: true,
+        msg: r.poolUpdated ? `Añadido al pool → ${r.mountPoint}` : `Montado en ${r.mountPoint} (sin pool MergerFS activo)`,
+      }))
+      setStep({ kind: 'done', results })
+      onSuccess()
+    } catch (err) {
+      const results: DiskResult[] = [{ disk: disks.map(d => d.device).join(', '), ok: false, msg: (err as Error).message }]
+      setStep({ kind: 'done', results })
     }
-    setStep({ kind: 'done', results })
-    if (results.some(r => r.ok)) onSuccess()
   }
 
   async function runCreate() {

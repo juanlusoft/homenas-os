@@ -227,57 +227,66 @@ async function findMergerFSMount(): Promise<{ mountPoint: string; sources: strin
 export async function addDiskToPool(
   device: string,
 ): Promise<{ mountPoint: string; poolUpdated: boolean }> {
-  validateDevice(device)
+  const results = await bulkAddToPool([device])
+  return { mountPoint: results[0].mountPoint, poolUpdated: results[0].poolUpdated }
+}
 
-  const diskName = await findNextDiskN()
-  const mountPoint = `/mnt/disks/${diskName}`
+export async function bulkAddToPool(
+  devices: string[],
+): Promise<Array<{ device: string; mountPoint: string; poolUpdated: boolean }>> {
+  if (devices.length === 0) return []
 
-  // Create mount dir
-  const mkdirResult = await exec('mkdir', ['-p', mountPoint])
-  if (mkdirResult.exitCode !== 0) {
-    throw new Error(`Cannot create ${mountPoint}: ${mkdirResult.stderr}`)
+  for (const device of devices) {
+    validateDevice(device)
   }
 
-  // Format as ext4
-  const formatResult = await exec('mkfs.ext4', ['-F', '-L', diskName, device])
-  if (formatResult.exitCode !== 0) {
-    throw new Error(`mkfs.ext4 failed on ${device}: ${formatResult.stderr || formatResult.stdout}`)
-  }
+  // Assign disk names up-front (sequential, no race)
+  const startN = await findNextDiskN()
+  const startIndex = parseInt(startN.replace('disk', ''), 10)
 
-  // Mount the new disk
-  const mountResult = await exec('mount', [device, mountPoint])
-  if (mountResult.exitCode !== 0) {
-    throw new Error(`Failed to mount ${device} at ${mountPoint}: ${mountResult.stderr}`)
-  }
+  const assignments = devices.map((device, i) => ({
+    device,
+    diskName: `disk${startIndex + i}`,
+    mountPoint: `/mnt/disks/disk${startIndex + i}`,
+  }))
 
-  // Try to add to existing MergerFS pool
+  // Format and mount all disks in parallel
+  await Promise.all(
+    assignments.map(async ({ device, diskName, mountPoint }) => {
+      const mkdirResult = await exec('mkdir', ['-p', mountPoint])
+      if (mkdirResult.exitCode !== 0) {
+        throw new Error(`Cannot create ${mountPoint}: ${mkdirResult.stderr}`)
+      }
+
+      const formatResult = await exec('mkfs.ext4', ['-F', '-L', diskName, device])
+      if (formatResult.exitCode !== 0) {
+        throw new Error(`mkfs.ext4 failed on ${device}: ${formatResult.stderr || formatResult.stdout}`)
+      }
+
+      const mountResult = await exec('mount', [device, mountPoint])
+      if (mountResult.exitCode !== 0) {
+        throw new Error(`Failed to mount ${device} at ${mountPoint}: ${mountResult.stderr}`)
+      }
+    }),
+  )
+
+  // Add all new mount points to the MergerFS pool in one remount
   const mergerfs = await findMergerFSMount()
-  if (!mergerfs) {
-    return { mountPoint, poolUpdated: false }
-  }
+  let poolUpdated = false
 
-  // Build updated sources list: existing + new path
-  const updatedSources = [...mergerfs.sources, mountPoint].join(':')
+  if (mergerfs) {
+    const newMounts = assignments.map(a => a.mountPoint)
+    const updatedSources = [...mergerfs.sources, ...newMounts].join(':')
 
-  const remountResult = await exec('mount', [
-    '-o', `remount,use_ino,allow_other,func.getattr=newest,category.create=mfs,${updatedSources}`,
-    mergerfs.mountPoint,
-  ])
-
-  if (remountResult.exitCode !== 0) {
-    // Remount may need different syntax depending on MergerFS version.
-    // Try alternative: mount the sources directly.
-    const remountAlt = await exec('mount', [
-      '-o', `remount`,
+    const remountResult = await exec('mount', [
+      '-o', `remount,use_ino,allow_other,func.getattr=newest,category.create=mfs,${updatedSources}`,
       mergerfs.mountPoint,
     ])
-    if (remountAlt.exitCode !== 0) {
-      // Pool mount failed but disk is mounted — partial success
-      return { mountPoint, poolUpdated: false }
-    }
+
+    poolUpdated = remountResult.exitCode === 0
   }
 
-  return { mountPoint, poolUpdated: true }
+  return assignments.map(a => ({ device: a.device, mountPoint: a.mountPoint, poolUpdated }))
 }
 
 // ─── createPool ───────────────────────────────────────────────────────────────
@@ -305,30 +314,30 @@ export async function createPool(
     validateDevice(device)
   }
 
-  const drives: string[] = []
+  // Format and mount all disks in parallel
+  const drives = await Promise.all(
+    devices.map(async (device, i) => {
+      const diskName = `disk${i + 1}`
+      const mountPoint = `/mnt/disks/${diskName}`
 
-  for (let i = 0; i < devices.length; i++) {
-    const device = devices[i]
-    const diskName = `disk${i + 1}`
-    const mountPoint = `/mnt/disks/${diskName}`
+      const mkdirResult = await exec('mkdir', ['-p', mountPoint])
+      if (mkdirResult.exitCode !== 0) {
+        throw new Error(`Cannot create ${mountPoint}: ${mkdirResult.stderr}`)
+      }
 
-    const mkdirResult = await exec('mkdir', ['-p', mountPoint])
-    if (mkdirResult.exitCode !== 0) {
-      throw new Error(`Cannot create ${mountPoint}: ${mkdirResult.stderr}`)
-    }
+      const formatResult = await exec('mkfs.ext4', ['-F', '-L', diskName, device])
+      if (formatResult.exitCode !== 0) {
+        throw new Error(`mkfs.ext4 failed on ${device}: ${formatResult.stderr || formatResult.stdout}`)
+      }
 
-    const formatResult = await exec('mkfs.ext4', ['-F', '-L', diskName, device])
-    if (formatResult.exitCode !== 0) {
-      throw new Error(`mkfs.ext4 failed on ${device}: ${formatResult.stderr || formatResult.stdout}`)
-    }
+      const mountResult = await exec('mount', [device, mountPoint])
+      if (mountResult.exitCode !== 0) {
+        throw new Error(`Failed to mount ${device} at ${mountPoint}: ${mountResult.stderr}`)
+      }
 
-    const mountResult = await exec('mount', [device, mountPoint])
-    if (mountResult.exitCode !== 0) {
-      throw new Error(`Failed to mount ${device} at ${mountPoint}: ${mountResult.stderr}`)
-    }
-
-    drives.push(mountPoint)
-  }
+      return mountPoint
+    }),
+  )
 
   const poolMount = await findAvailablePoolMount()
 

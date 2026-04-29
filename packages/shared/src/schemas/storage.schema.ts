@@ -89,3 +89,8 @@ export const CreatePoolInputSchema = z.object({
   devices: z.array(z.string().regex(/^\/dev\/[a-z]{1,3}[0-9]*$/)).min(1),
 })
 export type CreatePoolInput = z.infer<typeof CreatePoolInputSchema>
+
+export const BulkAddToPoolInputSchema = z.object({
+  devices: z.array(z.string().regex(/^\/dev\/[a-z]{1,3}[0-9]*$/)).min(1),
+})
+export type BulkAddToPoolInput = z.infer<typeof BulkAddToPoolInputSchema>
