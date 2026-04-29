@@ -23,6 +23,7 @@ import { activeBackupRoutes } from './routes/active-backup/index.js'
 import { syncthingRoutes } from './routes/syncthing/index.js'
 import { cloudBackupRoutes } from './routes/cloud-backup/index.js'
 import { filesRoutes } from './routes/files/index.js'
+import { networkDrivesRoutes } from './routes/network-drives/index.js'
 import { ddnsRoutes } from './routes/ddns/index.js'
 import { updatesRoutes } from './routes/updates/index.js'
 import { notificationsRoutes } from './routes/notifications/index.js'
@@ -163,7 +164,10 @@ export function buildApp(httpsOptions?: HttpsOptions) {
   // 19. File Manager
   app.register(filesRoutes, { prefix: '/api/files' })
 
-  // 20. DDNS
+  // 20. Network Drives (rclone FUSE mounts)
+  app.register(networkDrivesRoutes, { prefix: '/api/network-drives' })
+
+  // 21. DDNS
   app.register(ddnsRoutes, { prefix: '/api/ddns' })
 
   // 21. System Updates

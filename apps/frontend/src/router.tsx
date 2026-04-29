@@ -55,6 +55,7 @@ export const router = createBrowserRouter([
       { path: 'syncthing',        HydrateFallback: PageSpinner, lazy: () => import('./views/syncthing/SyncthingView').then(m => ({ Component: m.SyncthingView })) },
       { path: 'cloud-backup',     HydrateFallback: PageSpinner, lazy: () => import('./views/cloud-backup/CloudBackupView').then(m => ({ Component: m.CloudBackupView })) },
       { path: 'files',            HydrateFallback: PageSpinner, lazy: () => import('./views/files/FilesView').then(m => ({ Component: m.FilesView })) },
+      { path: 'network-drives',   HydrateFallback: PageSpinner, lazy: () => import('./views/network-drives/NetworkDrivesView').then(m => ({ Component: m.NetworkDrivesView })) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
