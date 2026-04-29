@@ -215,12 +215,12 @@ export function Sidebar() {
       )}
 
       {/* Homelabs Club logo */}
-      <div className="shrink-0 flex justify-center items-center px-4 py-3 border-t border-black/5 dark:border-white/5 opacity-50 hover:opacity-80 transition-opacity">
+      <div className="shrink-0 flex justify-center items-center px-2 py-2 border-t border-black/5 dark:border-white/5 opacity-50 hover:opacity-80 transition-opacity">
         <a href="https://homelabs.club" target="_blank" rel="noopener noreferrer" tabIndex={-1}>
           <img
             src="/logo.svg"
             alt="Homelabs Club"
-            className={cn('object-contain w-full', collapsed ? 'w-8 h-8' : 'max-w-[120px] h-auto')}
+            className={cn('object-contain w-full', collapsed ? 'w-8 h-8' : 'h-auto')}
           />
         </a>
       </div>
