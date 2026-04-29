@@ -3,7 +3,11 @@ set -euo pipefail
 
 # ─── HomeNas OS v3 — Install script ───────────────────────────────────────────
 # Usage: curl -sSL http://git.jlu.app/root/homenas-v3-os/-/raw/main/install.sh | bash
-# Tested on: Raspberry Pi OS / Debian arm64, Node.js ≥ 18
+# Tested on:
+#   - Raspberry Pi OS / Debian arm64
+#   - Ubuntu 22.04 / 24.04 x86_64
+#   - Debian 12 (Bookworm) x86_64
+#   - Node.js >= 18
 
 REPO="http://git.jlu.app/root/homenas-v3-os.git"
 INSTALL_DIR="/opt/homenas-v3"
@@ -17,6 +21,35 @@ GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; BLUE='\033[0;34m'; NC
 info()  { echo -e "${GREEN}[homenas]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[homenas]${NC} $*"; }
 error() { echo -e "${RED}[homenas]${NC} $*" >&2; }
+
+# ── Architecture and OS detection ─────────────────────────────────────────────
+ARCH=$(uname -m)
+OS_ID=""
+OS_VERSION_ID=""
+OS_PRETTY=""
+
+if [[ -f /etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  OS_ID="${ID:-}"
+  OS_VERSION_ID="${VERSION_ID:-}"
+  OS_PRETTY="${PRETTY_NAME:-Linux}"
+elif command -v lsb_release &>/dev/null; then
+  OS_ID=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
+  OS_VERSION_ID=$(lsb_release -sr)
+  OS_PRETTY=$(lsb_release -sd)
+fi
+
+info "Architecture: ${ARCH}"
+info "OS: ${OS_PRETTY}"
+
+# Normalise arch label
+case "${ARCH}" in
+  x86_64)  ARCH_LABEL="x86_64" ;;
+  aarch64|arm64) ARCH_LABEL="arm64" ;;
+  armv7l|armhf)  ARCH_LABEL="armhf" ;;
+  *) warn "Unrecognised architecture '${ARCH}' — proceeding anyway" ; ARCH_LABEL="${ARCH}" ;;
+esac
 
 # Read version from package.json after clone/update (fallback hardcoded)
 APP_VERSION="3.0.0"
@@ -63,17 +96,155 @@ fi
 
 # ── System dependencies ───────────────────────────────────────────────────────
 info "Installing system dependencies..."
-apt-get install -y --no-install-recommends \
-  xfsprogs \
-  e2fsprogs \
-  parted \
-  util-linux \
-  udev \
-  coreutils \
-  samba \
-  samba-vfs-modules \
-  avahi-daemon \
-  wsdd2
+
+# Base packages available on all supported platforms
+BASE_PKGS=(
+  xfsprogs
+  e2fsprogs
+  parted
+  util-linux
+  udev
+  coreutils
+  samba
+  samba-vfs-modules
+  avahi-daemon
+  smartmontools
+  hdparm
+  rsync
+  lsof
+  stdbuf
+)
+
+# wsdd2 (Windows WS-Discovery): available in Debian 11+ and Ubuntu 22.04+ repos.
+# On older/exotic distros the package may not exist — we install it separately
+# with a graceful fallback.
+WSDD2_PKGS=(wsdd2)
+
+# mergerfs and snapraid: not in official Ubuntu/Debian repos — installed below
+# via architecture-specific method.
+# NFS server: nfs-kernel-server (same package name on all Debian-family distros)
+NFS_PKGS=(nfs-kernel-server)
+
+# ethtool: used by network.service for interface speed reporting
+EXTRA_PKGS=(ethtool)
+
+apt-get install -y --no-install-recommends "${BASE_PKGS[@]}" "${NFS_PKGS[@]}" "${EXTRA_PKGS[@]}" || true
+
+# wsdd2: graceful — not critical if unavailable
+apt-get install -y --no-install-recommends "${WSDD2_PKGS[@]}" 2>/dev/null \
+  || warn "wsdd2 not available in apt — Windows WS-Discovery will not work"
+
+# ── mergerfs ──────────────────────────────────────────────────────────────────
+info "Installing mergerfs..."
+MERGERFS_INSTALLED=false
+
+install_mergerfs_deb() {
+  local deb_url=""
+  # Fetch latest mergerfs release for the correct architecture from GitHub
+  local api_url="https://api.github.com/repos/trapexit/mergerfs/releases/latest"
+  local arch_deb=""
+  case "${ARCH_LABEL}" in
+    x86_64) arch_deb="amd64" ;;
+    arm64)  arch_deb="arm64" ;;
+    armhf)  arch_deb="armhf" ;;
+    *)      arch_deb="amd64" ;;
+  esac
+
+  # Determine Debian/Ubuntu codename for package selection
+  local codename="${VERSION_CODENAME:-}"
+  if [[ -z "${codename}" ]] && command -v lsb_release &>/dev/null; then
+    codename=$(lsb_release -sc)
+  fi
+
+  # Try to find a matching .deb from the release assets
+  if command -v curl &>/dev/null; then
+    deb_url=$(curl -fsSL "${api_url}" 2>/dev/null \
+      | grep -o "https://[^\"]*${arch_deb}[^\"]*\.deb" \
+      | grep -v "static" \
+      | head -1 || true)
+  fi
+
+  if [[ -n "${deb_url}" ]]; then
+    local tmp_deb
+    tmp_deb=$(mktemp /tmp/mergerfs-XXXXXX.deb)
+    if curl -fsSL -o "${tmp_deb}" "${deb_url}" 2>/dev/null; then
+      dpkg -i "${tmp_deb}" && MERGERFS_INSTALLED=true || apt-get install -f -y
+      rm -f "${tmp_deb}"
+    fi
+  fi
+
+  # Fallback: try the static build (works on any Linux/libc)
+  if [[ "${MERGERFS_INSTALLED}" != "true" ]]; then
+    local static_url
+    if command -v curl &>/dev/null; then
+      static_url=$(curl -fsSL "${api_url}" 2>/dev/null \
+        | grep -o "https://[^\"]*${arch_deb}[^\"]*static[^\"]*\.tar\.gz" \
+        | head -1 || true)
+    fi
+    if [[ -n "${static_url:-}" ]]; then
+      local tmp_tar
+      tmp_tar=$(mktemp /tmp/mergerfs-XXXXXX.tar.gz)
+      if curl -fsSL -o "${tmp_tar}" "${static_url}"; then
+        tar -xzf "${tmp_tar}" -C /usr/local/bin --wildcards '*/mergerfs' --strip-components=1 2>/dev/null \
+          && chmod +x /usr/local/bin/mergerfs \
+          && MERGERFS_INSTALLED=true
+        rm -f "${tmp_tar}"
+      fi
+    fi
+  fi
+}
+
+if command -v mergerfs &>/dev/null; then
+  info "mergerfs already installed: $(mergerfs --version 2>&1 | head -1 || true)"
+  MERGERFS_INSTALLED=true
+elif apt-cache show mergerfs &>/dev/null 2>&1; then
+  apt-get install -y mergerfs && MERGERFS_INSTALLED=true
+else
+  install_mergerfs_deb
+fi
+
+if [[ "${MERGERFS_INSTALLED}" != "true" ]]; then
+  warn "mergerfs could not be installed automatically."
+  warn "Install manually: https://github.com/trapexit/mergerfs/releases"
+fi
+
+# ── snapraid ──────────────────────────────────────────────────────────────────
+info "Installing snapraid..."
+SNAPRAID_INSTALLED=false
+
+if command -v snapraid &>/dev/null; then
+  info "snapraid already installed"
+  SNAPRAID_INSTALLED=true
+elif apt-cache show snapraid &>/dev/null 2>&1; then
+  apt-get install -y snapraid && SNAPRAID_INSTALLED=true
+else
+  # Build from source (requires gcc make libz-dev)
+  if apt-get install -y --no-install-recommends gcc make libz-dev 2>/dev/null; then
+    SNAPRAID_SRC_URL="https://github.com/amadvance/snapraid/releases/download/v12.3/snapraid-12.3.tar.gz"
+    local_tmp=$(mktemp -d /tmp/snapraid-XXXXXX)
+    if curl -fsSL -o "${local_tmp}/snapraid.tar.gz" "${SNAPRAID_SRC_URL}" 2>/dev/null; then
+      tar -xzf "${local_tmp}/snapraid.tar.gz" -C "${local_tmp}" --strip-components=1
+      pushd "${local_tmp}" >/dev/null
+      ./configure --prefix=/usr && make -j"$(nproc)" && make install
+      popd >/dev/null
+      SNAPRAID_INSTALLED=true
+    fi
+    rm -rf "${local_tmp}"
+  fi
+fi
+
+if [[ "${SNAPRAID_INSTALLED}" != "true" ]]; then
+  warn "snapraid could not be installed automatically."
+  warn "Install manually: https://github.com/amadvance/snapraid/releases"
+fi
+
+# ── ARM-specific extras ───────────────────────────────────────────────────────
+if [[ "${ARCH_LABEL}" == "arm64" || "${ARCH_LABEL}" == "armhf" ]]; then
+  info "ARM platform detected — checking for arm-specific packages..."
+  # libraspberrypi-bin provides vcgencmd (Raspberry Pi only; non-fatal if absent)
+  apt-get install -y --no-install-recommends libraspberrypi-bin 2>/dev/null \
+    || true  # not available on non-RPi ARM boards
+fi
 
 # ── Clone / update ────────────────────────────────────────────────────────────
 if [[ -d "$INSTALL_DIR/.git" ]]; then
@@ -142,11 +313,28 @@ sudo -u homenas git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/n
 # ── Systemd service ───────────────────────────────────────────────────────────
 info "Creating systemd service..."
 SERVER_JS="${INSTALL_DIR}/apps/backend/dist/apps/backend/src/server.js"
-NODE_BIN=$(which node)
+
+# Resolve the absolute path of node — prefer the binary that is currently in
+# PATH (nodesource installs to /usr/bin/node; nvm installs under ~/.nvm).
+# Using `which` inside the script captures the runtime PATH at install time.
+NODE_BIN=$(command -v node 2>/dev/null || which node 2>/dev/null)
+if [[ -z "${NODE_BIN}" ]]; then
+  error "Cannot find node binary. Install Node.js first."
+  exit 1
+fi
+info "node binary: ${NODE_BIN}"
 
 # Ensure data directory exists and is writable
 mkdir -p "${INSTALL_DIR}/apps/backend/data"
 chown homenas:homenas "${INSTALL_DIR}/apps/backend/data"
+
+# Build a PATH that covers the most common Node.js installation locations:
+#  - /usr/bin          (apt/nodesource)
+#  - /usr/local/bin    (manual / n / volta)
+#  - /usr/local/sbin   (mergerfs static build)
+#  - /sbin /usr/sbin   (smartctl, hdparm, parted, mkfs.*)
+NODE_DIR=$(dirname "${NODE_BIN}")
+SERVICE_PATH="${NODE_DIR}:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
 
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
@@ -165,6 +353,7 @@ Environment=NODE_ENV=production
 Environment=PORT=${PORT}
 Environment=CERT_PATH=${CERT_PATH}
 Environment=KEY_PATH=${KEY_PATH}
+Environment=PATH=${SERVICE_PATH}
 
 # Allow binding to port 443 without root
 AmbientCapabilities=CAP_NET_BIND_SERVICE

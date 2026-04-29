@@ -180,15 +180,15 @@ async function getSmartData(deviceName: string): Promise<Disk['smart']> {
 
 // ─── listDisks ────────────────────────────────────────────────────────────────
 
-// Determine disk type from lsblk transport/rotational info
+// Determine disk type from lsblk transport/rotational info.
+// This function is architecture-agnostic: it uses the transport and rotational
+// flags reported by lsblk rather than assuming fixed device-name mappings.
 function resolveDiskType(device: LsblkDevice): Disk['diskType'] {
   const name  = device.name
   const tran  = (device.tran  ?? '').toLowerCase()
   const model = (device.model ?? '').toLowerCase()
 
   if (tran === 'nvme' || name.startsWith('nvme')) return 'nvme'
-  // sda and sdb are always NVMe slots on this hardware (CM5 M.2 via USB bridge)
-  if (name === 'sda' || name === 'sdb') return 'nvme'
   // NVMe drive connected via USB adapter — model name contains "nvme"
   if (tran === 'usb' && model.includes('nvme')) return 'nvme'
   if (tran === 'usb') return 'usb'
@@ -200,13 +200,14 @@ function resolveDiskType(device: LsblkDevice): Disk['diskType'] {
   return 'other'
 }
 
-// Returns true for virtual/system devices that must never be shown
+// Returns true for virtual/system devices that must never be shown in the UI.
+// This covers both ARM (mmcblk eMMC, zram) and x86 (loop, dm-*) platforms.
 function isHiddenDevice(name: string): boolean {
   return (
-    name.startsWith('mmcblk') ||   // eMMC (CM5 internal storage)
+    name.startsWith('mmcblk') ||   // eMMC / SD card on ARM/SBC boards
     name.startsWith('zram')   ||   // compressed RAM block device
-    name.startsWith('loop')   ||   // loopback
-    name.startsWith('dm-')         // device-mapper (LVM, etc.)
+    name.startsWith('loop')   ||   // loopback (snap packages, etc.)
+    name.startsWith('dm-')         // device-mapper (LVM, LUKS, etc.)
   )
 }
 
@@ -259,13 +260,20 @@ export async function listDisks(): Promise<Disk[]> {
 
     const smart = smartAvailable ? await getSmartData(device.name) : null
 
-    // For NVMe-via-USB-bridge slots (sda, sdb on CM5): if lsblk returns a
-    // short numeric model (e.g. "456"), replace with a readable label.
+    // Sanitise model string: some USB bridges report a short numeric string
+    // (e.g. "456") instead of a real model name.  Replace with a generic
+    // label derived from the detected disk type so the UI stays readable.
     let model = device.model?.trim() || null
-    if ((device.name === 'sda' || device.name === 'sdb') && model !== null) {
-      if (/^\d{1,3}$/.test(model)) {
-        model = 'NVMe SSD'
+    if (model !== null && /^\d{1,5}$/.test(model)) {
+      const diskType = resolveDiskType(device)
+      const typeLabel: Record<string, string> = {
+        nvme: 'NVMe SSD',
+        ssd:  'SATA SSD',
+        hdd:  'Hard Disk',
+        usb:  'USB Storage',
+        other: 'Storage Device',
       }
+      model = typeLabel[diskType] ?? 'Storage Device'
     }
 
     disks.push({
