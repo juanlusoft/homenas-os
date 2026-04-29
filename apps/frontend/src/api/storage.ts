@@ -6,7 +6,10 @@ import type {
   BadblocksStatus,
   StartSnapRaidInput,
   StartBadblocksInput,
+  DiskPartition,
 } from '@homenas/shared'
+
+export type { DiskPartition }
 
 export interface DiskIoStat {
   diskId: string
@@ -55,4 +58,20 @@ export const storageApi = {
 
   stopBadblocks: (): Promise<{ stopped: boolean }> =>
     apiFetch('/storage/badblocks/stop', { method: 'POST' }),
+
+  // Disk management (unconfigured disks)
+  getDiskPartitions: (diskName: string): Promise<DiskPartition[]> =>
+    apiFetch(`/storage/disks/${diskName}/partitions`),
+
+  mountPartition: (diskName: string, body: { browserId: string }): Promise<{ mountPoint: string }> =>
+    apiFetch(`/storage/disks/${diskName}/mount`, { method: 'POST', body: JSON.stringify(body) }),
+
+  unmountPartition: (diskName: string, body: { browserId: string }): Promise<void> =>
+    apiFetch(`/storage/disks/${diskName}/unmount`, { method: 'POST', body: JSON.stringify(body) }),
+
+  addDiskToPool: (diskName: string): Promise<{ mountPoint: string; poolUpdated: boolean }> =>
+    apiFetch(`/storage/disks/${diskName}/add-to-pool`, { method: 'POST', body: '{}' }),
+
+  createPool: (body: { devices: string[] }): Promise<{ poolMount: string; drives: string[] }> =>
+    apiFetch('/storage/pool/create', { method: 'POST', body: JSON.stringify(body) }),
 }

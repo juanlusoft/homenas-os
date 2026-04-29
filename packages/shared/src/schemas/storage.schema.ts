@@ -71,3 +71,21 @@ export type MergerFSStatus = z.infer<typeof MergerFSStatusSchema>
 export type BadblocksStatus = z.infer<typeof BadblocksStatusSchema>
 export type StartSnapRaidInput = z.infer<typeof StartSnapRaidSchema>
 export type StartBadblocksInput = z.infer<typeof StartBadblocksSchema>
+
+export const DiskPartitionSchema = z.object({
+  partition: z.string(),
+  fsType: z.string().nullable(),
+  sizeBytes: z.number(),
+  osHint: z.enum(['windows', 'linux', 'unknown']),
+})
+export type DiskPartition = z.infer<typeof DiskPartitionSchema>
+
+export const MountDiskInputSchema = z.object({
+  browserId: z.string().regex(/^[a-z0-9_-]{1,32}$/),
+})
+export type MountDiskInput = z.infer<typeof MountDiskInputSchema>
+
+export const CreatePoolInputSchema = z.object({
+  devices: z.array(z.string().regex(/^\/dev\/[a-z]{1,3}[0-9]*$/)).min(1),
+})
+export type CreatePoolInput = z.infer<typeof CreatePoolInputSchema>
