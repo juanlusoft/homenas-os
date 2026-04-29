@@ -1,9 +1,11 @@
-import { CheckCircle, XCircle, Minus, Thermometer } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle, XCircle, Minus, Thermometer, Wrench } from 'lucide-react'
 import { useDisks, useIoStats } from '../../hooks/useStorage'
 import { formatBytes } from '../../lib/utils'
 import type { Disk } from '@homenas/shared'
 import type { DiskIoStat } from '../../api/storage'
 import { useT } from '../../i18n/useT'
+import { DiskManageModal } from './DiskManageModal'
 
 function SmartHealthIcon({ smart }: { smart: Disk['smart'] }) {
   if (smart === null) {
@@ -38,7 +40,16 @@ function IoCell({ value, color }: { value: number; color: string }) {
   )
 }
 
-function DiskRow({ disk, io }: { disk: Disk; io: DiskIoStat | undefined }) {
+function DiskRow({
+  disk,
+  io,
+  onManage,
+}: {
+  disk: Disk
+  io: DiskIoStat | undefined
+  onManage: (disk: Disk) => void
+}) {
+  const isUnconfigured = disk.mountPoint === null && disk.fsType === null
   return (
     <tr className="border-b border-black/5 dark:border-white/5 hover:bg-black/5 dark:bg-white/5 transition-colors">
       <td className="px-4 py-3">
@@ -78,6 +89,17 @@ function DiskRow({ disk, io }: { disk: Disk; io: DiskIoStat | undefined }) {
           )}
         </div>
       </td>
+      <td className="px-4 py-3">
+        {isUnconfigured && (
+          <button
+            onClick={() => onManage(disk)}
+            title="Gestionar disco"
+            className="p-1.5 rounded-lg text-gray-400 dark:text-white/30 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+          >
+            <Wrench className="w-4 h-4" />
+          </button>
+        )}
+      </td>
     </tr>
   )
 }
@@ -85,7 +107,7 @@ function DiskRow({ disk, io }: { disk: Disk; io: DiskIoStat | undefined }) {
 function SkeletonRow() {
   return (
     <tr className="border-b border-black/5 dark:border-white/5">
-      {Array.from({ length: 9 }).map((_, i) => (
+      {Array.from({ length: 10 }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-4 bg-black/10 dark:bg-white/10 rounded animate-pulse" style={{ width: `${60 + (i * 13) % 40}%` }} />
         </td>
@@ -95,8 +117,9 @@ function SkeletonRow() {
 }
 
 export function DisksCard() {
-  const { data: disks, isLoading, error } = useDisks()
+  const { data: disks, isLoading, error, refetch } = useDisks()
   const t = useT()
+  const [managingDisk, setManagingDisk] = useState<Disk | null>(null)
 
   // Derive disk IDs (e.g. /dev/sda → sda) for I/O stats
   const diskIds = disks?.map(d => d.name).filter(Boolean) ?? []
@@ -104,55 +127,71 @@ export function DisksCard() {
   const ioMap = new Map<string, DiskIoStat>((ioData?.disks ?? []).map(d => [d.diskId, d]))
 
   return (
-    <div className="bg-black/5 dark:bg-white/5 backdrop-blur border border-black/10 dark:border-white/10 rounded-xl shadow-lg overflow-hidden">
-      <div className="px-6 py-4 border-b border-black/10 dark:border-white/10 flex items-center gap-3">
-        <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-        </svg>
-        <h2 className="font-semibold text-gray-900 dark:text-white">{t.storage.disks}</h2>
-        {disks && (
-          <span className="ml-auto text-xs text-gray-500 dark:text-white/40">{t.storage.disksCount(disks.length)}</span>
-        )}
+    <>
+      <div className="bg-black/5 dark:bg-white/5 backdrop-blur border border-black/10 dark:border-white/10 rounded-xl shadow-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-black/10 dark:border-white/10 flex items-center gap-3">
+          <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
+          </svg>
+          <h2 className="font-semibold text-gray-900 dark:text-white">{t.storage.disks}</h2>
+          {disks && (
+            <span className="ml-auto text-xs text-gray-500 dark:text-white/40">{t.storage.disksCount(disks.length)}</span>
+          )}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 text-xs uppercase tracking-wider">
+                <th className="px-4 py-3 text-left font-medium">{t.storage.device}</th>
+                <th className="px-4 py-3 text-left font-medium">{t.storage.model}</th>
+                <th className="px-4 py-3 text-left font-medium">{t.storage.size}</th>
+                <th className="px-4 py-3 text-left font-medium">{t.storage.used}</th>
+                <th className="px-4 py-3 text-left font-medium">FS</th>
+                <th className="px-4 py-3 text-left font-medium">{t.storage.mountPoint}</th>
+                <th className="px-4 py-3 text-left font-medium text-green-600 dark:text-green-500">↑ Read</th>
+                <th className="px-4 py-3 text-left font-medium text-yellow-600 dark:text-yellow-500">↓ Write</th>
+                <th className="px-4 py-3 text-left font-medium">SMART</th>
+                <th className="px-4 py-3 text-left font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
+              {error && (
+                <tr>
+                  <td colSpan={10} className="px-4 py-6 text-center text-red-600 dark:text-red-400 text-sm">
+                    {t.storage.failedToLoad}
+                  </td>
+                </tr>
+              )}
+              {disks && disks.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-4 py-6 text-center text-gray-400 dark:text-white/30 text-sm">
+                    {t.storage.noDisks}
+                  </td>
+                </tr>
+              )}
+              {disks?.map((disk) => (
+                <DiskRow
+                  key={disk.device}
+                  disk={disk}
+                  io={ioMap.get(disk.name)}
+                  onManage={setManagingDisk}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 text-xs uppercase tracking-wider">
-              <th className="px-4 py-3 text-left font-medium">{t.storage.device}</th>
-              <th className="px-4 py-3 text-left font-medium">{t.storage.model}</th>
-              <th className="px-4 py-3 text-left font-medium">{t.storage.size}</th>
-              <th className="px-4 py-3 text-left font-medium">{t.storage.used}</th>
-              <th className="px-4 py-3 text-left font-medium">FS</th>
-              <th className="px-4 py-3 text-left font-medium">{t.storage.mountPoint}</th>
-              <th className="px-4 py-3 text-left font-medium text-green-600 dark:text-green-500">↑ Read</th>
-              <th className="px-4 py-3 text-left font-medium text-yellow-600 dark:text-yellow-500">↓ Write</th>
-              <th className="px-4 py-3 text-left font-medium">SMART</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
-            {error && (
-              <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-red-600 dark:text-red-400 text-sm">
-                  {t.storage.failedToLoad}
-                </td>
-              </tr>
-            )}
-            {disks && disks.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-gray-400 dark:text-white/30 text-sm">
-                  {t.storage.noDisks}
-                </td>
-              </tr>
-            )}
-            {disks?.map((disk) => (
-              <DiskRow key={disk.device} disk={disk} io={ioMap.get(disk.name)} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {managingDisk && (
+        <DiskManageModal
+          disk={managingDisk}
+          onClose={() => setManagingDisk(null)}
+          onSuccess={() => { void refetch() }}
+        />
+      )}
+    </>
   )
 }

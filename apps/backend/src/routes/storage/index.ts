@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { StartSnapRaidSchema, StartBadblocksSchema } from '@homenas/shared'
+import { StartSnapRaidSchema, StartBadblocksSchema, MountDiskInputSchema, CreatePoolInputSchema } from '@homenas/shared'
 import {
   listDisks,
   getIoStats,
@@ -12,6 +12,13 @@ import {
   startBadblocks,
   stopBadblocks,
 } from '../../services/storage.service.js'
+import {
+  getDiskPartitions,
+  mountPartitionReadOnly,
+  unmountBrowse,
+  addDiskToPool,
+  createPool,
+} from '../../services/disk-manage.service.js'
 
 export async function storageRoutes(fastify: FastifyInstance) {
   const { requireAuth, requireAdmin } = fastify
@@ -116,5 +123,85 @@ export async function storageRoutes(fastify: FastifyInstance) {
   }, async (_request, reply) => {
     stopBadblocks()
     return reply.send({ stopped: true })
+  })
+
+  // GET /api/storage/disks/:device/partitions
+  fastify.get<{ Params: { device: string } }>('/disks/:device/partitions', {
+    preHandler: [requireAuth],
+  }, async (request, reply) => {
+    const device = `/dev/${request.params.device}`
+    try {
+      const partitions = await getDiskPartitions(device)
+      return reply.send(partitions)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      return reply.status(400).send({ error: 'Bad Request', message })
+    }
+  })
+
+  // POST /api/storage/disks/:device/mount
+  fastify.post<{ Params: { device: string } }>('/disks/:device/mount', {
+    preHandler: [requireAuth],
+  }, async (request, reply) => {
+    const device = `/dev/${request.params.device}`
+    const result = MountDiskInputSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.status(400).send({ error: 'Bad Request', message: result.error.message })
+    }
+    try {
+      const mountResult = await mountPartitionReadOnly(device, result.data.browserId)
+      return reply.send(mountResult)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      return reply.status(500).send({ error: 'Storage Error', message })
+    }
+  })
+
+  // POST /api/storage/disks/:device/unmount
+  fastify.post<{ Params: { device: string } }>('/disks/:device/unmount', {
+    preHandler: [requireAuth],
+  }, async (request, reply) => {
+    const result = MountDiskInputSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.status(400).send({ error: 'Bad Request', message: result.error.message })
+    }
+    try {
+      await unmountBrowse(result.data.browserId)
+      return reply.send({ ok: true })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      return reply.status(500).send({ error: 'Storage Error', message })
+    }
+  })
+
+  // POST /api/storage/disks/:device/add-to-pool
+  fastify.post<{ Params: { device: string } }>('/disks/:device/add-to-pool', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (request, reply) => {
+    const device = `/dev/${request.params.device}`
+    try {
+      const addResult = await addDiskToPool(device)
+      return reply.send(addResult)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      return reply.status(500).send({ error: 'Storage Error', message })
+    }
+  })
+
+  // POST /api/storage/pool/create
+  fastify.post('/pool/create', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (request, reply) => {
+    const result = CreatePoolInputSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.status(400).send({ error: 'Bad Request', message: result.error.message })
+    }
+    try {
+      const poolResult = await createPool(result.data.devices)
+      return reply.send(poolResult)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      return reply.status(500).send({ error: 'Storage Error', message })
+    }
   })
 }
