@@ -86,7 +86,7 @@ export const cloudBackupApi = {
 
   // Remotes
   listRemotes: (): Promise<CloudRemote[]> =>
-    apiFetch('/cloud-backup/remotes'),
+    apiFetch<{ items: CloudRemote[] }>('/cloud-backup/remotes').then(r => r.items),
 
   configureRemote: (input: CreateRemoteInput): Promise<CloudRemote> =>
     apiFetch('/cloud-backup/remotes', {
@@ -102,7 +102,7 @@ export const cloudBackupApi = {
 
   // Jobs
   listJobs: (): Promise<CloudJob[]> =>
-    apiFetch('/cloud-backup/jobs'),
+    apiFetch<{ items: CloudJob[] }>('/cloud-backup/jobs').then(r => r.items),
 
   createJob: (input: CreateJobInput): Promise<CloudJob> =>
     apiFetch('/cloud-backup/jobs', {
@@ -131,5 +131,5 @@ export const cloudBackupApi = {
 
   // History
   listTransfers: (): Promise<CloudTransfer[]> =>
-    apiFetch('/cloud-backup/transfers'),
+    apiFetch<{ items: CloudTransfer[] }>('/cloud-backup/transfers').then(r => r.items),
 }
