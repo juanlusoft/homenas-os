@@ -72,6 +72,9 @@ export const storageApi = {
   addDiskToPool: (diskName: string): Promise<{ mountPoint: string; poolUpdated: boolean }> =>
     apiFetch(`/storage/disks/${diskName}/add-to-pool`, { method: 'POST', body: '{}' }),
 
+  bulkAddToPool: (body: { devices: string[] }): Promise<{ results: Array<{ device: string; mountPoint: string; poolUpdated: boolean }> }> =>
+    apiFetch('/storage/pool/bulk-add', { method: 'POST', body: JSON.stringify(body) }),
+
   createPool: (body: { devices: string[] }): Promise<{ poolMount: string; drives: string[] }> =>
     apiFetch('/storage/pool/create', { method: 'POST', body: JSON.stringify(body) }),
 }

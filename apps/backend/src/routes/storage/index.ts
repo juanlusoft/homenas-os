@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { StartSnapRaidSchema, StartBadblocksSchema, MountDiskInputSchema, CreatePoolInputSchema } from '@homenas/shared'
+import { StartSnapRaidSchema, StartBadblocksSchema, MountDiskInputSchema, CreatePoolInputSchema, BulkAddToPoolInputSchema } from '@homenas/shared'
 import {
   listDisks,
   getIoStats,
@@ -17,6 +17,7 @@ import {
   mountPartitionReadOnly,
   unmountBrowse,
   addDiskToPool,
+  bulkAddToPool,
   createPool,
 } from '../../services/disk-manage.service.js'
 
@@ -182,6 +183,23 @@ export async function storageRoutes(fastify: FastifyInstance) {
     try {
       const addResult = await addDiskToPool(device)
       return reply.send(addResult)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      return reply.status(500).send({ error: 'Storage Error', message })
+    }
+  })
+
+  // POST /api/storage/pool/bulk-add — format + add multiple disks to existing pool in parallel
+  fastify.post('/pool/bulk-add', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (request, reply) => {
+    const result = BulkAddToPoolInputSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.status(400).send({ error: 'Bad Request', message: result.error.message })
+    }
+    try {
+      const addResult = await bulkAddToPool(result.data.devices)
+      return reply.send({ results: addResult })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       return reply.status(500).send({ error: 'Storage Error', message })
