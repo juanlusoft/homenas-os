@@ -165,6 +165,9 @@ export async function createDirectory(inputPath: string): Promise<void> {
   if (result.exitCode !== 0) {
     throw new Error(`mkdir failed: ${result.stderr}`)
   }
+  // mkdir runs via sudo (process is unprivileged) so the new dir is owned by root.
+  // Chown back to the service user so subsequent uploads/writes don't EACCES.
+  await exec('chown', ['homenas:homenas', safePath])
 }
 
 // ─── deleteItem ───────────────────────────────────────────────────────────────
