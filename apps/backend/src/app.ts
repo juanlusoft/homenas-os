@@ -18,6 +18,7 @@ import { schedulerRoutes } from './routes/scheduler/index.js'
 import { backupRoutes } from './routes/backup/index.js'
 import { setupRoutes } from './routes/setup/index.js'
 import { homestoreRoutes } from './routes/homestore/index.js'
+import { containersRoutes } from './routes/containers/index.js'
 import { activeDirectoryRoutes } from './routes/active-directory/index.js'
 import { activeBackupRoutes } from './routes/active-backup/index.js'
 import { syncthingRoutes } from './routes/syncthing/index.js'
@@ -148,6 +149,10 @@ export function buildApp(httpsOptions?: HttpsOptions) {
 
   // 14. HomeStore (Docker App Store)
   app.register(homestoreRoutes, { prefix: '/api/homestore' })
+
+  // 14.b Container edit (PATCH /api/containers/:id) — operates on
+  // HomeStore-installed containers but exposed under its own prefix per spec.
+  app.register(containersRoutes, { prefix: '/api/containers' })
 
   // 15. Active Directory (Samba AD DC)
   app.register(activeDirectoryRoutes, { prefix: '/api/ad' })

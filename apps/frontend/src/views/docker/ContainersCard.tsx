@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Play, Square, RotateCcw, Trash2, FileText,
-  Pause, PlayCircle, ChevronDown, ChevronRight,
+  Pause, PlayCircle, ChevronDown, ChevronRight, Pencil,
 } from 'lucide-react'
 import { useContainers, useContainerAction } from '../../hooks/useDocker'
+import { useHomeCatalog } from '../../hooks/useHomeStore'
 import { LogsModal } from './LogsModal'
-import type { Container } from '@homenas/shared'
+import type { CatalogApp, Container } from '@homenas/shared'
 import { useT } from '../../i18n/useT'
+import { ContainerEditModal } from '../../components/container-form'
 
 // ─── Container icon ───────────────────────────────────────────────────────────
 
@@ -171,12 +173,27 @@ function formatBytes(bytes: number | null): string {
 
 interface ContainerRowProps {
   container: Container
+  /**
+   * If the container belongs to a HomeStore app, this is the matching
+   * CatalogApp. The "Edit" button is rendered only when this is non-null —
+   * the PATCH /api/containers/:id endpoint only knows how to edit apps with a
+   * persisted config under the homestore service.
+   */
+  homeStoreApp: CatalogApp | null
   onAction: (containerId: string, action: string) => void
   onViewLogs: (container: Container) => void
+  onEdit: (app: CatalogApp) => void
   pending: boolean
 }
 
-function ContainerRow({ container, onAction, onViewLogs, pending }: ContainerRowProps) {
+function ContainerRow({
+  container,
+  homeStoreApp,
+  onAction,
+  onViewLogs,
+  onEdit,
+  pending,
+}: ContainerRowProps) {
   const t = useT()
   const [confirmRemove, setConfirmRemove] = useState(false)
   const isRunning = container.status === 'running'
@@ -275,6 +292,17 @@ function ContainerRow({ container, onAction, onViewLogs, pending }: ContainerRow
             >
               <FileText className="w-3.5 h-3.5" />
             </button>
+            {/* Edit (only for HomeStore-installed apps) */}
+            {homeStoreApp && (
+              <button
+                title={t.common.edit}
+                disabled={pending}
+                onClick={() => onEdit(homeStoreApp)}
+                className="p-1.5 rounded-lg bg-black/10 dark:bg-white/10 hover:bg-indigo-500/20 text-gray-600 dark:text-white/60 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-40 transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
             {/* Remove */}
             <button
               title="Remove"
@@ -327,8 +355,26 @@ function ContainerRow({ container, onAction, onViewLogs, pending }: ContainerRow
 export function ContainersCard() {
   const t = useT()
   const { data: containers, isLoading } = useContainers()
+  const { data: catalog } = useHomeCatalog()
   const actionMutation = useContainerAction()
   const [logsContainer, setLogsContainer] = useState<Container | null>(null)
+  const [editingApp, setEditingApp] = useState<CatalogApp | null>(null)
+
+  // Map docker container *name* → CatalogApp so the "Edit" button only shows
+  // for HomeStore-managed containers. We key on `containerName` because the
+  // HomeStore service uses a deterministic name per app and that's what the
+  // backend matches to perform the edit; container *id* would also work but
+  // can change after recreation.
+  const homeStoreByName = useMemo(() => {
+    const map = new Map<string, CatalogApp>()
+    if (!catalog) return map
+    for (const app of catalog) {
+      if (app.containerName) {
+        map.set(app.containerName, app)
+      }
+    }
+    return map
+  }, [catalog])
 
   function handleAction(containerId: string, action: string) {
     actionMutation.mutate({
@@ -393,8 +439,10 @@ export function ContainersCard() {
               <ContainerRow
                 key={container.id}
                 container={container}
+                homeStoreApp={homeStoreByName.get(container.name) ?? null}
                 onAction={handleAction}
                 onViewLogs={setLogsContainer}
+                onEdit={setEditingApp}
                 pending={actionMutation.isPending}
               />
             ))}
@@ -408,6 +456,16 @@ export function ContainersCard() {
           containerId={logsContainer.id}
           containerName={logsContainer.name}
           onClose={() => setLogsContainer(null)}
+        />
+      )}
+
+      {/* Edit Modal (HomeStore apps only) */}
+      {editingApp && (
+        <ContainerEditModal
+          container={editingApp}
+          isOpen
+          onClose={() => setEditingApp(null)}
+          onSaved={() => setEditingApp(null)}
         />
       )}
     </div>

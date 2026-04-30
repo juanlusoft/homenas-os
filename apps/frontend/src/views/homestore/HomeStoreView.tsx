@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  Play, Square, RotateCcw, ScrollText, RefreshCw, Trash2, Download,
+  Play, Square, RotateCcw, ScrollText, RefreshCw, Trash2, Download, Pencil,
 } from 'lucide-react'
 import {
   useHomeCatalog,
@@ -14,6 +14,12 @@ import {
 } from '../../hooks/useHomeStore'
 import type { CatalogApp, AppCategory, PortMapping, VolumeMapping, EnvVar, InstallPayload } from '@homenas/shared'
 import { useT } from '../../i18n/useT'
+import {
+  PortsField,
+  VolumesField,
+  EnvVarsField,
+  ContainerEditModal,
+} from '../../components/container-form'
 
 // ─── App icon ────────────────────────────────────────────────────────────────
 
@@ -122,38 +128,15 @@ function InstallModal({ app, onClose, onInstall, loading }: InstallModalProps) {
             {ports.length > 0 && (
               <section>
                 <h3 className="text-gray-600 dark:text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">{t.homestore.portMappings}</h3>
-                <div className="space-y-2">
-                  {ports.map((p, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <label className="block text-gray-500 dark:text-white/40 text-xs mb-1">{p.label ?? t.homestore.portHost(i + 1)}</label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={65535}
-                          value={p.hostPort}
-                          onChange={e => {
-                            const next = [...ports]
-                            next[i] = { ...next[i], hostPort: parseInt(e.target.value, 10) || p.hostPort }
-                            setPorts(next)
-                          }}
-                          className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500"
-                        />
-                      </div>
-                      <div className="pt-5 text-gray-400 dark:text-white/30 text-sm">→</div>
-                      <div className="flex-1">
-                        <label className="block text-gray-500 dark:text-white/40 text-xs mb-1">{t.homestore.containerPort}</label>
-                        <input
-                          type="number"
-                          value={p.containerPort}
-                          readOnly
-                          className="w-full bg-white/3 border border-black/5 dark:border-white/5 rounded-lg px-3 py-1.5 text-gray-400 dark:text-white/30 text-sm"
-                        />
-                      </div>
-                      <div className="pt-5 text-gray-400 dark:text-white/30 text-xs w-8 text-center">{p.protocol}</div>
-                    </div>
-                  ))}
-                </div>
+                <PortsField
+                  value={ports}
+                  onChange={setPorts}
+                  allowAddRemove={false}
+                  lockContainerSide
+                  containerLabel={t.homestore.containerPort}
+                  getRowLabel={(p, i) => p.label ?? t.homestore.portHost(i + 1)}
+                  idPrefix={`install-${app.id}-ports`}
+                />
               </section>
             )}
 
@@ -161,29 +144,15 @@ function InstallModal({ app, onClose, onInstall, loading }: InstallModalProps) {
             {volumes.length > 0 && (
               <section>
                 <h3 className="text-gray-600 dark:text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">{t.homestore.volumes}</h3>
-                <div className="space-y-2">
-                  {volumes.map((v, i) => (
-                    <div key={i}>
-                      <label className="block text-gray-500 dark:text-white/40 text-xs mb-1">{v.label ?? t.homestore.volumeHost(i + 1)}</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={v.hostPath}
-                          onChange={e => {
-                            const next = [...volumes]
-                            next[i] = { ...next[i], hostPath: e.target.value }
-                            setVolumes(next)
-                          }}
-                          className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-gray-900 dark:text-white text-sm font-mono focus:outline-none focus:border-indigo-500"
-                        />
-                        <div className="text-gray-400 dark:text-white/30 text-sm">→</div>
-                        <code className="text-gray-400 dark:text-white/30 text-xs bg-white/3 px-2 py-1.5 rounded border border-black/5 dark:border-white/5">
-                          {v.containerPath}
-                        </code>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <VolumesField
+                  value={volumes}
+                  onChange={setVolumes}
+                  allowAddRemove={false}
+                  lockContainerSide
+                  showMode={false}
+                  getRowLabel={(v, i) => v.label ?? t.homestore.volumeHost(i + 1)}
+                  idPrefix={`install-${app.id}-volumes`}
+                />
               </section>
             )}
 
@@ -191,27 +160,16 @@ function InstallModal({ app, onClose, onInstall, loading }: InstallModalProps) {
             {envVars.length > 0 && (
               <section>
                 <h3 className="text-gray-600 dark:text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">{t.homestore.envVars}</h3>
-                <div className="space-y-2">
-                  {envVars.map((e, i) => (
-                    <div key={i}>
-                      <label className="block text-gray-500 dark:text-white/40 text-xs mb-1">{e.label ?? e.key}</label>
-                      <div className="flex items-center gap-2">
-                        <code className="text-gray-400 dark:text-white/30 text-xs bg-white/3 px-2 py-2 rounded border border-black/5 dark:border-white/5 shrink-0">{e.key}</code>
-                        <input
-                          type={e.secret ? 'password' : 'text'}
-                          value={e.value}
-                          onChange={ev => {
-                            const next = [...envVars]
-                            next[i] = { ...next[i], value: ev.target.value }
-                            setEnvVars(next)
-                          }}
-                          placeholder={e.secret ? t.homestore.secretPlaceholder : t.homestore.valuePlaceholder}
-                          className="flex-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-gray-900 dark:text-white text-sm font-mono focus:outline-none focus:border-indigo-500"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <EnvVarsField
+                  value={envVars}
+                  onChange={setEnvVars}
+                  allowAddRemove={false}
+                  lockKey
+                  getRowLabel={(e) => e.label ?? e.key}
+                  valuePlaceholder={t.homestore.valuePlaceholder}
+                  secretPlaceholder={t.homestore.secretPlaceholder}
+                  idPrefix={`install-${app.id}-env`}
+                />
               </section>
             )}
           </div>
@@ -369,6 +327,7 @@ interface AppCardProps {
   onUninstall: (app: CatalogApp) => void
   onUpdate: (id: string) => void
   onLogs: (app: CatalogApp) => void
+  onEdit: (app: CatalogApp) => void
   pendingId: string | null
 }
 
@@ -381,6 +340,7 @@ function AppCard({
   onUninstall,
   onUpdate,
   onLogs,
+  onEdit,
   pendingId,
 }: AppCardProps) {
   const t = useT()
@@ -478,6 +438,14 @@ function AppCard({
               <ScrollText className="w-3.5 h-3.5" />
             </button>
             <button
+              onClick={() => onEdit(app)}
+              disabled={isPending}
+              title={t.common.edit}
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/80 disabled:opacity-50 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
               onClick={() => onUpdate(app.id)}
               disabled={isPending}
               title={t.common.update}
@@ -523,6 +491,7 @@ export function HomeStoreView() {
   const [installTarget, setInstallTarget] = useState<CatalogApp | null>(null)
   const [uninstallTarget, setUninstallTarget] = useState<CatalogApp | null>(null)
   const [logsTarget, setLogsTarget] = useState<CatalogApp | null>(null)
+  const [editingApp, setEditingApp] = useState<CatalogApp | null>(null)
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [logsKey, setLogsKey] = useState(0)
 
@@ -627,6 +596,17 @@ export function HomeStoreView() {
 
   const handleLogs = (app: CatalogApp) => setLogsTarget(app)
 
+  const handleEdit = (app: CatalogApp) => setEditingApp(app)
+
+  const handleEditSaved = () => {
+    // Refresh the catalog using the same mechanism the install/uninstall flows
+    // rely on. The mutation hook already invalidates the catalog query, but we
+    // call refetch() too in case the user has the modal open across a stale
+    // window — gives an immediate visual update.
+    refetch()
+    showToast(t.containerEdit.successRecreated, 'success')
+  }
+
   return (
     <div className="max-w-7xl space-y-6">
       {/* Page header */}
@@ -711,6 +691,7 @@ export function HomeStoreView() {
                   onUninstall={handleUninstall}
                   onUpdate={handleUpdate}
                   onLogs={handleLogs}
+                  onEdit={handleEdit}
                   pendingId={pendingId}
                 />
               ))}
@@ -746,6 +727,19 @@ export function HomeStoreView() {
           app={logsTarget}
           onClose={() => setLogsTarget(null)}
           onRefresh={() => setLogsKey(k => k + 1)}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editingApp && (
+        <ContainerEditModal
+          container={editingApp}
+          isOpen
+          onClose={() => setEditingApp(null)}
+          onSaved={() => {
+            handleEditSaved()
+            setEditingApp(null)
+          }}
         />
       )}
 
