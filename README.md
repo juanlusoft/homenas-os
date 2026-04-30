@@ -1,223 +1,171 @@
-# HomeNas OS v3
+# HomeNas OS
 
-PWA de gestión para NAS casero sobre Raspberry Pi CM5. Reemplaza la v2 monolítica con una arquitectura monorepo moderna.
+Panel de control para tu NAS casero. Gestiona discos, archivos, copias de seguridad, Docker, red y más desde cualquier navegador.
 
----
-
-## Stack
-
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | React 19 + TypeScript + Vite + TailwindCSS v4 + Zustand + React Router v7 + TanStack Query v5 |
-| Backend | Fastify v5 + TypeScript + better-sqlite3 |
-| Shared | `packages/shared` — Zod schemas como single source of truth |
-| Auth | X-Session-Id header + CSRF token, RBAC admin/user, 2FA/TOTP |
-| TLS | Certificado autofirmado, puerto 443, generado en install.sh |
+**Versión 1.0.0** · [homelabs.club](https://homelabs.club)
 
 ---
 
-## Estructura
+## Instalación
 
-```
-homenas-os-v3/
-├── apps/
-│   ├── backend/          # Fastify API
-│   └── frontend/         # React SPA
-├── packages/
-│   └── shared/           # Tipos y schemas Zod compartidos
-├── install.sh            # Script de instalación para producción
-├── uninstall.sh          # Script de desinstalación limpia
-└── DEVLOG.md             # Registro de decisiones y cambios
-```
-
----
-
-## Módulos
-
-| Módulo | Estado | Descripción |
-|--------|--------|-------------|
-| **Dashboard** | ✅ | CPU, RAM, red, temperatura, fans, potencia (polling 2s) |
-| **Storage** | ✅ | Discos (lsblk + SMART), SnapRAID, MergerFS con caché NVMe, Badblocks |
-| **Files** | ✅ | Explorador con árbol lateral, breadcrumb, subida drag & drop, validación MIME |
-| **Docker** | ✅ | Contenedores, logs, variables de entorno, Compose stacks |
-| **HomeStore** | ✅ | Tienda de apps Docker (18+ aplicaciones por categoría) |
-| **Network** | ✅ | Interfaces, configuración IP (DHCP/estática), WireGuard (QR), Samba, NFS, DDNS, ancho de banda |
-| **Syncthing** | ✅ | Sincronización P2P — dispositivos y carpetas vía API Syncthing |
-| **Cloud Backup** | ✅ | Backup en nube con rclone (9+ proveedores: S3, GDrive, B2, Dropbox…) |
-| **Active Backup** | ✅ | Backup pull-based con agente para Win/Mac/Linux, hardlinks, versiones |
-| **Active Directory** | ✅ | Samba AD DC — usuarios, grupos y equipos CRUD |
-| **Users** | ✅ | CRUD con RBAC admin/user, cambio de contraseña, 2FA por cuenta |
-| **Backup** | ✅ | rsync/tar/rclone con historial de ejecuciones |
-| **Scheduler** | ✅ | Tareas cron persistidas en SQLite, ejecución manual |
-| **System** | ✅ | Info del sistema, actualizaciones OTA, UPS, toggle SSH, audit log, backup DB, integridad DB |
-
----
-
-## Seguridad
-
-### Autenticación
-- Account lockout: 5 intentos fallidos en 15 minutos → bloqueo temporal (429)
-- Idle session timeout: 8 horas de inactividad → sesión revocada
-- Sliding session: la sesión se extiende 7 días en cada request
-- CSRF token en todas las peticiones mutantes
-- 2FA/TOTP compatible con Google Authenticator, Authy y similares
-
-### Cabeceras y límites
-- HSTS (1 año, includeSubDomains)
-- Content Security Policy completa
-- Rate limiting global (200 req/min) + por ruta sensible
-- Body limit 1 MB (uploads tienen límite propio de 50 GB)
-
-### Cifrado
-- Secrets en DB (tokens DDNS, Cloudflare, SMTP, Telegram, cloud-backup) cifrados con AES-256-GCM
-- Clave derivada de `/etc/machine-id` — única por máquina
-- Token Cloudflare Tunnel en `EnvironmentFile` (no expuesto en `ps aux`)
-
-### Validación de uploads
-- Lista negra de extensiones: `.sh`, `.py`, `.js`, `.exe`, `.elf`, `.deb`…
-- Comprobación de magic bytes: ELF, MZ/PE, shebang (`#!`), Mach-O
-
-### Auditoría
-- Tabla `audit_log` con todos los eventos relevantes: login, setup completado, reboot, CRUD usuarios, cambios de contraseña, activación/desactivación 2FA y SSH
-- Endpoint paginado: `GET /api/system/audit-log` (solo admin)
-
-### Contraseña inicial
-Al primer arranque se genera una contraseña aleatoria impresa **una sola vez** en los logs:
-```bash
-journalctl -u homenas --no-pager | grep "FIRST RUN"
-```
-El wizard de setup obliga a cambiarla. La contraseña nueva debe tener mínimo 8 caracteres, una mayúscula y un número.
-
----
-
-## Alertas externas
-
-Configurables desde `Sistema → Alertas y notificaciones`:
-
-- **Email (SMTP)**: compatible con Gmail, Outlook, Postfix local y cualquier servidor SMTP
-- **Telegram Bot**: notificaciones instantáneas vía bot propio
-
-Eventos que disparan alertas automáticas:
-- Cuenta bloqueada por brute force
-- 2FA activado o desactivado
-- Inicio de sesión exitoso (opt-in)
-
----
-
-## Setup Wizard
-
-Al primer acceso, el wizard guía la configuración inicial en 6 pasos:
-
-1. **Bienvenido** — presentación
-2. **Cuenta** — cambio de usuario (mín. 5 chars) y contraseña (mín. 8 chars, 1 mayúscula, 1 número)
-3. **Red** — DHCP o IP estática con autodetección de la interfaz activa
-4. **Almacenamiento** — selección de discos, roles (datos/paridad/caché), tipo de pool (único/MergerFS/SnapRAID) y sistema de ficheros (ext4/xfs)
-5. **Acceso externo** — Cloudflare Tunnel (opcional)
-6. **Listo** — resumen y acceso al dashboard
-
-El wizard hace autologin automático (sin pantalla de login). Una vez completado, el autologin queda bloqueado permanentemente incluso si se resetea el flag manualmente.
-
----
-
-## Instalación en producción
+### Raspberry Pi / ARM64
 
 ```bash
-curl -fsSL http://git.jlu.app/root/homenas-v3-os/-/raw/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/install.sh | sudo bash
 ```
 
-El script:
-- Instala Node.js, pnpm y dependencias del sistema
-- Genera certificado TLS autofirmado en `/opt/homenas-v3/certs/`
-- Compila el proyecto (`pnpm build`)
-- Crea y activa el servicio systemd `homenas.service` en el puerto 443
+### PC / Servidor x86 (Ubuntu 22.04 / 24.04 · Debian 12)
 
-Acceso tras la instalación: `https://<ip-del-nas>`
-
-Obtener la contraseña generada en el primer arranque:
 ```bash
-journalctl -u homenas --no-pager | grep "FIRST RUN"
+curl -fsSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/install-x86.sh | sudo bash
+```
+
+El instalador hace todo solo: instala dependencias, configura el servicio y arranca el panel. Cuando termine, abre `https://IP-DE-TU-NAS` en el navegador.
+
+> El instalador es **idempotente**: puedes volver a ejecutarlo para actualizar una instalación existente sin perder datos.
+
+---
+
+## Qué incluye
+
+### Almacenamiento
+- **Discos** — ve el estado de todos tus discos y su temperatura en tiempo real
+- **Archivos** — navega, sube, descarga y organiza tus archivos desde el navegador
+- **Pool de datos** — combina varios discos en uno usando MergerFS
+- **Paridad** — protege tus datos frente a fallos de disco con SnapRAID
+- **Unidades de red** — conecta y monta carpetas remotas (WebDAV, SFTP, S3, SMB, FTP, Backblaze B2)
+
+### Copias de seguridad
+- **Copia en la nube** — sincroniza con cualquier servicio compatible con rclone (Dropbox, Google Drive, Backblaze, etc.)
+- **Copia activa** — agente ligero para Windows, Linux y Mac que hace backup a tu NAS directamente
+
+### Red y acceso
+- **Samba** — comparte carpetas con Windows, Mac y Linux de tu red local automáticamente
+- **WireGuard** — VPN integrada para acceder a tu NAS desde fuera de casa de forma segura
+- **NFS** — comparte carpetas con otros servidores Linux
+- **DNS personalizado** — bloquea publicidad y configura dominios locales
+
+### Aplicaciones
+- **Docker** — gestiona contenedores e imágenes sin tocar la terminal
+- **Syncthing** — sincronización continua entre dispositivos
+
+### Sistema
+- **Dashboard** — resumen en tiempo real: CPU, RAM, temperatura, red, discos
+- **Usuarios** — crea cuentas con distintos niveles de acceso
+- **Actualizaciones** — actualiza el panel y el sistema operativo con un clic
+- **Alertas** — recibe notificaciones por email o Telegram cuando algo falla
+- **2FA** — autenticación en dos pasos para mayor seguridad
+
+---
+
+## Requisitos
+
+| Componente | Mínimo |
+|---|---|
+| CPU | ARM64 (Raspberry Pi 4/5) o x86_64 |
+| RAM | 1 GB |
+| Almacenamiento del sistema | 8 GB (tarjeta SD o SSD) |
+| Sistema operativo | Raspberry Pi OS · Ubuntu 22.04/24.04 · Debian 12 |
+| Conexión | Red local |
+
+---
+
+## Actualizar
+
+El panel incluye actualizaciones con un clic desde **Sistema → Actualizaciones**. También puedes volver a ejecutar el instalador sobre una instalación existente.
+
+---
+
+## Desinstalar
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/uninstall.sh | sudo bash
 ```
 
 ---
 
-## Desinstalación
+---
 
-```bash
-curl -sSL http://git.jlu.app/root/homenas-v3-os/-/raw/main/uninstall.sh | sudo bash
-```
+# HomeNas OS — English
 
-El script:
-- Para y elimina el servicio systemd `homenas.service`
-- Borra `/opt/homenas-v3` (incluye base de datos y certificados TLS)
-- Pide confirmación antes de borrar nada
-- **No elimina** Node.js, pnpm ni git
+Control panel for your home NAS. Manage disks, files, backups, Docker, networking and more from any browser.
+
+**Version 1.0.0** · [homelabs.club](https://homelabs.club)
 
 ---
 
-## Desarrollo local
+## Installation
+
+### Raspberry Pi / ARM64
 
 ```bash
-# Instalar dependencias
-pnpm install
-
-# Terminal 1 — backend (puerto 3000)
-pnpm --filter @homenas/backend dev
-
-# Terminal 2 — frontend (puerto 5173, proxy /api → 3000)
-pnpm --filter @homenas/frontend dev
+curl -fsSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/install.sh | sudo bash
 ```
+
+### PC / Server x86 (Ubuntu 22.04 / 24.04 · Debian 12)
 
 ```bash
-# Typecheck de todos los paquetes
-pnpm -r typecheck
+curl -fsSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/install-x86.sh | sudo bash
 ```
+
+The installer handles everything: installs dependencies, sets up the service and starts the panel. When it's done, open `https://YOUR-NAS-IP` in your browser.
+
+> The installer is **idempotent**: you can run it again to update an existing installation without losing any data.
 
 ---
 
-## Deploy en el NAS
+## What's included
 
-```bash
-sshpass -p '<password>' ssh juanlu@<ip> \
-  "cd /opt/homenas-v3 && sudo -u homenas git pull && sudo -u homenas pnpm install && sudo -u homenas pnpm -r build && sudo systemctl restart homenas"
-```
+### Storage
+- **Disks** — see all your disks, their usage and temperature in real time
+- **Files** — browse, upload, download and organize your files from the browser
+- **Data pool** — combine multiple disks into one using MergerFS
+- **Parity** — protect your data against disk failures with SnapRAID
+- **Network drives** — connect and mount remote folders (WebDAV, SFTP, S3, SMB, FTP, Backblaze B2)
 
-### Resetear el wizard (para pruebas)
+### Backups
+- **Cloud backup** — sync with any rclone-compatible service (Dropbox, Google Drive, Backblaze, etc.)
+- **Active backup** — lightweight agent for Windows, Linux and Mac that backs up directly to your NAS
 
-> ⚠️ Solo resetea `setup_complete`. El autologin automático queda permanentemente bloqueado una vez que el setup se completó por primera vez.
+### Network & access
+- **Samba** — share folders with Windows, Mac and Linux on your local network automatically
+- **WireGuard** — built-in VPN to access your NAS from anywhere securely
+- **NFS** — share folders with other Linux servers
+- **Custom DNS** — block ads and set up local domains
 
-```bash
-python3 -c "
-import sqlite3
-conn = sqlite3.connect('/opt/homenas-v3/apps/backend/data/homenas.db')
-conn.execute('DELETE FROM settings WHERE key=\"setup_complete\"')
-conn.commit()
-conn.close()
-"
-sudo systemctl restart homenas
-```
+### Applications
+- **Docker** — manage containers and images without touching the terminal
+- **Syncthing** — continuous sync between devices
 
----
-
-## Flujo de almacenamiento (MergerFS + SnapRAID + caché)
-
-```
-Escritura → /mnt/storage (MergerFS)
-                │
-                ▼
-         NVMe caché (/mnt/disks/cache1)   ← escrituras rápidas
-                │
-         05:00  rsync --remove-source-files → /mnt/disks/disk1 (HDD datos)
-                │
-         06:00  snapraid sync              → /mnt/parity1 (HDD paridad)
-                │
-         07:00  snapraid scrub (domingos)  → verificación integridad
-```
-
-El botón **"Crear tareas automáticas"** en la tarjeta SnapRAID crea estas 3 tareas en el Scheduler.
-El botón **"Vaciar caché ahora"** en la tarjeta MergerFS permite el drenado manual.
+### System
+- **Dashboard** — real-time overview: CPU, RAM, temperature, network, disks
+- **Users** — create accounts with different access levels
+- **Updates** — update the panel and OS with one click
+- **Alerts** — get notified by email or Telegram when something goes wrong
+- **2FA** — two-factor authentication for extra security
 
 ---
 
-## Changelog
+## Requirements
 
-Ver [DEVLOG.md](./DEVLOG.md) para el registro completo de decisiones, bugs y cambios.
+| Component | Minimum |
+|---|---|
+| CPU | ARM64 (Raspberry Pi 4/5) or x86_64 |
+| RAM | 1 GB |
+| System storage | 8 GB (SD card or SSD) |
+| Operating system | Raspberry Pi OS · Ubuntu 22.04/24.04 · Debian 12 |
+| Network | Local network |
+
+---
+
+## Update
+
+The panel includes one-click updates from **System → Updates**. You can also re-run the installer on top of an existing installation.
+
+---
+
+## Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/uninstall.sh | sudo bash
+```
