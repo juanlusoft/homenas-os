@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─── HomeNas OS v3 — Uninstall script ─────────────────────────────────────────
-# Usage: curl -sSL http://git.jlu.app/root/homenas-v3-os/-/raw/main/uninstall.sh | sudo bash
+# Usage: curl -sSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/uninstall.sh | sudo bash
 # Removes: systemd service, /opt/homenas-v3, TLS certs
 # Does NOT remove: Node.js, pnpm, git, apt packages
 
