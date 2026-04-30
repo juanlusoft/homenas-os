@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─── HomeNas OS v3 — x86_64 installer (Ubuntu 22.04/24.04, Debian 12) ────────
+# ─── HomeNas OS — x86_64 installer (Ubuntu 22.04/24.04, Debian 12) ────────
 #
-# This script installs HomeNas OS v3 from scratch on an x86_64 machine running
+# This script installs HomeNas OS from scratch on an x86_64 machine running
 # Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, or Debian 12 (Bookworm).
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/YOUR_ORG/homenas-v3-os/main/scripts/install-x86.sh | sudo bash
+#   curl -sSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/install-x86.sh | sudo bash
 #   — or —
-#   sudo bash scripts/install-x86.sh
+#   sudo bash install-x86.sh
 #
 # What this script does:
 #   1. Verifies you are on x86_64 running a supported Debian-family distro
@@ -17,7 +17,7 @@ set -euo pipefail
 #   3. Installs pnpm, git, and all required system tools
 #   4. Installs mergerfs (from GitHub releases)
 #   5. Installs snapraid (from apt if available, otherwise builds from source)
-#   6. Clones / updates HomeNas OS v3 into /opt/homenas-v3
+#   6. Clones / updates HomeNas OS into /opt/homenas-os
 #   7. Installs pnpm dependencies and builds the project
 #   8. Generates a self-signed TLS certificate
 #   9. Creates a dedicated 'homenas' system user with appropriate sudoers
@@ -26,7 +26,7 @@ set -euo pipefail
 #
 # Idempotent: safe to run again to upgrade an existing installation.
 
-REPO="${HOMENAS_REPO:-http://git.jlu.app/root/homenas-v3-os.git}"
+REPO="${HOMENAS_REPO:-https://github.com/juanlusoft/homenas-os.git}"
 INSTALL_DIR="/opt/homenas-v3"
 SERVICE_NAME="homenas"
 PORT=443
@@ -45,7 +45,7 @@ section() { echo -e "\n${BLUE}══ $* ══${NC}"; }
 section "Preflight checks"
 
 if [[ $EUID -ne 0 ]]; then
-  error "Run as root:  sudo bash scripts/install-x86.sh"
+  error "Run as root:  sudo bash install-x86.sh"
   exit 1
 fi
 
@@ -321,7 +321,7 @@ else
   git clone "${REPO}" "${INSTALL_DIR}"
 fi
 
-APP_VERSION="3.0.0"
+APP_VERSION="1.0.0"
 if [[ -f "${INSTALL_DIR}/package.json" ]]; then
   APP_VERSION=$(grep '"version"' "${INSTALL_DIR}/package.json" | head -1 \
     | sed 's/.*"version": *"\([^"]*\)".*/\1/')

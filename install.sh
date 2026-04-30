@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─── HomeNas OS v3 — Install script ───────────────────────────────────────────
-# Usage: curl -sSL http://git.jlu.app/root/homenas-v3-os/-/raw/main/install.sh | bash
+# ─── HomeNas OS — Install script ───────────────────────────────────────────
+# Usage: curl -sSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/install.sh | bash
 # Tested on:
 #   - Raspberry Pi OS / Debian arm64
 #   - Ubuntu 22.04 / 24.04 x86_64
 #   - Debian 12 (Bookworm) x86_64
 #   - Node.js >= 18
 
-REPO="http://git.jlu.app/root/homenas-v3-os.git"
+REPO="https://github.com/juanlusoft/homenas-os.git"
 INSTALL_DIR="/opt/homenas-v3"
 SERVICE_NAME="homenas"
 PORT=443
@@ -52,7 +52,7 @@ case "${ARCH}" in
 esac
 
 # Read version from package.json after clone/update (fallback hardcoded)
-APP_VERSION="3.0.0"
+APP_VERSION="1.0.0"
 get_version() {
   local pkg="${INSTALL_DIR}/package.json"
   if [[ -f "$pkg" ]]; then
