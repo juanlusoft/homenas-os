@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { homestoreApi } from '../api/homestore'
-import type { InstallPayload, UninstallPayload } from '@homenas/shared'
+import type { InstallPayload, UninstallPayload, EditPayload } from '@homenas/shared'
 
 const CATALOG_KEY = ['homestore', 'catalog'] as const
 
@@ -77,6 +77,24 @@ export function useRestartApp() {
   })
 }
 
+// ── useEditApp ────────────────────────────────────────────────────────────────
+//
+// Note: the PATCH endpoint always responds 200 with a discriminated union, even
+// on rollback. The mutation therefore *resolves* (not rejects) for `ok:false`
+// cases — the caller must inspect the response. Only true HTTP errors (4xx/5xx
+// thrown by apiFetch) bubble up via `onError` / `mutateAsync` rejection.
+
+export function useEditApp() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: EditPayload }) =>
+      homestoreApi.editApp(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CATALOG_KEY })
+    },
+  })
+}
+
 // ── useUpdateApp ──────────────────────────────────────────────────────────────
 
 export function useUpdateApp() {
@@ -96,6 +114,24 @@ export function useAppLogs(id: string | null) {
     queryKey: ['homestore', 'logs', id],
     queryFn: () => homestoreApi.getAppLogs(id!),
     enabled: !!id,
+    staleTime: 0,
+    gcTime: 0,
+  })
+}
+
+// ── useContainerConfig ────────────────────────────────────────────────────────
+//
+// Fetches the *currently persisted* config of an installed HomeStore container.
+// The edit modal calls this on open so it can prefill ports/volumes/envVars
+// with the user's real values instead of the catalog defaults. `staleTime: 0`
+// ensures every modal open refetches — relevant if the user just edited and
+// reopened.
+
+export function useContainerConfig(id: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['homestore', 'containerConfig', id],
+    queryFn: () => homestoreApi.getContainerConfig(id!),
+    enabled: enabled && !!id,
     staleTime: 0,
     gcTime: 0,
   })

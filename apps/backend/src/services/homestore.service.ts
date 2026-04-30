@@ -6,9 +6,13 @@ import type {
   AppConfig,
   AppStatus,
   InstallPayload,
+  EditPayload,
+  EditResponse,
+  EffectiveContainerConfig,
   PortMapping,
   VolumeMapping,
   EnvVar,
+  ResourceLimits,
 } from '@homenas/shared'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -408,6 +412,53 @@ const APP_CATALOG: AppDefinition[] = [
   },
 ]
 
+// ─── Pure command builder ─────────────────────────────────────────────────────
+//
+// Builds the full `docker run` argv (starting with 'run') for a container
+// described by `config`. Pure: no I/O, no side-effects — both install and edit
+// rely on it so the two paths produce byte-identical containers.
+//
+// NOTE: validation that touches the host (path existence, port collisions,
+// image resolvability) lives in the callers — this function trusts its input.
+
+export function buildDockerRunCommand(config: AppConfig): string[] {
+  const args: string[] = ['run', '-d', '--name', config.containerName, '--restart', config.restartPolicy]
+
+  // Resource limits — only emit flags when the user actually set a value.
+  if (config.resources?.cpus && config.resources.cpus.trim() !== '') {
+    args.push('--cpus', config.resources.cpus)
+  }
+  if (config.resources?.memory && config.resources.memory.trim() !== '') {
+    args.push('--memory', config.resources.memory)
+  }
+
+  for (const p of config.ports) {
+    const proto = p.protocol ?? 'tcp'
+    args.push('-p', `${p.hostPort}:${p.containerPort}/${proto}`)
+  }
+
+  for (const v of config.volumes) {
+    // Append `:ro` when the user explicitly marked the mount read-only. `rw`
+    // is the docker default, so we omit the suffix to keep argv concise.
+    const suffix = v.mode === 'ro' ? ':ro' : ''
+    args.push('-v', `${v.hostPath}:${v.containerPath}${suffix}`)
+  }
+
+  for (const e of config.envVars) {
+    if (e.key.includes('\0') || e.value.includes('\0')) continue
+    if (e.value !== '') {
+      args.push('-e', `${e.key}=${e.value}`)
+    }
+  }
+
+  for (const arg of config.extraArgs) {
+    args.push(arg)
+  }
+
+  args.push(config.dockerImage)
+  return args
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function validateAppId(id: string): void {
@@ -484,50 +535,52 @@ async function getContainerStatus(name: string): Promise<{ status: AppStatus; co
 
 // ─── getCatalog ───────────────────────────────────────────────────────────────
 
-export async function getCatalog(): Promise<CatalogApp[]> {
-  const apps: CatalogApp[] = []
+async function buildCatalogEntry(def: AppDefinition): Promise<CatalogApp> {
+  const config = readConfig(def.id)
+  const name = config?.containerName ?? containerName(def.id)
 
-  for (const def of APP_CATALOG) {
-    const config = readConfig(def.id)
-    const name = config?.containerName ?? containerName(def.id)
+  let status: AppStatus = 'notInstalled'
+  let containerId: string | null = null
+  let installedAt: number | null = null
 
-    let status: AppStatus = 'notInstalled'
-    let containerId: string | null = null
-    let installedAt: number | null = null
-
-    if (config) {
-      installedAt = config.installedAt
-      const stateResult = await getContainerStatus(name)
-      status = stateResult.status
-      containerId = stateResult.containerId ?? config.containerId
-    }
-
-    // Build web URL from config ports or default ports
-    let webUrl: string | null = null
-    const ports = config?.ports ?? def.defaultPorts
-    const webPort = def.webPortIndex !== undefined ? ports[def.webPortIndex] : ports[0]
-    if (webPort && status === 'running') {
-      webUrl = `http://localhost:${webPort.hostPort}`
-    }
-
-    apps.push({
-      id: def.id,
-      name: def.name,
-      description: def.description,
-      icon: def.icon,
-      category: def.category,
-      dockerImage: config?.dockerImage ?? def.dockerImage,
-      defaultPorts: def.defaultPorts,
-      defaultVolumes: def.defaultVolumes,
-      defaultEnvVars: def.defaultEnvVars,
-      status,
-      containerId,
-      containerName: config?.containerName ?? null,
-      installedAt,
-      webUrl,
-    })
+  if (config) {
+    installedAt = config.installedAt
+    const stateResult = await getContainerStatus(name)
+    status = stateResult.status
+    containerId = stateResult.containerId ?? config.containerId
   }
 
+  // Build web URL from config ports or default ports
+  let webUrl: string | null = null
+  const ports = config?.ports ?? def.defaultPorts
+  const webPort = def.webPortIndex !== undefined ? ports[def.webPortIndex] : ports[0]
+  if (webPort && status === 'running') {
+    webUrl = `http://localhost:${webPort.hostPort}`
+  }
+
+  return {
+    id: def.id,
+    name: def.name,
+    description: def.description,
+    icon: def.icon,
+    category: def.category,
+    dockerImage: config?.dockerImage ?? def.dockerImage,
+    defaultPorts: def.defaultPorts,
+    defaultVolumes: def.defaultVolumes,
+    defaultEnvVars: def.defaultEnvVars,
+    status,
+    containerId,
+    containerName: config?.containerName ?? null,
+    installedAt,
+    webUrl,
+  }
+}
+
+export async function getCatalog(): Promise<CatalogApp[]> {
+  const apps: CatalogApp[] = []
+  for (const def of APP_CATALOG) {
+    apps.push(await buildCatalogEntry(def))
+  }
   return apps
 }
 
@@ -537,6 +590,41 @@ function findDefinition(id: string): AppDefinition {
   const def = APP_CATALOG.find((a) => a.id === id)
   if (!def) throw new Error(`App '${id}' not found in catalog`)
   return def
+}
+
+export async function getCatalogApp(id: string): Promise<CatalogApp> {
+  validateAppId(id)
+  return buildCatalogEntry(findDefinition(id))
+}
+
+// ─── getEffectiveConfig ───────────────────────────────────────────────────────
+//
+// Returns the currently persisted runtime config for a HomeStore-installed app
+// (the same JSON we would feed back into `buildDockerRunCommand`). Used by the
+// edit modal so it can prefill fields with what's actually running, not the
+// catalog defaults.
+//
+// Returns `null` if the app is not installed → the route layer turns that into
+// a 404 so the frontend can distinguish "no config" from a 500.
+
+export async function getEffectiveConfig(id: string): Promise<EffectiveContainerConfig | null> {
+  validateAppId(id)
+  // The id must also be a known catalog app — we don't expose configs for
+  // arbitrary docker containers through this endpoint.
+  findDefinition(id)
+
+  const config = readConfig(id)
+  if (!config) return null
+
+  return {
+    dockerImage: config.dockerImage,
+    ports: config.ports,
+    volumes: config.volumes,
+    envVars: config.envVars,
+    restartPolicy: config.restartPolicy,
+    extraArgs: config.extraArgs,
+    ...(config.resources ? { resources: config.resources } : {}),
+  }
 }
 
 // ─── installApp ───────────────────────────────────────────────────────────────
@@ -560,53 +648,24 @@ export async function installApp(id: string, payload: InstallPayload): Promise<v
   const envVars = payload.envVars ?? def.defaultEnvVars
   const restartPolicy = payload.restartPolicy ?? 'unless-stopped'
   const extraArgs = payload.extraArgs ?? []
+  const resources = payload.resources
   const name = containerName(id)
 
-  // Build docker run args — NO shell strings
-  const args: string[] = ['run', '-d', '--name', name, '--restart', restartPolicy]
-
-  for (const p of ports) {
-    const proto = p.protocol ?? 'tcp'
-    args.push('-p', `${p.hostPort}:${p.containerPort}/${proto}`)
-  }
-
+  // Host-side validation that the pure builder cannot do.
   for (const v of volumes) {
-    // Reject path traversal
     if (v.hostPath.includes('..') || v.containerPath.includes('..')) {
       throw new Error('Path traversal not allowed in volumes')
     }
-    // Create host dir if needed (best effort)
     if (!v.hostPath.startsWith('/var/run')) {
-      const mkdirResult = await exec('mkdir', ['-p', v.hostPath])
-      if (mkdirResult.exitCode !== 0) {
-        // non-fatal — Docker will error on its own if the path is bad
-      }
+      // Create host dir if needed — best effort, Docker will surface real errors.
+      await exec('mkdir', ['-p', v.hostPath])
     }
-    args.push('-v', `${v.hostPath}:${v.containerPath}`)
   }
-
   for (const e of envVars) {
-    // Reject null bytes
     if (e.key.includes('\0') || e.value.includes('\0')) {
       throw new Error('Null bytes not allowed in env vars')
     }
-    if (e.value !== '') {
-      args.push('-e', `${e.key}=${e.value}`)
-    }
   }
-
-  for (const arg of extraArgs) {
-    args.push(arg)
-  }
-
-  args.push(def.dockerImage)
-
-  const result = await exec('docker', args)
-  if (result.exitCode !== 0) {
-    throw new Error(result.stderr || 'docker run failed')
-  }
-
-  const containerId = result.stdout.trim().substring(0, 12)
 
   const config: AppConfig = {
     id,
@@ -614,12 +673,21 @@ export async function installApp(id: string, payload: InstallPayload): Promise<v
     ports,
     volumes,
     envVars,
-    containerId,
+    containerId: null,
     containerName: name,
     installedAt: Math.floor(Date.now() / 1000),
     restartPolicy,
     extraArgs,
+    ...(resources ? { resources } : {}),
   }
+
+  const args = buildDockerRunCommand(config)
+  const result = await exec('docker', args)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || 'docker run failed')
+  }
+
+  config.containerId = result.stdout.trim().substring(0, 12)
   writeConfig(config)
 }
 
@@ -698,35 +766,12 @@ export async function updateApp(id: string): Promise<void> {
   const pullResult = await exec('docker', ['pull', config.dockerImage])
   if (pullResult.exitCode !== 0) throw new Error(pullResult.stderr || 'docker pull failed')
 
-  // Stop and remove old container
+  // Stop and remove old container (no -v: preserve named volumes; bind mounts
+  // live on the host and are unaffected by `docker rm`).
   await exec('docker', ['rm', '-f', config.containerName])
 
-  // Re-create with same config
-  const args: string[] = ['run', '-d', '--name', config.containerName, '--restart', config.restartPolicy]
-
-  for (const p of config.ports) {
-    const proto = p.protocol ?? 'tcp'
-    args.push('-p', `${p.hostPort}:${p.containerPort}/${proto}`)
-  }
-
-  for (const v of config.volumes) {
-    args.push('-v', `${v.hostPath}:${v.containerPath}`)
-  }
-
-  for (const e of config.envVars) {
-    if (e.key.includes('\0') || e.value.includes('\0')) continue
-    if (e.value !== '') {
-      args.push('-e', `${e.key}=${e.value}`)
-    }
-  }
-
-  for (const arg of config.extraArgs) {
-    args.push(arg)
-  }
-
-  args.push(config.dockerImage)
-
-  const runResult = await exec('docker', args)
+  // Re-create with the same config via the shared command builder.
+  const runResult = await exec('docker', buildDockerRunCommand(config))
   if (runResult.exitCode !== 0) throw new Error(runResult.stderr || 'docker run failed after update')
 
   const newContainerId = runResult.stdout.trim().substring(0, 12)
@@ -742,4 +787,241 @@ export async function getAppLogs(id: string): Promise<string> {
 
   const result = await exec('docker', ['logs', '--tail', '500', config.containerName])
   return [result.stdout, result.stderr].filter(Boolean).join('\n')
+}
+
+// ─── editApp ──────────────────────────────────────────────────────────────────
+
+// Subset of `docker ps -a --format '{{json .}}'` rows used for port-conflict
+// detection during edit. Only the fields we actually read are typed.
+interface DockerPsRow {
+  Names?: string
+  Ports?: string
+}
+
+// Stable JSON serialization for diff comparison — sorted keys at every level so
+// that two objects with identical content but differing key order compare equal.
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) {
+    return '[' + value.map(stableStringify).join(',') + ']'
+  }
+  const obj = value as Record<string, unknown>
+  const keys = Object.keys(obj).sort()
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}'
+}
+
+// Returns the subset of fields that drive `docker run`. Comparing this subset
+// (not the whole AppConfig) means cosmetic fields like `containerId` or
+// `installedAt` never trigger a recreate.
+function runtimeShape(config: AppConfig): Record<string, unknown> {
+  return {
+    dockerImage: config.dockerImage,
+    ports: config.ports,
+    volumes: config.volumes,
+    envVars: config.envVars,
+    restartPolicy: config.restartPolicy,
+    extraArgs: config.extraArgs,
+    resources: config.resources ?? null,
+  }
+}
+
+function normalizeResources(r: ResourceLimits | undefined): ResourceLimits | undefined {
+  if (!r) return undefined
+  const cpus = r.cpus?.trim() ? r.cpus.trim() : undefined
+  const memory = r.memory?.trim() ? r.memory.trim() : undefined
+  if (!cpus && !memory) return undefined
+  return { ...(cpus ? { cpus } : {}), ...(memory ? { memory } : {}) }
+}
+
+// Re-parse "0.0.0.0:8080->80/tcp, :::8080->80/tcp" into {hostPort, proto} pairs.
+// Mirrors the parser in docker.service.ts but kept local to avoid cross-service
+// coupling — both callers want a different output shape.
+function extractPublishedHostPorts(portsStr: string): Array<{ hostPort: number; proto: string }> {
+  if (!portsStr) return []
+  const out: Array<{ hostPort: number; proto: string }> = []
+  for (const entry of portsStr.split(',').map(s => s.trim())) {
+    if (!entry) continue
+    const m = entry.match(/(?:\S+:)?(\d+)->\d+\/(\w+)/)
+    if (!m) continue
+    const hostPort = parseInt(m[1], 10)
+    if (!isNaN(hostPort)) out.push({ hostPort, proto: m[2] })
+  }
+  return out
+}
+
+// Look up published host ports across every container EXCEPT the one we're
+// editing (matched by name). Returns a Set of "PORT/PROTO" strings.
+async function getPublishedPortsFromOtherContainers(excludeName: string): Promise<Set<string>> {
+  const taken = new Set<string>()
+  const result = await exec('docker', ['ps', '-a', '--format', '{{json .}}'])
+  if (result.exitCode !== 0 || !result.stdout.trim()) return taken
+
+  for (const line of result.stdout.trim().split('\n')) {
+    if (!line.trim()) continue
+    let row: DockerPsRow
+    try { row = JSON.parse(line) as DockerPsRow } catch { continue }
+    const name = (row.Names ?? '').replace(/^\//, '').split(',')[0]
+    if (name === excludeName) continue
+    for (const p of extractPublishedHostPorts(row.Ports ?? '')) {
+      taken.add(`${p.hostPort}/${p.proto}`)
+    }
+  }
+  return taken
+}
+
+// Validate the merged config before we touch anything. Throws on the first
+// problem so the caller can surface it as a 400 / 409 to the client.
+async function validateEditedConfig(merged: AppConfig, original: AppConfig): Promise<void> {
+  // Path traversal + null bytes — same rules as installApp.
+  for (const v of merged.volumes) {
+    if (v.hostPath.includes('..') || v.containerPath.includes('..')) {
+      throw new Error('Path traversal not allowed in volumes')
+    }
+  }
+  for (const e of merged.envVars) {
+    if (e.key.includes('\0') || e.value.includes('\0')) {
+      throw new Error('Null bytes not allowed in env vars')
+    }
+  }
+
+  // Port conflicts: any host port we publish must not be claimed by a
+  // *different* container. Same-container reuse is fine (we're recreating it).
+  const taken = await getPublishedPortsFromOtherContainers(merged.containerName)
+  for (const p of merged.ports) {
+    const proto = p.protocol ?? 'tcp'
+    if (taken.has(`${p.hostPort}/${proto}`)) {
+      throw new Error(`Host port ${p.hostPort}/${proto} is already published by another container`)
+    }
+  }
+
+  // Bind-mount host paths: the spec asks us to ensure the host path *exists*.
+  // installApp creates missing dirs for the user; for edits we keep that
+  // behaviour for paths the user already accepted (unchanged volumes) but
+  // require new bind-mount sources to exist so a typo can't silently create
+  // an empty dir on a privileged path.
+  const previousHostPaths = new Set(original.volumes.map(v => v.hostPath))
+  for (const v of merged.volumes) {
+    if (v.hostPath.startsWith('/var/run')) continue // sockets, never mkdir
+    if (previousHostPaths.has(v.hostPath)) {
+      // Keep install-time behaviour for unchanged paths.
+      if (!existsSync(v.hostPath)) {
+        await exec('mkdir', ['-p', v.hostPath])
+      }
+      continue
+    }
+    if (!existsSync(v.hostPath)) {
+      throw new Error(`Volume host path does not exist: ${v.hostPath}`)
+    }
+  }
+
+  // Image must be resolvable. `docker pull --quiet` is a no-op for cached
+  // images and a real network fetch otherwise — either way exitCode ≠ 0
+  // means the tag does not resolve.
+  if (merged.dockerImage !== original.dockerImage) {
+    const pullResult = await exec('docker', ['pull', '--quiet', merged.dockerImage])
+    if (pullResult.exitCode !== 0) {
+      throw new Error(pullResult.stderr.trim() || `Cannot resolve image: ${merged.dockerImage}`)
+    }
+  }
+}
+
+export async function editApp(id: string, partial: EditPayload): Promise<EditResponse> {
+  validateAppId(id)
+  const original = readConfig(id)
+  if (!original) throw new Error(`App '${id}' is not installed`)
+
+  // Snapshot the running/stopped state BEFORE doing anything, so rollback can
+  // restore it faithfully.
+  const initialState = await getContainerStatus(original.containerName)
+  const wasRunning = initialState.status === 'running'
+
+  // Merge: arrays replace wholesale (matches install semantics — user always
+  // sends the full list of ports/volumes/envVars they want), scalars overwrite
+  // when present, resources normalise empty strings down to "unset".
+  const merged: AppConfig = {
+    ...original,
+    ...(partial.dockerImage !== undefined ? { dockerImage: partial.dockerImage } : {}),
+    ...(partial.ports !== undefined ? { ports: partial.ports } : {}),
+    ...(partial.volumes !== undefined ? { volumes: partial.volumes } : {}),
+    ...(partial.envVars !== undefined ? { envVars: partial.envVars } : {}),
+    ...(partial.restartPolicy !== undefined ? { restartPolicy: partial.restartPolicy } : {}),
+    ...(partial.extraArgs !== undefined ? { extraArgs: partial.extraArgs } : {}),
+    ...(partial.resources !== undefined
+      ? { resources: normalizeResources(partial.resources) }
+      : {}),
+  }
+
+  // Idempotent short-circuit: nothing actually changed in the runtime shape.
+  if (stableStringify(runtimeShape(original)) === stableStringify(runtimeShape(merged))) {
+    return {
+      ok: true,
+      recreated: false,
+      container: await getCatalogApp(id),
+    }
+  }
+
+  // Validate the merged config; throws → caller maps to 4xx.
+  await validateEditedConfig(merged, original)
+
+  // Tear down the existing container. `docker rm` (no -v) preserves named
+  // volumes; bind mounts live on the host, untouched. `docker stop` is a
+  // best-effort step — `rm -f` would also work but a clean stop gives
+  // applications a chance to flush.
+  await exec('docker', ['stop', original.containerName])
+  const rmResult = await exec('docker', ['rm', original.containerName])
+  if (rmResult.exitCode !== 0 && !rmResult.stderr.includes('No such container')) {
+    // Couldn't even remove the old container — nothing to roll back yet.
+    throw new Error(rmResult.stderr || 'docker rm failed')
+  }
+
+  // Try to run the new config. On failure we *must* leave the user with a
+  // working container — re-create from the original snapshot.
+  const newRun = await exec('docker', buildDockerRunCommand(merged))
+  if (newRun.exitCode !== 0) {
+    const errMsg = newRun.stderr.trim() || 'docker run failed for new config'
+
+    // Rollback: re-create the original container exactly as it was.
+    const rollback = await exec('docker', buildDockerRunCommand(original))
+    if (rollback.exitCode === 0) {
+      const restoredId = rollback.stdout.trim().substring(0, 12)
+      writeConfig({ ...original, containerId: restoredId })
+      // If the original was stopped, leave it stopped — `run -d` started it.
+      if (!wasRunning) {
+        await exec('docker', ['stop', original.containerName])
+      }
+      return {
+        ok: false,
+        error: errMsg,
+        rolledBack: true,
+        container: await getCatalogApp(id),
+      }
+    }
+
+    // Rollback itself failed. The on-disk config still describes the
+    // original container; we just couldn't recreate it. Surface the worst
+    // outcome so the operator (and the UI) can take manual action.
+    return {
+      ok: false,
+      error: `${errMsg}; rollback also failed: ${rollback.stderr.trim() || 'unknown error'}`,
+      rolledBack: false,
+      container: await getCatalogApp(id),
+    }
+  }
+
+  // Success — persist the new config.
+  const newContainerId = newRun.stdout.trim().substring(0, 12)
+  writeConfig({ ...merged, containerId: newContainerId })
+
+  // Honour the prior state: if it was stopped before, stop it again. Matches
+  // the principle of least surprise for users who deliberately keep apps
+  // halted.
+  if (!wasRunning) {
+    await exec('docker', ['stop', merged.containerName])
+  }
+
+  return {
+    ok: true,
+    recreated: true,
+    container: await getCatalogApp(id),
+  }
 }
