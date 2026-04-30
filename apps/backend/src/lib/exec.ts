@@ -85,3 +85,35 @@ export async function execWithInput(
 export function sudoWrap(command: string, args: string[]): [string, string[]] {
   return AS_ROOT ? [command, args] : ['sudo', [command, ...args]]
 }
+
+// Atomically write content to a system file owned by root. Uses `install`
+// (coreutils) via the sudo helper: writes content to a private temp file
+// owned by the current user, then `install -m <mode> -o root -g root tmp dst`
+// performs the privileged copy in one atomic step. Cleans up tmp afterwards.
+//
+// Required because the service runs as the `homenas` user, which can READ
+// /etc/samba/smb.conf, /etc/exports, /etc/wireguard/* but not WRITE them
+// directly. EACCES is what you would otherwise see.
+export async function writeFileAsRoot(
+  target: string,
+  content: string,
+  mode: number = 0o644,
+): Promise<void> {
+  const { writeFileSync, unlinkSync, mkdtempSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const path       = await import('node:path')
+
+  const dir = mkdtempSync(path.join(tmpdir(), 'homenas-write-'))
+  const tmp = path.join(dir, 'payload')
+  writeFileSync(tmp, content, { mode: 0o600 })
+  try {
+    const modeStr = mode.toString(8).padStart(4, '0')
+    const r = await exec('install', ['-m', modeStr, '-o', 'root', '-g', 'root', tmp, target])
+    if (r.exitCode !== 0) {
+      throw new Error(`writeFileAsRoot ${target} failed: ${r.stderr || r.stdout || `exit ${r.exitCode}`}`)
+    }
+  } finally {
+    try { unlinkSync(tmp) } catch {}
+    try { (await import('node:fs')).rmdirSync(dir) } catch {}
+  }
+}

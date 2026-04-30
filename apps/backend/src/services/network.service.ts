@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { mkdirSync } from 'node:fs'
 import { normalize as normalizePath } from 'node:path'
 import { execa } from 'execa'
-import { exec } from '../lib/exec.js'
+import { exec, writeFileAsRoot } from '../lib/exec.js'
 import type {
   NetworkInterface,
   WireguardStatus,
@@ -207,7 +207,7 @@ PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING 
     mkdirSync('/etc/wireguard', { recursive: true, mode: 0o700 })
   }
 
-  writeFileSync(WG0_CONF, conf, { mode: 0o600 })
+  await writeFileAsRoot(WG0_CONF, conf, 0o600)
 }
 
 // ─── startWireguard / stopWireguard / restartWireguard ───────────────────────
@@ -385,7 +385,7 @@ export async function addWireguardPeer(
   }
 
   const newConf = conf + peerBlock
-  writeFileSync(WG0_CONF, newConf, { mode: 0o600 })
+  await writeFileAsRoot(WG0_CONF, newConf, 0o600)
 
   // Sync running wg interface if active
   const syncResult = await exec('wg', ['syncconf', 'wg0', WG0_CONF])
@@ -429,7 +429,7 @@ PersistentKeepalive = 25`
     const peersDir = '/etc/wireguard/peers'
     if (!existsSync(peersDir)) mkdirSync(peersDir, { recursive: true, mode: 0o700 })
     const safeKey = clientPubKey.replace(/[^a-zA-Z0-9+/=]/g, '_')
-    writeFileSync(`${peersDir}/${safeKey}.conf`, configText, { mode: 0o600 })
+    await writeFileAsRoot(`${peersDir}/${safeKey}.conf`, configText, 0o600)
   } catch {
     // graceful — peer config saved in return value anyway
   }
@@ -454,7 +454,7 @@ export async function removeWireguardPeer(publicKey: string): Promise<void> {
       if (!section.startsWith('[Peer]')) return true
       return !section.includes(publicKey)
     })
-    writeFileSync(WG0_CONF, filtered.join(''), { mode: 0o600 })
+    await writeFileAsRoot(WG0_CONF, filtered.join(''), 0o600)
 
     // Sync if active
     await exec('wg', ['syncconf', 'wg0', WG0_CONF])
@@ -554,8 +554,8 @@ function readSmbConf(): string {
   }
 }
 
-function writeSmbConf(content: string): void {
-  writeFileSync(SMB_CONF, content, { mode: 0o644 })
+async function writeSmbConf(content: string): Promise<void> {
+  await writeFileAsRoot(SMB_CONF, content, 0o644)
 }
 
 // ─── listSambaShares ──────────────────────────────────────────────────────────
@@ -649,7 +649,7 @@ export async function createSambaShare(share: CreateSambaShareInput): Promise<Sa
   lines.push('')
 
   const conf = readSmbConf()
-  writeSmbConf(conf + '\n' + lines.join('\n'))
+  await writeSmbConf(conf + '\n' + lines.join('\n'))
 
   // Restart Samba
   await exec('systemctl', ['restart', 'smbd'])
@@ -715,7 +715,7 @@ export async function updateSambaShare(
 
   if (!found) throw new Error(`Share "${name}" not found`)
 
-  writeSmbConf(updatedSections.join(''))
+  await writeSmbConf(updatedSections.join(''))
   await exec('systemctl', ['restart', 'smbd'])
 
   // Return updated share
@@ -743,7 +743,7 @@ export async function deleteSambaShare(name: string): Promise<void> {
     throw new Error(`Share "${name}" not found`)
   }
 
-  writeSmbConf(filtered.join(''))
+  await writeSmbConf(filtered.join(''))
   await exec('systemctl', ['restart', 'smbd'])
 }
 
@@ -812,8 +812,8 @@ function readExportsFile(): string {
   }
 }
 
-function writeExportsFile(content: string): void {
-  writeFileSync(EXPORTS_FILE, content, { mode: 0o644 })
+async function writeExportsFile(content: string): Promise<void> {
+  await writeFileAsRoot(EXPORTS_FILE, content, 0o644)
 }
 
 function parseNfsExports(content: string): NfsExport[] {
@@ -937,7 +937,7 @@ export async function createNfsExport(input: CreateNfsExportInput): Promise<NfsE
   const line = buildExportLine(path, input.clients, input.options)
   const content = readExportsFile()
   const newContent = content ? `${content.trimEnd()}\n${line}\n` : `${line}\n`
-  writeExportsFile(newContent)
+  await writeExportsFile(newContent)
 
   await reloadExports()
 
