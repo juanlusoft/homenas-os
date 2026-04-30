@@ -140,10 +140,10 @@ export function AddDriveModal({ onClose }: { onClose: () => void }) {
             <select
               value={type}
               onChange={e => handleTypeChange(e.target.value as DriveType)}
-              className="w-full px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-black/10 dark:border-white/10 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             >
               {DRIVE_TYPES.map(d => (
-                <option key={d.value} value={d.value}>{d.label}</option>
+                <option key={d.value} value={d.value} className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white">{d.label}</option>
               ))}
             </select>
           </div>
