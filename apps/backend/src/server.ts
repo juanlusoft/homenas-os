@@ -11,13 +11,14 @@ const httpsOptions = (certPath && keyPath)
 
 const app = buildApp(httpsOptions)
 
+let scheduler: ReturnType<typeof createSchedulerService> | undefined
+
 async function shutdown(signal: string) {
   app.log.info(`Received ${signal} — shutting down gracefully`)
   try {
-    // Stop all scheduled cron jobs
-    createSchedulerService(app.db).shutdown()
+    scheduler?.shutdown()
   } catch {
-    // db may not be ready if shutdown happens before plugin registration
+    // scheduler may not be ready if shutdown happens before listen completes
   }
   await app.close()
   process.exit(0)
@@ -30,7 +31,9 @@ const port = parseInt(process.env.PORT ?? '3000', 10)
 
 try {
   await app.listen({ port, host: '0.0.0.0' })
-  app.log.info(`HomeNas OS v3 backend running on port ${port}${httpsOptions ? ' (HTTPS)' : ''}`)
+  scheduler = createSchedulerService(app.db)
+  scheduler.initialize()
+  app.log.info(`HomeNas OS v3 backend running on port ${port}${httpsOptions ? ' (HTTPS)' : ''} — scheduler initialized`)
 } catch (err) {
   app.log.error(err)
   process.exit(1)
