@@ -287,13 +287,27 @@ else
 fi
 chmod 600 "$KEY_PATH" "$CERT_PATH"
 
+# ── Docker (needed for the docker management panel) ──────────────────────────
+if command -v docker &>/dev/null; then
+  info "Docker already installed: $(docker --version)"
+else
+  info "Docker not found — installing via official get.docker.com script..."
+  if curl -fsSL https://get.docker.com | sh; then
+    systemctl enable --now docker
+    info "Docker installed: $(docker --version)"
+  else
+    warn "Docker install failed. The docker management panel will be unavailable."
+    warn "Retry manually: curl -fsSL https://get.docker.com | sh"
+  fi
+fi
+
 # ── Dedicated service user ────────────────────────────────────────────────────
 info "Setting up homenas system user..."
 if ! id homenas &>/dev/null; then
   useradd -r -s /usr/sbin/nologin -d "$INSTALL_DIR" -c "HomeNas OS service" homenas
 fi
 # Add to docker group so docker commands work without sudo
-usermod -aG docker homenas 2>/dev/null || true
+usermod -aG docker homenas 2>/dev/null || warn "docker group not found — skipping (Docker not installed?)"
 
 # Sudoers: homenas can run any command as root without password.
 # Required for disk ops, mount, network config, service management, etc.
