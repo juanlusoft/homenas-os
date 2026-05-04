@@ -488,21 +488,49 @@ export async function drainMergerFSCache(): Promise<void> {
   if (!status.mounted) throw new Error('MergerFS no está montado')
 
   const cacheDisk = status.drives.find(d => d.role === 'cache')
-  const dataDisk  = status.drives.find(d => d.role === 'data')
-
   if (!cacheDisk) throw new Error('No se detectó ningún disco de caché')
-  if (!dataDisk)  throw new Error('No se detectó ningún disco de datos')
 
-  // /mnt/disks/* mountpoints are root-owned and rsync needs to read from
-  // lost+found, set times, and create dirs on the data disk — all root-only.
-  // Run rsync via sudo (NOPASSWD configured for the homenas user).
-  const result = await exec('rsync', [
-    '--remove-source-files', '--archive',
-    `${cacheDisk.path}/`, `${dataDisk.path}/`,
+  // Sort data disks by free space descending (most-free first) so files are
+  // spread across all disks instead of piling onto a single one.
+  const dataDisks = status.drives
+    .filter(d => d.role === 'data')
+    .filter(d => d.totalBytes !== null && d.usedBytes !== null)
+    .sort((a, b) => (b.totalBytes! - b.usedBytes!) - (a.totalBytes! - a.usedBytes!))
+
+  if (dataDisks.length === 0) throw new Error('No se detectaron discos de datos')
+
+  let lastError: string | null = null
+
+  for (const dataDisk of dataDisks) {
+    // Stop early if the cache is already empty
+    const checkResult = await exec('find', [
+      cacheDisk.path, '-mindepth', '1', '-maxdepth', '1',
+      '!', '-name', 'lost+found',
+    ])
+    if (!checkResult.stdout.trim()) break
+
+    // --ignore-errors: skip files that don't fit (disk full) and continue.
+    // --remove-source-files only removes files that transferred successfully,
+    // so partially-fitting files stay in cache for the next disk.
+    const result = await exec('rsync', [
+      '--remove-source-files', '--archive', '--ignore-errors',
+      `${cacheDisk.path}/`, `${dataDisk.path}/`,
+    ])
+    if (result.exitCode !== 0) {
+      lastError = result.stderr || result.stdout
+    }
+  }
+
+  // Verify cache is empty; surface an error if files remain (all disks full)
+  const remaining = await exec('find', [
+    cacheDisk.path, '-mindepth', '1', '-maxdepth', '1',
+    '!', '-name', 'lost+found',
   ])
-
-  if (result.exitCode !== 0) {
-    throw new Error(`rsync falló: ${result.stderr || result.stdout}`)
+  if (remaining.stdout.trim()) {
+    throw new Error(
+      'No se pudieron mover todos los archivos: puede que todos los discos de datos estén llenos.' +
+      (lastError ? ` Último error rsync: ${lastError}` : '')
+    )
   }
 }
 
