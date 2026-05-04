@@ -88,11 +88,12 @@ async function checkAppUpdates(): Promise<AppUpdateInfo> {
 
   await execa('git', ['fetch', 'origin'], gitOpts)
 
-  // Detect branch dynamically — don't hardcode 'main'
-  const branchResult = await execa('git', ['branch', '--show-current'], gitOpts)
-  const branch = branchResult.stdout?.trim() || 'main'
+  // Use remote HEAD to detect the default branch — avoids failures when local
+  // branch is a feature branch that no longer exists on origin
+  const remoteHeadResult = await execa('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'], gitOpts)
+  const remoteRef = remoteHeadResult.stdout?.trim() || 'refs/remotes/origin/main'
 
-  const logResult = await execa('git', ['log', `HEAD..origin/${branch}`, '--oneline'], gitOpts)
+  const logResult = await execa('git', ['log', `HEAD..${remoteRef}`, '--oneline'], gitOpts)
   const pendingCommits = logResult.exitCode === 0
     ? logResult.stdout.split('\n').filter(Boolean)
     : []
@@ -164,12 +165,6 @@ async function runAppUpdate(): Promise<void> {
   try {
     append('=== Starting app update ===')
 
-    // Detect current branch dynamically
-    append('> git branch --show-current')
-    const branchResult = await run('git', ['branch', '--show-current'])
-    const branch = branchResult.stdout?.trim() || 'main'
-    append(`branch: ${branch}`)
-
     // Fetch latest from origin (prune stale/corrupted remote refs first)
     append('> git remote prune origin')
     await run('git', ['remote', 'prune', 'origin'])
@@ -181,9 +176,19 @@ async function runAppUpdate(): Promise<void> {
       throw new Error(`git fetch failed: ${fetchResult.stderr}`)
     }
 
+    // Detect the default remote branch (HEAD → origin/main or origin/master)
+    const remoteHeadResult = await run('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'])
+    const remoteHead = remoteHeadResult.stdout?.trim().replace('refs/remotes/', '') || 'origin/main'
+    append(`remote HEAD: ${remoteHead}`)
+
+    // Ensure we are on the default branch locally before resetting
+    const defaultBranch = remoteHead.replace('origin/', '')
+    const checkoutResult = await run('git', ['checkout', '-B', defaultBranch, remoteHead])
+    append(checkoutResult.all ?? '')
+
     // Hard reset to remote — more reliable than pull (no merge conflicts)
-    append(`> git reset --hard origin/${branch}`)
-    const resetResult = await run('git', ['reset', '--hard', `origin/${branch}`])
+    append(`> git reset --hard ${remoteHead}`)
+    const resetResult = await run('git', ['reset', '--hard', remoteHead])
     append(resetResult.all ?? '')
     if (resetResult.exitCode !== 0) {
       throw new Error(`git reset failed: ${resetResult.stderr}`)
