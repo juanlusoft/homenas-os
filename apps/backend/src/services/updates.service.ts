@@ -211,6 +211,12 @@ async function runAppUpdate(): Promise<void> {
       throw new Error(`pnpm install failed: ${installResult.stderr}`)
     }
 
+    // Fix ownership — dist/ dirs may have been created as root in a previous run
+    append('> chown -R homenas:homenas (repo)')
+    await execa(...sudoWrap('chown', ['-R', 'homenas:homenas', REPO_ROOT]), {
+      shell: false, reject: false,
+    })
+
     // Build all packages
     append('> pnpm -r build')
     const buildResult = await run('pnpm', ['-r', 'build'])
