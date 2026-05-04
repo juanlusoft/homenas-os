@@ -97,7 +97,10 @@ fi
 # ── System dependencies ───────────────────────────────────────────────────────
 info "Installing system dependencies..."
 
-# Base packages available on all supported platforms
+# Base packages available on all supported platforms.
+# NB: `stdbuf` is NOT an apt package — the binary ships inside `coreutils`,
+# which is already listed below. Adding stdbuf as a pkg name caused
+# "E: Unable to locate package stdbuf" on every Debian/Ubuntu install.
 BASE_PKGS=(
   xfsprogs
   e2fsprogs
@@ -112,7 +115,6 @@ BASE_PKGS=(
   hdparm
   rsync
   lsof
-  stdbuf
 )
 
 # wsdd2 (Windows WS-Discovery): available in Debian 11+ and Ubuntu 22.04+ repos.
