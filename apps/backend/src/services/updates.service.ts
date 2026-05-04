@@ -194,6 +194,13 @@ async function runAppUpdate(): Promise<void> {
       throw new Error(`git reset failed: ${resetResult.stderr}`)
     }
 
+    // Fix ownership BEFORE install — git reset/previous root runs may leave
+    // node_modules/.pnpm entries owned by root, causing EACCES during install
+    append('> chown -R homenas:homenas (repo)')
+    await execa(...sudoWrap('chown', ['-R', 'homenas:homenas', REPO_ROOT]), {
+      shell: false, reject: false,
+    })
+
     // Install dependencies — CI=true skips TTY confirmation for node_modules removal
     append('> pnpm install --frozen-lockfile')
     const installResult = await run('pnpm', ['install', '--frozen-lockfile', '--config.confirmModulesPurge=false'], {
@@ -203,12 +210,6 @@ async function runAppUpdate(): Promise<void> {
     if (installResult.exitCode !== 0) {
       throw new Error(`pnpm install failed: ${installResult.stderr}`)
     }
-
-    // Fix ownership — dist/ dirs may have been created as root in a previous run
-    append('> chown -R homenas:homenas (repo)')
-    await execa(...sudoWrap('chown', ['-R', 'homenas:homenas', REPO_ROOT]), {
-      shell: false, reject: false,
-    })
 
     // Build all packages
     append('> pnpm -r build')

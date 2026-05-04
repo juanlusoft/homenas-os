@@ -90,7 +90,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStartPre=/bin/mkdir -p ${mountPoint}
-ExecStart=/usr/bin/rclone mount ${name}: ${mountPoint} --config ${CONF_PATH} --allow-other --vfs-cache-mode writes --dir-cache-time 5m --poll-interval 30s --log-level ERROR
+ExecStart=/usr/bin/rclone mount ${name}: ${mountPoint} --config ${CONF_PATH} --allow-other --vfs-cache-mode full --dir-cache-time 5m --poll-interval 30s --log-level ERROR
 ExecStop=/bin/fusermount3 -uz ${mountPoint}
 Restart=on-failure
 RestartSec=10

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { mkdirSync } from 'node:fs'
 import { normalize as normalizePath } from 'node:path'
 import { execa } from 'execa'
-import { exec, writeFileAsRoot } from '../lib/exec.js'
+import { exec, execWithInput, writeFileAsRoot } from '../lib/exec.js'
 import type {
   NetworkInterface,
   WireguardStatus,
@@ -184,7 +184,7 @@ export async function initWireguard(input: WireguardInitInput): Promise<void> {
   const serverPrivKey = privResult.stdout.trim()
 
   // Derive server public key
-  const pubResult = await execa('wg', ['pubkey'], { input: serverPrivKey, shell: false, reject: false })
+  const pubResult = await execWithInput('wg', ['pubkey'], serverPrivKey)
   if (pubResult.exitCode !== 0) throw new Error(`Failed to derive server public key: ${pubResult.stderr}`)
   const serverPubKey = pubResult.stdout.trim()
 
