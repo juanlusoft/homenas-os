@@ -1,4 +1,5 @@
 import { exec } from '../lib/exec.js'
+import { ensureDockerAvailable } from './docker.service.js'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type {
@@ -630,6 +631,7 @@ export async function getEffectiveConfig(id: string): Promise<EffectiveContainer
 // ─── installApp ───────────────────────────────────────────────────────────────
 
 export async function installApp(id: string, payload: InstallPayload): Promise<void> {
+  await ensureDockerAvailable()
   validateAppId(id)
 
   const def = findDefinition(id)
@@ -694,6 +696,7 @@ export async function installApp(id: string, payload: InstallPayload): Promise<v
 // ─── uninstallApp ─────────────────────────────────────────────────────────────
 
 export async function uninstallApp(id: string, removeData: boolean): Promise<void> {
+  await ensureDockerAvailable()
   validateAppId(id)
 
   const config = readConfig(id)
@@ -725,6 +728,7 @@ export async function uninstallApp(id: string, removeData: boolean): Promise<voi
 // ─── startApp ────────────────────────────────────────────────────────────────
 
 export async function startApp(id: string): Promise<void> {
+  await ensureDockerAvailable()
   validateAppId(id)
   const config = readConfig(id)
   if (!config) throw new Error(`App '${id}' is not installed`)
@@ -736,6 +740,7 @@ export async function startApp(id: string): Promise<void> {
 // ─── stopApp ─────────────────────────────────────────────────────────────────
 
 export async function stopApp(id: string): Promise<void> {
+  await ensureDockerAvailable()
   validateAppId(id)
   const config = readConfig(id)
   if (!config) throw new Error(`App '${id}' is not installed`)
@@ -747,6 +752,7 @@ export async function stopApp(id: string): Promise<void> {
 // ─── restartApp ──────────────────────────────────────────────────────────────
 
 export async function restartApp(id: string): Promise<void> {
+  await ensureDockerAvailable()
   validateAppId(id)
   const config = readConfig(id)
   if (!config) throw new Error(`App '${id}' is not installed`)
@@ -758,6 +764,7 @@ export async function restartApp(id: string): Promise<void> {
 // ─── updateApp ───────────────────────────────────────────────────────────────
 
 export async function updateApp(id: string): Promise<void> {
+  await ensureDockerAvailable()
   validateAppId(id)
   const config = readConfig(id)
   if (!config) throw new Error(`App '${id}' is not installed`)
@@ -781,6 +788,7 @@ export async function updateApp(id: string): Promise<void> {
 // ─── getAppLogs ───────────────────────────────────────────────────────────────
 
 export async function getAppLogs(id: string): Promise<string> {
+  await ensureDockerAvailable()
   validateAppId(id)
   const config = readConfig(id)
   if (!config) throw new Error(`App '${id}' is not installed`)
@@ -926,6 +934,7 @@ async function validateEditedConfig(merged: AppConfig, original: AppConfig): Pro
 }
 
 export async function editApp(id: string, partial: EditPayload): Promise<EditResponse> {
+  await ensureDockerAvailable()
   validateAppId(id)
   const original = readConfig(id)
   if (!original) throw new Error(`App '${id}' is not installed`)
