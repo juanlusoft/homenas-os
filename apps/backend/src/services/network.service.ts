@@ -202,9 +202,11 @@ PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING 
 # ServerPublicKey = ${serverPubKey}
 `
 
-  // Ensure directory exists
+  // /etc/wireguard is root-owned — mkdirSync would EACCES from the homenas
+  // user. Use exec which routes through sudo, then chmod 700 for the dir.
   if (!existsSync('/etc/wireguard')) {
-    mkdirSync('/etc/wireguard', { recursive: true, mode: 0o700 })
+    const mk = await exec('mkdir', ['-p', '-m', '700', '/etc/wireguard'])
+    if (mk.exitCode !== 0) throw new Error(`Failed to create /etc/wireguard: ${mk.stderr}`)
   }
 
   await writeFileAsRoot(WG0_CONF, conf, 0o600)

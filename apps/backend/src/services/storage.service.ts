@@ -489,10 +489,13 @@ export async function drainMergerFSCache(): Promise<void> {
   if (!cacheDisk) throw new Error('No se detectó ningún disco de caché')
   if (!dataDisk)  throw new Error('No se detectó ningún disco de datos')
 
-  const result = await execa('rsync', [
+  // /mnt/disks/* mountpoints are root-owned and rsync needs to read from
+  // lost+found, set times, and create dirs on the data disk — all root-only.
+  // Run rsync via sudo (NOPASSWD configured for the homenas user).
+  const result = await exec('rsync', [
     '--remove-source-files', '--archive',
     `${cacheDisk.path}/`, `${dataDisk.path}/`,
-  ], { shell: false, reject: false })
+  ])
 
   if (result.exitCode !== 0) {
     throw new Error(`rsync falló: ${result.stderr || result.stdout}`)
