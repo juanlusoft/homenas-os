@@ -2,12 +2,21 @@
 set -euo pipefail
 
 # ─── HomeNas OS v3 — Uninstall script ─────────────────────────────────────────
-# Usage: curl -sSL https://raw.githubusercontent.com/juanlusoft/homenas-os/main/uninstall.sh | sudo bash
+# Usage:
+#   sudo bash uninstall.sh                       (interactive, asks for confirm)
+#   sudo bash uninstall.sh --yes                 (non-interactive)
+#   curl -sSL .../uninstall.sh | sudo bash -s -- --yes
 # Removes: systemd service, /opt/homenas-v3, TLS certs
 # Does NOT remove: Node.js, pnpm, git, apt packages
 
 INSTALL_DIR="/opt/homenas-v3"
 SERVICE_NAME="homenas"
+ASSUME_YES=0
+for arg in "$@"; do
+  case "$arg" in
+    -y|--yes) ASSUME_YES=1 ;;
+  esac
+done
 
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[homenas]${NC} $*"; }
@@ -25,10 +34,26 @@ warn "This will:"
 warn "  - Stop and remove the ${SERVICE_NAME} systemd service"
 warn "  - Delete ${INSTALL_DIR} (includes database and certificates)"
 echo ""
-read -rp "Are you sure? [y/N] " CONFIRM
-if [[ "${CONFIRM,,}" != "y" ]]; then
-  info "Aborted."
-  exit 0
+if (( ASSUME_YES )); then
+  info "--yes set, proceeding without prompt."
+elif [[ -t 0 ]]; then
+  # stdin is a TTY → ask normally
+  read -rp "Are you sure? [y/N] " CONFIRM
+  if [[ "${CONFIRM,,}" != "y" ]]; then
+    info "Aborted."
+    exit 0
+  fi
+elif [[ -r /dev/tty ]]; then
+  # Piped via curl|bash but TTY available → read from controlling terminal
+  read -rp "Are you sure? [y/N] " CONFIRM </dev/tty
+  if [[ "${CONFIRM,,}" != "y" ]]; then
+    info "Aborted."
+    exit 0
+  fi
+else
+  error "No interactive terminal detected (running via pipe). Re-run with --yes:"
+  error "  curl -sSL .../uninstall.sh | sudo bash -s -- --yes"
+  exit 1
 fi
 
 # ── Stop and disable service ──────────────────────────────────────────────────
