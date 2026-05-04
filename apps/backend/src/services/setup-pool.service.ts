@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
+import { writeFileSync, readFileSync } from 'node:fs'
 import { execa } from 'execa'
 import { exec, sudoWrap } from '../lib/exec.js'
 
@@ -148,7 +148,9 @@ function writeSnapraidConf(dataMounts: string[], parityMounts: string[]): void {
 
 async function mountMergerFS(cacheMounts: string[], dataMounts: string[]): Promise<void> {
   const POOL = '/mnt/storage'
-  mkdirSync(POOL, { recursive: true })
+  // /mnt/storage is root-owned — must mkdir via sudo (see same fix applied to disk mountpoints).
+  const mkdirPool = await execa(...sudoWrap('mkdir', ['-p', POOL]), { shell: false, reject: false })
+  if (mkdirPool.exitCode !== 0) throw new Error(`Failed to create pool mount point ${POOL}: ${mkdirPool.stderr}`)
 
   // Cache disks FIRST so the ff (first found) policy always writes there.
   // Data disks follow as overflow once the cache is full.
@@ -237,9 +239,15 @@ export async function configurePool(config: PoolConfig): Promise<void> {
              : d.role === 'parity' ? `/mnt/parity${pi++}`
              :                       `/mnt/disks/cache${ci++}`
 
-    mkdirSync(mp, { recursive: true })
+    // /mnt/disks and /mnt/parity* are root-owned. The backend runs as the
+    // homenas user (sudoers NOPASSWD), so mkdirSync would EACCES — use sudo.
+    const mkdirResult = await execa(...sudoWrap('mkdir', ['-p', mp]), { shell: false, reject: false })
+    if (mkdirResult.exitCode !== 0) throw new Error(`Failed to create mount point ${mp}: ${mkdirResult.stderr}`)
 
-    if (d.role === 'data') mkdirSync(`${mp}/.snapraid`, { recursive: true })
+    if (d.role === 'data') {
+      const snapraidDir = await execa(...sudoWrap('mkdir', ['-p', `${mp}/.snapraid`]), { shell: false, reject: false })
+      if (snapraidDir.exitCode !== 0) throw new Error(`Failed to create ${mp}/.snapraid: ${snapraidDir.stderr}`)
+    }
 
     const partition = partitionDevice(d.device)
     const mountResult = await execa(...sudoWrap('mount', [partition, mp]), { shell: false, reject: false })
