@@ -70,8 +70,10 @@ export async function validateRealPath(inputPath: string): Promise<string> {
     return normalized
   }
 
-  // Verify the resolved (symlink-free) path is still within allowed roots
-  const allowed = ALL_ALLOWED_ROOTS.some((root) => resolved.startsWith(root))
+  // Verify the resolved (symlink-free) path is still within allowed roots.
+  // realpath strips trailing slashes, so "/mnt" must match root "/mnt/".
+  const resolvedNorm = resolved.endsWith('/') ? resolved : `${resolved}/`
+  const allowed = ALL_ALLOWED_ROOTS.some((root) => resolvedNorm.startsWith(root))
   if (!allowed) {
     throw new Error('Path traversal via symlink not allowed')
   }

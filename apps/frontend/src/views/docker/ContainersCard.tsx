@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   Play, Square, RotateCcw, Trash2, FileText,
-  Pause, PlayCircle, ChevronDown, ChevronRight, Pencil,
+  Pause, PlayCircle, ChevronDown, ChevronRight, Pencil, ExternalLink,
 } from 'lucide-react'
 import { useContainers, useContainerAction } from '../../hooks/useDocker'
 import { useHomeCatalog } from '../../hooks/useHomeStore'
@@ -156,6 +156,20 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+function getWebPort(ports: Container['ports']): number | null {
+  const tcp = ports.filter(p => p.protocol === 'tcp' && p.hostPort !== null)
+  if (tcp.length === 0) return null
+  // Prefer common web ports, then lowest host port
+  const preferred = [80, 443, 8080, 8443, 8096, 8123, 3000, 9000, 7878, 8989, 8686, 9696]
+  for (const p of preferred) {
+    if (tcp.some(t => t.containerPort === p || t.hostPort === p)) {
+      const match = tcp.find(t => t.containerPort === p || t.hostPort === p)
+      return match?.hostPort ?? null
+    }
+  }
+  return tcp.sort((a, b) => (a.hostPort ?? 0) - (b.hostPort ?? 0))[0]?.hostPort ?? null
+}
+
 function formatPorts(ports: Container['ports']): string {
   if (!ports.length) return '—'
   return ports
@@ -284,6 +298,23 @@ function ContainerRow({
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
             )}
+            {/* Open web UI */}
+            {isRunning && (() => {
+              const webPort = getWebPort(container.ports)
+              if (!webPort) return null
+              const protocol = webPort === 443 ? 'https' : 'http'
+              return (
+                <a
+                  href={`${protocol}://${window.location.hostname}:${webPort}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Abrir interfaz web"
+                  className="p-1.5 rounded-lg bg-black/10 dark:bg-white/10 hover:bg-indigo-500/20 text-gray-600 dark:text-white/60 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )
+            })()}
             {/* Logs */}
             <button
               title={t.common.logs}
