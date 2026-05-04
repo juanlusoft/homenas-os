@@ -6,6 +6,23 @@ import { parse as parseYaml } from 'yaml'
 import { exec } from '../lib/exec.js'
 import type { Container, ComposeStack, ComposeProgress } from '@homenas/shared'
 
+// Cache: only check `which docker` once per process. Docker presence
+// doesn't change at runtime (install requires service restart anyway).
+let _dockerAvailable: boolean | null = null
+
+export async function ensureDockerAvailable(): Promise<void> {
+  if (_dockerAvailable === null) {
+    const r = await exec('which', ['docker'])
+    _dockerAvailable = r.exitCode === 0 && r.stdout.trim() !== ''
+  }
+  if (!_dockerAvailable) {
+    throw new Error(
+      'Docker no está instalado en este sistema. ' +
+      'Instálalo con: curl -fsSL https://get.docker.com | sudo sh && sudo systemctl enable --now docker'
+    )
+  }
+}
+
 // ─── Compose YAML validation ──────────────────────────────────────────────────
 
 const ALLOWED_VOLUME_PREFIXES = [
@@ -230,6 +247,9 @@ function parseMemValue(s: string): number | null {
 // ─── listContainers ───────────────────────────────────────────────────────────
 
 export async function listContainers(): Promise<Container[]> {
+  // Docker missing → empty list (UI shows "No containers" instead of 500).
+  try { await ensureDockerAvailable() } catch { return [] }
+
   const result = await exec('docker', [
     'ps', '-a',
     '--format', '{{json .}}',
@@ -327,6 +347,7 @@ export async function listContainers(): Promise<Container[]> {
 // ─── containerAction ──────────────────────────────────────────────────────────
 
 export async function containerAction(containerId: string, action: string): Promise<void> {
+  await ensureDockerAvailable()
   // Defensive validation — schema already checks, but guard at service layer too
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(containerId)) {
     throw new Error('Invalid container ID format')
@@ -348,6 +369,7 @@ export async function containerAction(containerId: string, action: string): Prom
 // ─── getContainerLogs ─────────────────────────────────────────────────────────
 
 export async function getContainerLogs(containerId: string, lines: number): Promise<string> {
+  await ensureDockerAvailable()
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(containerId)) {
     throw new Error('Invalid container ID format')
   }
@@ -373,6 +395,9 @@ interface ComposePsLine {
 
 export async function listComposeStacks(): Promise<ComposeStack[]> {
   const stacks: ComposeStack[] = []
+
+  // Docker missing → empty list (UI shows "No stacks").
+  try { await ensureDockerAvailable() } catch { return stacks }
 
   // Check if /opt/stacks exists
   const checkDir = await exec('test', ['-d', STACKS_DIR])
@@ -468,6 +493,7 @@ export async function listComposeStacks(): Promise<ComposeStack[]> {
 // ─── composeAction ────────────────────────────────────────────────────────────
 
 export async function composeAction(path: string, action: string): Promise<{ started: true }> {
+  await ensureDockerAvailable()
   if (composeState.running) {
     throw new Error('A compose operation is already running')
   }
