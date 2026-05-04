@@ -128,7 +128,13 @@ NFS_PKGS=(nfs-kernel-server)
 # ethtool: used by network.service for interface speed reporting
 EXTRA_PKGS=(ethtool)
 
-apt-get install -y --no-install-recommends "${BASE_PKGS[@]}" "${NFS_PKGS[@]}" "${EXTRA_PKGS[@]}" || true
+# Refresh apt index — without this, a stale/empty cache causes silent install
+# failures that surface much later (e.g. /etc/samba missing when writing smb.conf).
+apt-get update -qq
+
+# Required packages: fail loudly if any can't be installed (set -e aborts).
+# Don't wrap in `|| true` — a missing samba/avahi/etc. breaks later steps.
+apt-get install -y --no-install-recommends "${BASE_PKGS[@]}" "${NFS_PKGS[@]}" "${EXTRA_PKGS[@]}"
 
 # wsdd2: graceful — not critical if unavailable
 apt-get install -y --no-install-recommends "${WSDD2_PKGS[@]}" 2>/dev/null \
@@ -399,7 +405,13 @@ HOSTNAME_SHORT=$(hostname -s)
 # Write a [global] section that gives the NAS a friendly name and ensures
 # it appears in Mac Finder and Windows Explorer network browsers.
 SMB_CONF=/etc/samba/smb.conf
-if [[ ! -f "$SMB_CONF" ]] || ! grep -q '^\[global\]' "$SMB_CONF" 2>/dev/null; then
+# Defensive: if samba install failed silently the parent dir won't exist and the
+# heredoc redirect would die with "No such file or directory". Skip with warning
+# instead of crashing the whole installer.
+if [[ ! -d /etc/samba ]]; then
+  warn "/etc/samba missing — samba install failed earlier. Skipping smb.conf setup."
+  warn "Reinstall samba manually: apt-get install -y samba samba-vfs-modules"
+elif [[ ! -f "$SMB_CONF" ]] || ! grep -q '^\[global\]' "$SMB_CONF" 2>/dev/null; then
   cat > "$SMB_CONF" <<SMBEOF
 [global]
    netbios name = HOMENAS
