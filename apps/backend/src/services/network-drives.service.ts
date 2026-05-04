@@ -88,10 +88,10 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=notify
+Type=simple
 ExecStartPre=/bin/mkdir -p ${mountPoint}
-ExecStart=/usr/bin/rclone mount ${name}: ${mountPoint} --config ${CONF_PATH} --allow-other --vfs-cache-mode writes --dir-cache-time 5m --poll-interval 30s
-ExecStop=/bin/sh -c 'fusermount3 -u ${mountPoint} 2>/dev/null || fusermount -u ${mountPoint} 2>/dev/null || true'
+ExecStart=/usr/bin/rclone mount ${name}: ${mountPoint} --config ${CONF_PATH} --allow-other --vfs-cache-mode writes --dir-cache-time 5m --poll-interval 30s --log-level ERROR
+ExecStop=/bin/fusermount3 -uz ${mountPoint}
 Restart=on-failure
 RestartSec=10
 
@@ -151,7 +151,14 @@ export function createNetworkDrivesService(db: Database.Database) {
       const drive = parseRow(getStmt.get(result.lastInsertRowid) as unknown as Record<string, unknown>)
 
       if (autoMount) {
-        await this.mountDrive(drive.id)
+        try {
+          await this.mountDrive(drive.id)
+        } catch (mountErr) {
+          // Roll back DB entry so the user can retry without "Ya existe" error
+          deleteStmt.run(drive.id)
+          await removeFromConf(safeName)
+          throw mountErr
+        }
       }
 
       return drive

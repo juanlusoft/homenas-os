@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { execa } from 'execa'
-import { exec } from '../lib/exec.js'
+import { exec, sudoWrap } from '../lib/exec.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,33 +137,20 @@ async function runInstall(): Promise<void> {
   try {
     appendOutput('Starting Samba AD DC installation...')
 
-    // Set DEBIAN_FRONTEND noninteractive to suppress interactive prompts
-    const env = { ...process.env, DEBIAN_FRONTEND: 'noninteractive' }
-
-    const proc = execa(
-      'apt-get',
-      [
-        'install', '-y',
-        'samba',
-        'krb5-config',
-        'winbind',
-        'samba-dsdb-modules',
-        'samba-vfs-modules',
-      ],
-      { shell: false, reject: false, env }
+    const aptArgs = ['install', '-y', 'samba', 'krb5-config', 'winbind', 'samba-dsdb-modules', 'samba-vfs-modules']
+    const result = await execa(
+      ...sudoWrap('apt-get', aptArgs),
+      {
+        shell: false,
+        reject: false,
+        all: true,
+        env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' },
+      }
     )
 
-    const appendChunk = (chunk: Buffer) => {
-      const lines = chunk.toString().split('\n')
-      for (const line of lines) {
-        if (line.trim()) appendOutput(line)
-      }
+    for (const line of (result.all ?? '').split('\n')) {
+      if (line.trim()) appendOutput(line)
     }
-
-    if (proc.stdout) proc.stdout.on('data', appendChunk)
-    if (proc.stderr) proc.stderr.on('data', appendChunk)
-
-    const result = await proc
 
     if (result.exitCode !== 0) {
       throw new Error(`apt-get install failed (exit ${result.exitCode})`)
