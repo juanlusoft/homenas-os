@@ -33,6 +33,13 @@ export interface UpdateStatus {
   process: UpdateProcessState
 }
 
+export interface AutoUpdateConfig {
+  enabled: boolean
+  intervalMinutes: number
+  lastCheckAt: number | null
+  lastApplyAt: number | null
+}
+
 export const updatesApi = {
   getStatus: (): Promise<UpdateStatus> =>
     apiFetch('/updates/status'),
@@ -48,4 +55,10 @@ export const updatesApi = {
       method: 'POST',
       body: JSON.stringify({ packages: packages ?? [] }),
     }),
+
+  getAutoConfig: (): Promise<AutoUpdateConfig> =>
+    apiFetch('/updates/auto'),
+
+  setAutoConfig: (body: { enabled: boolean; intervalMinutes: number }): Promise<AutoUpdateConfig> =>
+    apiFetch('/updates/auto', { method: 'POST', body: JSON.stringify(body) }),
 }

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { buildApp } from './app.js'
 import { createSchedulerService } from './services/scheduler.service.js'
 import { initCacheDrainScheduler } from './services/storage.service.js'
+import { initAutoUpdatePoller } from './services/updates.service.js'
 
 // Optional HTTPS — read cert/key if paths are provided
 const certPath = process.env.CERT_PATH
@@ -35,6 +36,7 @@ try {
   scheduler = createSchedulerService(app.db)
   scheduler.initialize()
   initCacheDrainScheduler(app.db)
+  initAutoUpdatePoller(app.db)
   app.log.info(`HomeNas OS v3 backend running on port ${port}${httpsOptions ? ' (HTTPS)' : ''} — scheduler initialized`)
 } catch (err) {
   app.log.error(err)
