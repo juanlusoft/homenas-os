@@ -1,5 +1,7 @@
 import { execa } from 'execa'
+import type { Database } from 'better-sqlite3'
 import { exec, sudoWrap } from '../lib/exec.js'
+import { getSetting, setSetting } from '../lib/settings.js'
 import { resolve } from 'node:path'
 
 // Repo root is two levels up from apps/backend (WorkingDirectory in systemd)
@@ -285,5 +287,61 @@ async function runOsUpdate(packages: string[]): Promise<void> {
     processState.error = message
     processState.finishedAt = Math.floor(Date.now() / 1000)
     append(`=== ERROR: ${message} ===`)
+  }
+}
+
+// ─── Auto-update poller ───────────────────────────────────────────────────────
+
+export interface AutoUpdateConfig {
+  enabled: boolean
+  intervalMinutes: number
+}
+
+let _autoDb: Database | null = null
+let _autoTimer: ReturnType<typeof setInterval> | null = null
+let _autoConfig: AutoUpdateConfig = { enabled: true, intervalMinutes: 30 }
+let _lastAutoCheck: number | null = null
+let _lastAutoApply: number | null = null
+
+export function getAutoUpdateConfig(): AutoUpdateConfig & { lastCheckAt: number | null; lastApplyAt: number | null } {
+  return { ..._autoConfig, lastCheckAt: _lastAutoCheck, lastApplyAt: _lastAutoApply }
+}
+
+export function setAutoUpdateConfig(config: AutoUpdateConfig): void {
+  _autoConfig = { ...config }
+  if (_autoDb) setSetting(_autoDb, 'auto_update_config', JSON.stringify(config))
+  _restartAutoTimer()
+}
+
+export function initAutoUpdatePoller(db: Database): void {
+  _autoDb = db
+  const raw = getSetting(db, 'auto_update_config')
+  if (raw) {
+    try { _autoConfig = JSON.parse(raw) as AutoUpdateConfig } catch { /* use defaults */ }
+  }
+  _restartAutoTimer()
+}
+
+function _restartAutoTimer(): void {
+  if (_autoTimer) { clearInterval(_autoTimer); _autoTimer = null }
+  if (!_autoConfig.enabled) return
+  const ms = Math.max(5, _autoConfig.intervalMinutes) * 60 * 1000
+  _autoTimer = setInterval(() => { void _autoPoll() }, ms)
+  // Run once after 1 minute on startup so the first check happens quickly
+  setTimeout(() => { void _autoPoll() }, 60_000)
+}
+
+async function _autoPoll(): Promise<void> {
+  _lastAutoCheck = Date.now()
+  try {
+    const app = await checkAppUpdates()
+    if (app.pendingCommits.length === 0) return
+    if (processState.status === 'updating') return
+
+    console.log(`[auto-update] ${app.pendingCommits.length} new commit(s) detected — applying update`)
+    _lastAutoApply = Date.now()
+    updateApp()
+  } catch (err) {
+    console.error('[auto-update] poll error:', (err as Error).message)
   }
 }

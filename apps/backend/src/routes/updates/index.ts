@@ -4,6 +4,8 @@ import {
   updateApp,
   updateOs,
   getUpdateProcessState,
+  getAutoUpdateConfig,
+  setAutoUpdateConfig,
 } from '../../services/updates.service.js'
 
 // Simple in-process rate limiting (per update type)
@@ -96,5 +98,28 @@ export async function updatesRoutes(fastify: FastifyInstance) {
     preHandler: [requireAuth, requireAdmin],
   }, async (_request, reply) => {
     return reply.send(getUpdateProcessState())
+  })
+
+  // GET /api/updates/auto — auto-update config + last check/apply times
+  fastify.get('/auto', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (_request, reply) => {
+    return reply.send(getAutoUpdateConfig())
+  })
+
+  // POST /api/updates/auto — enable/disable + set interval
+  // body: { enabled: boolean, intervalMinutes: number }
+  fastify.post('/auto', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (request, reply) => {
+    const body = request.body as { enabled?: unknown; intervalMinutes?: unknown }
+    if (typeof body?.enabled !== 'boolean') {
+      return reply.status(400).send({ error: 'Bad Request', message: 'enabled must be boolean' })
+    }
+    const intervalMinutes = typeof body.intervalMinutes === 'number'
+      ? Math.max(5, Math.min(1440, body.intervalMinutes))
+      : 30
+    setAutoUpdateConfig({ enabled: body.enabled, intervalMinutes })
+    return reply.send(getAutoUpdateConfig())
   })
 }
