@@ -304,9 +304,14 @@ section "Docker"
 if command -v docker &>/dev/null; then
   info "Docker already installed: $(docker --version)"
 else
-  warn "Docker not found. The docker management panel will be unavailable."
-  warn "Install via: https://docs.docker.com/engine/install/"
-  warn "Quick install (Ubuntu): curl -fsSL https://get.docker.com | bash"
+  info "Docker not found — installing via official get.docker.com script..."
+  if curl -fsSL https://get.docker.com | sh; then
+    systemctl enable --now docker
+    info "Docker installed: $(docker --version)"
+  else
+    warn "Docker install failed. The docker management panel will be unavailable."
+    warn "Retry manually: curl -fsSL https://get.docker.com | sh"
+  fi
 fi
 
 # ── Clone / update HomeNas OS v3 ──────────────────────────────────────────────
