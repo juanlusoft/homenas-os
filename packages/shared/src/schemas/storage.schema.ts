@@ -94,3 +94,16 @@ export const BulkAddToPoolInputSchema = z.object({
   devices: z.array(z.string().regex(/^\/dev\/[a-z]{1,3}[0-9]*$/)).min(1),
 })
 export type BulkAddToPoolInput = z.infer<typeof BulkAddToPoolInputSchema>
+
+export const CacheDrainConfigSchema = z.object({
+  mode: z.enum(['off', 'time', 'size', 'both']),
+  intervalHours: z.number().int().min(1).max(168),
+  thresholdGB: z.number().int().min(1).max(100000),
+})
+export type CacheDrainConfig = z.infer<typeof CacheDrainConfigSchema>
+
+export const CacheDrainStatusSchema = CacheDrainConfigSchema.extend({
+  lastDrainAt: z.number().nullable(),
+  draining: z.boolean(),
+})
+export type CacheDrainStatus = z.infer<typeof CacheDrainStatusSchema>

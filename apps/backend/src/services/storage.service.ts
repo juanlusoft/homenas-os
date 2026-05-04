@@ -1,13 +1,17 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { execa } from 'execa'
 import type { ResultPromise } from 'execa'
+import type { Database } from 'better-sqlite3'
 import { exec } from '../lib/exec.js'
+import { getSetting, setSetting } from '../lib/settings.js'
 import type {
   Disk,
   SnapRaidStatus,
   MergerFSStatus,
   MergerFSDrive,
   BadblocksStatus,
+  CacheDrainConfig,
+  CacheDrainStatus,
 } from '@homenas/shared'
 
 // ─── Module-level state ───────────────────────────────────────────────────────
@@ -499,6 +503,74 @@ export async function drainMergerFSCache(): Promise<void> {
 
   if (result.exitCode !== 0) {
     throw new Error(`rsync falló: ${result.stderr || result.stdout}`)
+  }
+}
+
+// ─── Cache drain scheduler ────────────────────────────────────────────────────
+
+let _db: Database | null = null
+let _drainConfig: CacheDrainConfig = { mode: 'off', intervalHours: 6, thresholdGB: 50 }
+let _drainTimer: ReturnType<typeof setInterval> | null = null
+let _lastDrainAt: number | null = null
+let _draining = false
+
+export function getCacheDrainStatus(): CacheDrainStatus {
+  return { ..._drainConfig, lastDrainAt: _lastDrainAt, draining: _draining }
+}
+
+export function initCacheDrainScheduler(db: Database): void {
+  _db = db
+  const raw = getSetting(db, 'cache_drain_config')
+  if (raw) {
+    try { _drainConfig = JSON.parse(raw) as CacheDrainConfig } catch { /* use defaults */ }
+  }
+  _restartDrainTimer()
+}
+
+export function setCacheDrainConfig(config: CacheDrainConfig): void {
+  _drainConfig = { ...config }
+  if (_db) setSetting(_db, 'cache_drain_config', JSON.stringify(config))
+  _restartDrainTimer()
+}
+
+function _restartDrainTimer(): void {
+  if (_drainTimer) { clearInterval(_drainTimer); _drainTimer = null }
+  if (_drainConfig.mode === 'off') return
+  // Poll every 10 minutes; both time and size conditions are checked each tick
+  _drainTimer = setInterval(() => { void _checkAndDrain() }, 10 * 60 * 1000)
+}
+
+async function _checkAndDrain(): Promise<void> {
+  if (_draining) return
+  const { mode, intervalHours, thresholdGB } = _drainConfig
+  const now = Date.now()
+  let shouldDrain = false
+
+  if (mode === 'time' || mode === 'both') {
+    const elapsed = now - (_lastDrainAt ?? 0)
+    if (elapsed >= intervalHours * 3_600_000) shouldDrain = true
+  }
+
+  if (!shouldDrain && (mode === 'size' || mode === 'both')) {
+    try {
+      const status = await getMergerFSStatus()
+      const cache = status.drives.find(d => d.role === 'cache')
+      if (cache?.usedBytes != null && cache.usedBytes >= thresholdGB * 1_073_741_824) {
+        shouldDrain = true
+      }
+    } catch { /* getMergerFSStatus failed — skip this tick */ }
+  }
+
+  if (!shouldDrain) return
+
+  _draining = true
+  try {
+    await drainMergerFSCache()
+    _lastDrainAt = Date.now()
+  } catch (err) {
+    console.error('[cache-drain] auto drain failed:', (err as Error).message)
+  } finally {
+    _draining = false
   }
 }
 

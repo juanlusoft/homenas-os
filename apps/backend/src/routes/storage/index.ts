@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { StartSnapRaidSchema, StartBadblocksSchema, MountDiskInputSchema, CreatePoolInputSchema, BulkAddToPoolInputSchema } from '@homenas/shared'
+import { StartSnapRaidSchema, StartBadblocksSchema, MountDiskInputSchema, CreatePoolInputSchema, BulkAddToPoolInputSchema, CacheDrainConfigSchema } from '@homenas/shared'
 import {
   listDisks,
   getIoStats,
@@ -8,6 +8,8 @@ import {
   stopSnapRaid,
   getMergerFSStatus,
   drainMergerFSCache,
+  getCacheDrainStatus,
+  setCacheDrainConfig,
   getBadblocksStatus,
   startBadblocks,
   stopBadblocks,
@@ -88,6 +90,25 @@ export async function storageRoutes(fastify: FastifyInstance) {
     } catch (err) {
       return reply.status(500).send({ error: 'Storage Error', message: (err as Error).message })
     }
+  })
+
+  // GET /api/storage/mergerfs/drain-config
+  fastify.get('/mergerfs/drain-config', {
+    preHandler: [requireAuth],
+  }, async (_request, reply) => {
+    return reply.send(getCacheDrainStatus())
+  })
+
+  // POST /api/storage/mergerfs/drain-config
+  fastify.post('/mergerfs/drain-config', {
+    preHandler: [requireAuth, requireAdmin],
+  }, async (request, reply) => {
+    const result = CacheDrainConfigSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.status(400).send({ error: 'Bad Request', message: result.error.message })
+    }
+    setCacheDrainConfig(result.data)
+    return reply.send(getCacheDrainStatus())
   })
 
   // GET /api/storage/badblocks/status

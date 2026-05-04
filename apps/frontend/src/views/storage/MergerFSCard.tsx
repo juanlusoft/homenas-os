@@ -1,7 +1,8 @@
-import { HardDrive, ArrowRightLeft, Loader2 } from 'lucide-react'
-import { useMergerFSStatus, useDrainMergerFSCache } from '../../hooks/useStorage'
+import { useState, useEffect } from 'react'
+import { HardDrive, ArrowRightLeft, Loader2, Settings2 } from 'lucide-react'
+import { useMergerFSStatus, useDrainMergerFSCache, useCacheDrainStatus, useSetCacheDrainConfig } from '../../hooks/useStorage'
 import { formatBytes } from '../../lib/utils'
-import type { MergerFSDrive } from '@homenas/shared'
+import type { MergerFSDrive, CacheDrainConfig } from '@homenas/shared'
 import { useT } from '../../i18n/useT'
 
 const ROLE_STYLE: Record<MergerFSDrive['role'], string> = {
@@ -13,7 +14,22 @@ const ROLE_STYLE: Record<MergerFSDrive['role'], string> = {
 export function MergerFSCard() {
   const { data: status, isLoading } = useMergerFSStatus()
   const drain = useDrainMergerFSCache()
+  const { data: drainStatus } = useCacheDrainStatus()
+  const saveDrainConfig = useSetCacheDrainConfig()
   const t = useT()
+
+  const [showDrainSettings, setShowDrainSettings] = useState(false)
+  const [drainMode, setDrainMode] = useState<CacheDrainConfig['mode']>('off')
+  const [drainHours, setDrainHours] = useState(6)
+  const [drainGB, setDrainGB] = useState(50)
+
+  useEffect(() => {
+    if (drainStatus) {
+      setDrainMode(drainStatus.mode)
+      setDrainHours(drainStatus.intervalHours)
+      setDrainGB(drainStatus.thresholdGB)
+    }
+  }, [drainStatus])
 
   const roleLabel: Record<MergerFSDrive['role'], string> = {
     data: t.storage.dataLabel, cache: t.storage.cacheLabel, unknown: '?',
@@ -122,22 +138,121 @@ export function MergerFSCard() {
             </p>
           )}
 
-          {/* Manual cache drain */}
+          {/* Cache drain controls */}
           {status.mounted && status.drives.some(d => d.role === 'cache') && (
-            <div className="border-t border-black/5 dark:border-white/5 pt-3">
+            <div className="border-t border-black/5 dark:border-white/5 pt-3 space-y-2">
               {drain.isError && (
-                <p className="text-xs text-red-600 dark:text-red-400 mb-2">{(drain.error as Error)?.message}</p>
+                <p className="text-xs text-red-600 dark:text-red-400">{(drain.error as Error)?.message}</p>
               )}
-              <button
-                onClick={() => drain.mutate()}
-                disabled={drain.isPending}
-                className="flex items-center gap-1.5 text-xs font-medium bg-purple-500/20 hover:bg-purple-500/30 text-purple-700 dark:text-purple-300 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 w-full justify-center"
-              >
-                {drain.isPending
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Vaciando caché...</>
-                  : <><ArrowRightLeft className="w-3.5 h-3.5" />Vaciar caché ahora</>
-                }
-              </button>
+
+              {/* Manual drain + auto-drain toggle row */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => drain.mutate()}
+                  disabled={drain.isPending || drainStatus?.draining}
+                  className="flex items-center gap-1.5 text-xs font-medium bg-purple-500/20 hover:bg-purple-500/30 text-purple-700 dark:text-purple-300 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex-1 justify-center"
+                >
+                  {(drain.isPending || drainStatus?.draining)
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{t.storage.drainRunning}</>
+                    : <><ArrowRightLeft className="w-3.5 h-3.5" />Vaciar caché ahora</>
+                  }
+                </button>
+                <button
+                  onClick={() => setShowDrainSettings(v => !v)}
+                  className={`p-1.5 rounded-lg transition-colors ${showDrainSettings ? 'bg-indigo-500/20 text-indigo-500' : 'bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/40 hover:bg-black/10 dark:hover:bg-white/10'}`}
+                  title={t.storage.autoDrain}
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Auto-drain badge */}
+              {drainStatus && drainStatus.mode !== 'off' && (
+                <p className="text-xs text-gray-500 dark:text-white/40">
+                  {t.storage.autoDrain}:{' '}
+                  <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                    {drainStatus.mode === 'time' && `cada ${drainStatus.intervalHours}h`}
+                    {drainStatus.mode === 'size' && `>${drainStatus.thresholdGB} GB`}
+                    {drainStatus.mode === 'both' && `cada ${drainStatus.intervalHours}h o >${drainStatus.thresholdGB} GB`}
+                  </span>
+                  {drainStatus.lastDrainAt && (
+                    <> · {t.storage.drainLastRun}: {new Date(drainStatus.lastDrainAt).toLocaleString()}</>
+                  )}
+                </p>
+              )}
+
+              {/* Auto-drain settings panel */}
+              {showDrainSettings && (
+                <div className="bg-black/5 dark:bg-white/5 rounded-lg p-3 space-y-3 text-xs">
+                  <p className="font-medium text-gray-700 dark:text-white/70">{t.storage.autoDrain}</p>
+
+                  {/* Mode selector */}
+                  <div className="space-y-1">
+                    <p className="text-gray-500 dark:text-white/40">{t.storage.drainMode}</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      {(['off', 'time', 'size', 'both'] as const).map(m => (
+                        <button
+                          key={m}
+                          onClick={() => setDrainMode(m)}
+                          className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                            drainMode === m
+                              ? 'bg-indigo-500/30 text-indigo-700 dark:text-indigo-300'
+                              : 'bg-black/5 dark:bg-white/5 text-gray-600 dark:text-white/50 hover:bg-black/10 dark:hover:bg-white/10'
+                          }`}
+                        >
+                          {m === 'off'  && t.storage.drainOff}
+                          {m === 'time' && t.storage.drainTime}
+                          {m === 'size' && t.storage.drainSize}
+                          {m === 'both' && t.storage.drainBoth}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Interval input */}
+                  {(drainMode === 'time' || drainMode === 'both') && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-gray-500 dark:text-white/40 flex-1">{t.storage.drainInterval}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={168}
+                        value={drainHours}
+                        onChange={e => setDrainHours(Math.max(1, Math.min(168, parseInt(e.target.value) || 1)))}
+                        className="w-16 bg-black/10 dark:bg-white/10 text-gray-800 dark:text-white text-xs rounded px-2 py-1 text-right border border-black/10 dark:border-white/10"
+                      />
+                    </div>
+                  )}
+
+                  {/* Threshold input */}
+                  {(drainMode === 'size' || drainMode === 'both') && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-gray-500 dark:text-white/40 flex-1">{t.storage.drainThreshold}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100000}
+                        value={drainGB}
+                        onChange={e => setDrainGB(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-16 bg-black/10 dark:bg-white/10 text-gray-800 dark:text-white text-xs rounded px-2 py-1 text-right border border-black/10 dark:border-white/10"
+                      />
+                    </div>
+                  )}
+
+                  {/* Save button */}
+                  <button
+                    onClick={() => {
+                      saveDrainConfig.mutate({ mode: drainMode, intervalHours: drainHours, thresholdGB: drainGB })
+                      setShowDrainSettings(false)
+                    }}
+                    disabled={saveDrainConfig.isPending}
+                    className="flex items-center gap-1.5 font-medium bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 w-full justify-center"
+                  >
+                    {saveDrainConfig.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    {t.storage.drainSave}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>

@@ -7,7 +7,11 @@ import type {
   StartSnapRaidInput,
   StartBadblocksInput,
   DiskPartition,
+  CacheDrainConfig,
+  CacheDrainStatus,
 } from '@homenas/shared'
+
+export type { CacheDrainConfig, CacheDrainStatus }
 
 export type { DiskPartition }
 
@@ -45,6 +49,12 @@ export const storageApi = {
 
   drainMergerFSCache: (): Promise<{ ok: boolean }> =>
     apiFetch('/storage/mergerfs/drain', { method: 'POST', body: '{}' }),
+
+  getCacheDrainStatus: (): Promise<CacheDrainStatus> =>
+    apiFetch('/storage/mergerfs/drain-config'),
+
+  setCacheDrainConfig: (body: CacheDrainConfig): Promise<CacheDrainStatus> =>
+    apiFetch('/storage/mergerfs/drain-config', { method: 'POST', body: JSON.stringify(body) }),
 
   // Badblocks
   getBadblocksStatus: (): Promise<BadblocksStatus> =>
