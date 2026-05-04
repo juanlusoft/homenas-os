@@ -164,7 +164,7 @@ SYSTEM_PKGS=(
   hdparm
   # RAID / pool helpers
   rsync
-  stdbuf          # provides stdbuf — used by badblocks progress tracking
+  # stdbuf binary ships in coreutils (already pulled in transitively) — NOT a separate package
   lsof
   # Network
   ethtool
