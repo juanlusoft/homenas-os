@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { storageApi } from '../api/storage'
-import type { StartSnapRaidInput, StartBadblocksInput } from '@homenas/shared'
+import type { StartSnapRaidInput, StartBadblocksInput, CacheDrainConfig } from '@homenas/shared'
 
 export function useDisks() {
   return useQuery({
@@ -44,6 +44,25 @@ export function useDrainMergerFSCache() {
     mutationFn: () => storageApi.drainMergerFSCache(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['storage', 'mergerfs', 'status'] })
+      queryClient.invalidateQueries({ queryKey: ['storage', 'mergerfs', 'drain-config'] })
+    },
+  })
+}
+
+export function useCacheDrainStatus() {
+  return useQuery({
+    queryKey: ['storage', 'mergerfs', 'drain-config'],
+    queryFn: () => storageApi.getCacheDrainStatus(),
+    staleTime: 30_000,
+  })
+}
+
+export function useSetCacheDrainConfig() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (config: CacheDrainConfig) => storageApi.setCacheDrainConfig(config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['storage', 'mergerfs', 'drain-config'] })
     },
   })
 }
