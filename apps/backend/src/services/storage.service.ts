@@ -502,10 +502,10 @@ export async function drainMergerFSCache(): Promise<void> {
   let lastError: string | null = null
 
   for (const dataDisk of dataDisks) {
-    // Stop early if the cache is already empty
+    // Check for FILES only — rsync --remove-source-files leaves empty dirs behind,
+    // so checking for any directory entry would always be non-empty.
     const checkResult = await exec('find', [
-      cacheDisk.path, '-mindepth', '1', '-maxdepth', '1',
-      '!', '-name', 'lost+found',
+      cacheDisk.path, '-mindepth', '1', '-type', 'f',
     ])
     if (!checkResult.stdout.trim()) break
 
@@ -521,10 +521,16 @@ export async function drainMergerFSCache(): Promise<void> {
     }
   }
 
-  // Verify cache is empty; surface an error if files remain (all disks full)
+  // Remove empty directories left by --remove-source-files (-depth = bottom-up,
+  // so nested empty dirs are deleted before their parents in a single pass).
+  await exec('find', [
+    cacheDisk.path, '-mindepth', '1', '-depth',
+    '-type', 'd', '-empty', '!', '-name', 'lost+found', '-delete',
+  ])
+
+  // Verify no FILES remain (empty dirs were cleaned above)
   const remaining = await exec('find', [
-    cacheDisk.path, '-mindepth', '1', '-maxdepth', '1',
-    '!', '-name', 'lost+found',
+    cacheDisk.path, '-mindepth', '1', '-type', 'f',
   ])
   if (remaining.stdout.trim()) {
     throw new Error(
