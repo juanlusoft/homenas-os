@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
 
 const chunkSize = 4 * 1024 * 1024 // 4 MB
@@ -23,14 +24,21 @@ type NASClient struct {
 }
 
 func NewNASClient(baseURL, token string) *NASClient {
-	// Accept self-signed certificates — the NAS typically uses its own cert
+	// Self-signed cert from the NAS is accepted, but force at least TLS 1.2
+	// (Go default still allows 1.0/1.1). TODO: pin the cert SHA-256 once the
+	// installer publishes it alongside the token — until then this is the
+	// minimum reasonable hardening.
 	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, //nolint:gosec
+			MinVersion:         tls.VersionTLS12,
+		},
 	}
 	return &NASClient{
 		BaseURL: baseURL,
 		Token:   token,
-		HTTP:    &http.Client{Transport: transport},
+		// Hard timeout so a stuck/unreachable NAS doesn't hang uploads forever.
+		HTTP: &http.Client{Transport: transport, Timeout: 60 * time.Second},
 	}
 }
 
@@ -109,10 +117,10 @@ func (c *NASClient) UploadFile(ctx context.Context, sessionID, localPath, relPat
 	}
 	defer f.Close()
 
-	totalChunks := int(entry.Size/chunkSize) + 1
-	if entry.Size%chunkSize == 0 && entry.Size > 0 {
-		totalChunks = int(entry.Size / chunkSize)
-	}
+	// Ceiling division — handles size%chunkSize == 0 cleanly without the
+	// previous "+1 then maybe undo" dance that was off-by-one for empty
+	// files (we still need at least 1 chunk to write zero bytes).
+	totalChunks := int((entry.Size + chunkSize - 1) / chunkSize)
 	if totalChunks == 0 {
 		totalChunks = 1
 	}
@@ -196,14 +204,16 @@ func (c *NASClient) EndSession(ctx context.Context, sessionID string, manifest [
 	return nil
 }
 
-// Heartbeat polls the NAS — keeps last_seen fresh.
+// Heartbeat polls the NAS — keeps last_seen fresh. Token goes in the
+// X-Agent-Token header (same as every other request) instead of a query
+// string, so it doesn't end up in nginx/journald access logs on the NAS.
 func (c *NASClient) Heartbeat(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		c.BaseURL+"/api/active-backup/agent/poll?token="+c.Token, nil)
+		c.BaseURL+"/api/active-backup/agent/poll", nil)
 	if err != nil {
 		return err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return err
 	}
@@ -215,8 +225,12 @@ func (c *NASClient) Heartbeat(ctx context.Context) error {
 func Register(ctx context.Context, baseURL, deviceName, hostname, osType string) (string, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, //nolint:gosec
+				MinVersion:         tls.VersionTLS12,
+			},
 		},
+		Timeout: 30 * time.Second,
 	}
 	data, _ := json.Marshal(map[string]string{
 		"name":     deviceName,

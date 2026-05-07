@@ -40,6 +40,20 @@ func UninstallService() error {
 // ── Linux (systemd) ───────────────────────────────────────────────────────────
 
 func installLinux(exePath, nasURL, token string) error {
+	// Token goes in a root-only EnvironmentFile so it doesn't leak through
+	// the world-readable unit file (chmod 0644) or appear in `systemctl cat`
+	// output for non-root users.
+	if err := os.MkdirAll("/etc/homenas", 0o700); err != nil {
+		return fmt.Errorf("mkdir /etc/homenas: %w", err)
+	}
+	envContent := fmt.Sprintf("HOMENAS_NAS_URL=%s\nHOMENAS_AGENT_TOKEN=%s\n", nasURL, token)
+	if err := os.WriteFile("/etc/homenas/agent.env", []byte(envContent), 0o600); err != nil {
+		return fmt.Errorf("write agent.env: %w", err)
+	}
+	if err := os.Chmod("/etc/homenas/agent.env", 0o600); err != nil {
+		return fmt.Errorf("chmod agent.env: %w", err)
+	}
+
 	unit := fmt.Sprintf(`[Unit]
 Description=HomeNas Active Backup Agent
 After=network-online.target
@@ -47,19 +61,25 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=%s --run --nas %s --token %s
+EnvironmentFile=/etc/homenas/agent.env
+ExecStart=%s --run --nas ${HOMENAS_NAS_URL} --token ${HOMENAS_AGENT_TOKEN}
 Restart=always
 RestartSec=30
 Environment=HOME=/root
 
 [Install]
 WantedBy=multi-user.target
-`, exePath, nasURL, token)
+`, exePath)
 
 	if err := os.WriteFile("/etc/systemd/system/homenas-agent.service", []byte(unit), 0o644); err != nil {
 		return fmt.Errorf("write systemd unit: %w", err)
 	}
-	return runCmd("systemctl", "daemon-reload", "&&", "systemctl", "enable", "--now", "homenas-agent")
+	// runCmd uses exec.Command which doesn't spawn a shell — `&&` was being
+	// passed as a literal argument to systemctl. Split into two calls.
+	if err := runCmd("systemctl", "daemon-reload"); err != nil {
+		return fmt.Errorf("systemctl daemon-reload: %w", err)
+	}
+	return runCmd("systemctl", "enable", "--now", "homenas-agent")
 }
 
 func uninstallLinux() error {

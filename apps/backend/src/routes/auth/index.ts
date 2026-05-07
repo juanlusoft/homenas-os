@@ -11,8 +11,12 @@ import { totpRoutes } from './totp.js'
 
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60 // 7 days
 
-// Dummy hash used when user is not found — ensures bcrypt always runs to prevent timing attacks
-const DUMMY_HASH = '$2a$12$invalidhashusedfortimingprotection00000000000000000000000'
+// Dummy hash for the username-not-found path so bcrypt always runs and login
+// time stays constant. Must be a REAL valid bcrypt hash — an invalid one
+// short-circuits bcryptjs.compare() in 0ms, defeating the protection (a
+// real hash with cost 12 takes ~400ms, exposing existing usernames).
+// Pre-computed once at module load: bcryptjs.hashSync('not-a-real-password', 12).
+const DUMMY_HASH = bcryptjs.hashSync('homenas-dummy-not-a-real-password', 12)
 
 export async function authRoutes(fastify: FastifyInstance) {
   const { requireAuth } = fastify
