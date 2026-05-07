@@ -387,11 +387,23 @@ export function FilesView() {
   const handleContextAction = (action: string, entry: FileEntry, path: string) => {
     switch (action) {
       case 'download': {
-        const url = filesApi.getDownloadUrl(path)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = entry.name
-        a.click()
+        // getDownloadUrl is async: it fetches the file using the session
+        // header (no leak in URL) and returns a blob: URL. Revoke it after
+        // the browser has had a chance to start the download.
+        void filesApi
+          .getDownloadUrl(path)
+          .then((url) => {
+            const a = document.createElement('a')
+            a.href = url
+            a.download = entry.name
+            a.click()
+            // Defer revoke so the click handler can pick up the URL first
+            setTimeout(() => URL.revokeObjectURL(url), 1000)
+          })
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error('Download failed', err)
+          })
         break
       }
       case 'rename':
