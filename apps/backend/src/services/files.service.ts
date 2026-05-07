@@ -265,8 +265,11 @@ export async function searchFiles(basePath: string, query: string): Promise<stri
     throw new Error('Search query is required')
   }
 
-  // Sanitize query: no shell metacharacters — we pass it directly as an arg
-  const safeQuery = query.replace(/[`$\\]/g, '')
+  // Sanitize query: strip shell metacharacters and glob breakers. exec runs
+  // with shell:false so this is defense-in-depth, but it also avoids the
+  // user accidentally producing weird find globs (e.g. "*?[1-9]").
+  const safeQuery = query.replace(/[`$\\;|&<>(){}[\]*?!^"']/g, '').slice(0, 128)
+  if (!safeQuery.trim()) return []
 
   const result = await exec('find', [
     safePath,
