@@ -41,10 +41,32 @@ function rcloneType(type: DriveType): string {
   return type  // rclone 1.63+ uses these names directly
 }
 
+// rclone INI keys: rclone allows letters, digits, underscore and hyphen.
+// Reject anything else to avoid breaking the parser or smuggling new keys.
+const INI_KEY_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/
+
+function assertSafeIniKey(key: string): void {
+  if (!INI_KEY_RE.test(key)) {
+    throw new Error(`Invalid config key: ${key}`)
+  }
+}
+
+// Reject characters that would let a value start a new section, comment line,
+// or break the INI parser. \r and \n are the most dangerous (allow injecting
+// `\n[other-section]\n` to overwrite/create unrelated remotes).
+function assertSafeIniValue(key: string, value: string): void {
+  if (/[\r\n\x00]/.test(value)) {
+    throw new Error(`Invalid characters in value for key "${key}"`)
+  }
+}
+
 function buildRemoteSection(name: string, type: DriveType, config: Record<string, string>): string {
   const lines = [`[${name}]`, `type = ${rcloneType(type)}`]
   for (const [k, v] of Object.entries(config)) {
-    if (v && v.trim()) lines.push(`${k} = ${v}`)
+    if (!v || !v.trim()) continue
+    assertSafeIniKey(k)
+    assertSafeIniValue(k, v)
+    lines.push(`${k} = ${v}`)
   }
   return lines.join('\n') + '\n'
 }

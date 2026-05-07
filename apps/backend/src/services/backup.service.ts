@@ -33,6 +33,11 @@ interface RunningJob {
   output: string[]
   startedAt: number
   process: Subprocess
+  // Marks the job as cancelled/deleted by deleteJob() or cancelJob().
+  // The async .then() handler checks this before writing to the repo, so
+  // the completion handler never finalises a deleted run nor stomps on a
+  // newer job that may have started in between.
+  cancelled: boolean
 }
 
 // Module-level state — one backup at a time
@@ -61,6 +66,7 @@ export function createBackupService(db: Database) {
       if (!existing) throw new Error('Job not found')
       // Cancel if this job is currently running
       if (runningJob && runningJob.jobId === id) {
+        runningJob.cancelled = true
         try { runningJob.process.kill() } catch { /* ignore */ }
         runningJob = null
       }
@@ -114,13 +120,15 @@ export function createBackupService(db: Database) {
 
       const outputLines: string[] = []
 
-      runningJob = {
+      const thisJob: RunningJob = {
         jobId,
         runId: run.id,
         output: outputLines,
         startedAt,
         process: proc,
+        cancelled: false,
       }
+      runningJob = thisJob
 
       // Capture output line-by-line
       if (proc.all) {
@@ -138,8 +146,13 @@ export function createBackupService(db: Database) {
         })
       }
 
-      // Handle completion
+      // Handle completion. If cancelJob/deleteJob ran in the meantime,
+      // they already finalised the run (cancel) or deleted it (delete) —
+      // skip both repo writes to avoid resurrecting deleted rows or
+      // overwriting a 'cancelled' status with 'error'.
       void proc.then((result) => {
+        if (thisJob.cancelled) return
+
         const finishedAt = Math.floor(Date.now() / 1000)
         const duration = finishedAt - startedAt
         const exitCode = result.exitCode ?? 0
@@ -155,7 +168,9 @@ export function createBackupService(db: Database) {
 
         repo.updateJobStatus(jobId, status === 'success' ? 'success' : 'error', startedAt, duration)
 
-        runningJob = null
+        // Only clear runningJob if it still refers to this run — otherwise
+        // a newer job has already taken its place and we'd null it out.
+        if (runningJob === thisJob) runningJob = null
       })
 
       return { started: true }
@@ -204,26 +219,28 @@ export function createBackupService(db: Database) {
     cancelJob(): void {
       if (!runningJob) throw new Error('No job is currently running')
 
-      const { jobId, runId, startedAt, process: proc } = runningJob
+      const job = runningJob
+      job.cancelled = true
 
       try {
-        proc.kill('SIGTERM')
+        job.process.kill('SIGTERM')
       } catch {
         // ignore kill errors
       }
 
       const finishedAt = Math.floor(Date.now() / 1000)
-      const duration = finishedAt - startedAt
+      const duration = finishedAt - job.startedAt
 
-      repo.finishRun(runId, {
+      repo.finishRun(job.runId, {
         status: 'cancelled',
         exitCode: -1,
         duration,
       })
 
-      repo.updateJobStatus(jobId, 'error', startedAt, duration)
+      repo.updateJobStatus(job.jobId, 'error', job.startedAt, duration)
 
-      runningJob = null
+      // Only clear runningJob if no newer job has started in between.
+      if (runningJob === job) runningJob = null
     },
   }
 }
