@@ -387,11 +387,23 @@ export function FilesView() {
   const handleContextAction = (action: string, entry: FileEntry, path: string) => {
     switch (action) {
       case 'download': {
-        const url = filesApi.getDownloadUrl(path)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = entry.name
-        a.click()
+        // getDownloadUrl is async: it fetches the file using the session
+        // header (no leak in URL) and returns a blob: URL. Revoke it after
+        // the browser has had a chance to start the download.
+        void filesApi
+          .getDownloadUrl(path)
+          .then((url) => {
+            const a = document.createElement('a')
+            a.href = url
+            a.download = entry.name
+            a.click()
+            // Defer revoke so the click handler can pick up the URL first
+            setTimeout(() => URL.revokeObjectURL(url), 1000)
+          })
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error('Download failed', err)
+          })
         break
       }
       case 'rename':
@@ -515,7 +527,11 @@ export function FilesView() {
                   onClick={() => navigate(crumb.path)}
                   className={cn(
                     'hover:text-gray-900 dark:hover:text-white transition-colors truncate',
-                    i === breadcrumbs.length - 1 ? 'text-white font-medium' : 'text-gray-500 dark:text-white/40',
+                    // Active crumb needs both light + dark variants — previously
+                    // only `text-white` was set which is unreadable in light mode.
+                    i === breadcrumbs.length - 1
+                      ? 'text-zinc-900 dark:text-white font-medium'
+                      : 'text-gray-500 dark:text-white/40',
                   )}
                 >
                   {i === 0 ? <Home className="w-3.5 h-3.5" /> : crumb.label}

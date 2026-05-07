@@ -7,11 +7,15 @@ import { PageSpinner } from './components/PageSpinner'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const { data: setupStatus, isSuccess } = useSetupStatus()
+  const { data: setupStatus, isSuccess, isError } = useSetupStatus()
 
   if (!isAuthenticated) {
+    // If setup status request failed (backend down, network error, etc.),
+    // fall back to the login screen instead of spinning forever.
+    if (isError) return <Navigate to="/login" replace />
     if (!isSuccess) return <PageSpinner />
-    if (!setupStatus.complete) return <Navigate to="/setup" replace />
+    // Defensive: backend may return null/{} on unexpected payloads
+    if (!setupStatus?.complete) return <Navigate to="/setup" replace />
     return <Navigate to="/login" replace />
   }
 

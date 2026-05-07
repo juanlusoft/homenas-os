@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Cpu,
   MemoryStick,
@@ -57,12 +57,12 @@ function Sparkline({
 }
 
 function useHistory<T>(value: T | undefined, maxLen = HISTORY): T[] {
-  const buf = useRef<T[]>([])
+  const [buf, setBuf] = useState<T[]>([])
   useEffect(() => {
     if (value === undefined) return
-    buf.current = [...buf.current.slice(-(maxLen - 1)), value]
+    setBuf((prev) => [...prev.slice(-(maxLen - 1)), value])
   }, [value, maxLen])
-  return buf.current
+  return buf
 }
 
 // ─── Shared UI primitives ─────────────────────────────────────────────────────

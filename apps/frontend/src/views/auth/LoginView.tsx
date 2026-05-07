@@ -43,7 +43,13 @@ export function LoginView() {
       navigate('/', { replace: true })
     } catch (err) {
       const msg = err instanceof Error ? err.message : t.auth.loginFailed
-      // Server told us TOTP is required
+      // Server told us TOTP is required.
+      // TODO: backend returns a structured `requireTotp: true` flag in the
+      // 401 body — surface it through apiFetch (e.g. throw a typed
+      // ApiError with the parsed body) instead of pattern-matching the
+      // human-readable message. The string check here is a stop-gap that
+      // breaks if the message is ever localised. Until then, keep matching
+      // both the plain string and the legacy flag name.
       if (msg.includes('TOTP') || msg.includes('requireTotp')) {
         setPending({ username, password })
         setStep('totp')

@@ -8,8 +8,10 @@ export const setupApi = {
     return res.json()
   },
 
-  autologin: async (): Promise<{ sessionId: string; csrfToken: string; user: { id: number; username: string; role: 'admin' | 'user' } }> => {
-    const res = await fetch('/api/setup/autologin', { method: 'POST' })
+  autologin: async (
+    opts: { signal?: AbortSignal } = {}
+  ): Promise<{ sessionId: string; csrfToken: string; user: { id: number; username: string; role: 'admin' | 'user' } }> => {
+    const res = await fetch('/api/setup/autologin', { method: 'POST', signal: opts.signal })
     if (!res.ok) throw new Error(await res.text())
     return res.json()
   },

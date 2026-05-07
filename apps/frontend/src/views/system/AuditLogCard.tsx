@@ -51,15 +51,29 @@ export function AuditLogCard() {
     staleTime: 30_000,
   })
 
-  // Accumulate pages as user loads more
+  // Accumulate pages as user loads more.
+  // Use a Map keyed by entry id for O(1) dedup (vs the previous O(n²)
+  // Array.find inside a filter). Insertion order is preserved, and any
+  // refreshed entry from the latest page overwrites the older copy.
+  // NOTE: a future refactor to `useInfiniteQuery` from @tanstack/react-query
+  // would handle the page accumulation natively and avoid the corruption
+  // that happens when offset=0 refetches while later pages are loaded.
   const currentItems = query.data?.items ?? []
-  const displayed = offset === 0 ? currentItems : [...allEntries, ...currentItems.filter(e => !allEntries.find(x => x.id === e.id))]
   const total = query.data?.total ?? 0
+
+  let displayed: AuditEntry[]
+  if (offset === 0) {
+    displayed = currentItems
+  } else {
+    const merged = new Map<number, AuditEntry>(allEntries.map((e) => [e.id, e]))
+    for (const e of currentItems) merged.set(e.id, e)
+    displayed = Array.from(merged.values())
+  }
   const hasMore = displayed.length < total
 
   const loadMore = () => {
     setAllEntries(displayed)
-    setOffset(prev => prev + PAGE_SIZE)
+    setOffset((prev) => prev + PAGE_SIZE)
   }
 
   return (
