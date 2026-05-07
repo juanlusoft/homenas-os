@@ -182,7 +182,16 @@ export function UpdatesCard() {
                       : 'Desactivada — solo manual'
                     }
                     {autoConfig.lastApplyAt && (
-                      <> · aplicada {new Date(autoConfig.lastApplyAt).toLocaleTimeString()}</>
+                      <> · aplicada {
+                        // Backend may return either seconds (Unix) or ms.
+                        // Anything below ~10^10 is a 10-digit second timestamp
+                        // (year ≈ 2286 in ms), so multiply by 1000.
+                        new Date(
+                          autoConfig.lastApplyAt < 1e10
+                            ? autoConfig.lastApplyAt * 1000
+                            : autoConfig.lastApplyAt
+                        ).toLocaleTimeString()
+                      }</>
                     )}
                   </p>
                 )}

@@ -527,7 +527,11 @@ export function FilesView() {
                   onClick={() => navigate(crumb.path)}
                   className={cn(
                     'hover:text-gray-900 dark:hover:text-white transition-colors truncate',
-                    i === breadcrumbs.length - 1 ? 'text-white font-medium' : 'text-gray-500 dark:text-white/40',
+                    // Active crumb needs both light + dark variants — previously
+                    // only `text-white` was set which is unreadable in light mode.
+                    i === breadcrumbs.length - 1
+                      ? 'text-zinc-900 dark:text-white font-medium'
+                      : 'text-gray-500 dark:text-white/40',
                   )}
                 >
                   {i === 0 ? <Home className="w-3.5 h-3.5" /> : crumb.label}
