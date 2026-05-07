@@ -3,8 +3,11 @@ import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import bcryptjs from 'bcryptjs'
 import { execa } from 'execa'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, writeFile, mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { execWithInput, sudoWrap } from '../../lib/exec.js'
+import { logError } from '../../lib/log-store.js'
 import { getSetting, setSetting } from '../../lib/settings.js'
 import { createUsersRepo } from '../../repositories/users.repo.js'
 import { createSessionsRepo } from '../../repositories/sessions.repo.js'
@@ -57,7 +60,9 @@ async function fixPoolPermissions(): Promise<void> {
           const conf = await readFile(SMB_CONF, 'utf-8').catch(() => '')
           if (!conf.includes('[storage]')) {
             const shareSection = `\n[storage]\n   path = ${mountPoint}\n   comment = HomeNas Storage\n   browseable = yes\n   read only = no\n   valid users = @sambashare\n   create mask = 0664\n   directory mask = 0775\n`
-            const tmpPath = '/tmp/smb.conf.tmp'
+            // Unique temp file (concurrent requests would otherwise stomp /tmp/smb.conf.tmp)
+            const tmpDir = await mkdtemp(join(tmpdir(), 'homenas-smb-'))
+            const tmpPath = join(tmpDir, 'smb.conf.tmp')
             await writeFile(tmpPath, conf + shareSection)
             await execa(...sudoWrap('mv', [tmpPath, SMB_CONF]), { reject: false })
             await execa(...sudoWrap('systemctl', ['reload-or-restart', 'smbd']), { reject: false })
@@ -189,7 +194,8 @@ export async function setupRoutes(fastify: FastifyInstance) {
     usersRepo.updatePassword(request.user.id, newHash)
 
     // Create Samba user in background — non-fatal if Samba not installed
-    setupSambaUser(result.data.username, result.data.newPassword).catch(() => {})
+    setupSambaUser(result.data.username, result.data.newPassword)
+      .catch((err) => logError('setup', 'setupSambaUser failed (Samba may not be installed)', { username: result.data.username, message: err instanceof Error ? err.message : String(err) }))
 
     // Update the current session user info in the response
     return reply.send({ ok: true, username: result.data.username })
@@ -281,7 +287,8 @@ export async function setupRoutes(fastify: FastifyInstance) {
     fastify.db.prepare(`INSERT INTO audit_log (user_id, username, action, ip) VALUES (?, ?, 'setup_complete', ?)`)
       .run(request.user.id, request.user.username, request.ip)
     // Fix pool permissions so the Samba user can write — non-fatal
-    fixPoolPermissions().catch(() => {})
+    fixPoolPermissions()
+      .catch((err) => logError('setup', 'fixPoolPermissions failed (pool may not be ready)', { message: err instanceof Error ? err.message : String(err) }))
     return reply.send({ complete: true })
   })
 }

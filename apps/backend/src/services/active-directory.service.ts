@@ -188,6 +188,11 @@ export async function provisionDomain(config: ProvisionConfig): Promise<void> {
     throw new Error('Admin password must be at least 8 characters')
   }
 
+  // TODO(security): adminPassword aparece en argv y es visible vía /proc/<pid>/cmdline
+  // y `ps auxf` durante los segundos que dura la provisión. samba-tool no
+  // soporta --adminpass-from-stdin ni --adminpass-file, así que la única
+  // mitigación real es usar `expect`-style stdin interaction. Riesgo aceptado
+  // para esta release: la ventana es corta y requiere acceso local al host.
   const result = await exec('samba-tool', [
     'domain', 'provision',
     '--use-rfc2307',
@@ -312,6 +317,8 @@ export async function resetPassword(username: string, newPassword: string): Prom
   if (!validateUsername(username)) throw new Error('Invalid username')
   if (newPassword.length < 8) throw new Error('Password must be at least 8 characters')
 
+  // TODO(security): newPassword visible en argv como en provisionDomain.
+  // Misma limitación de samba-tool. Riesgo aceptado para esta release.
   const result = await exec('samba-tool', ['user', 'setpassword', username, `--newpassword=${newPassword}`])
   if (result.exitCode !== 0) throw new Error(result.stderr || 'samba-tool user setpassword failed')
 }

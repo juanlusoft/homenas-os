@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { basename } from 'node:path'
 import * as nodeCron from 'node-cron'
 import { type ScheduledTask as CronJob } from 'node-cron'
 import type { Database } from 'better-sqlite3'
@@ -10,6 +11,51 @@ const execFileAsync = promisify(execFile)
 
 // Map of task id → scheduled cron job
 const activeJobs = new Map<number, CronJob>()
+
+// Allowlist of commands that scheduled tasks are allowed to run. Anything
+// else is rejected at validation time, before reaching execFile.
+//
+// Rationale: even though execFile doesn't spawn a shell, the binary itself
+// can be a shell (`bash -c "rm -rf /"`), `sudo`, `python -c "..."`, or any
+// interpreter — turning the scheduler into an admin → root RCE. The
+// allowlist restricts tasks to backup/maintenance binaries that are safe
+// to expose to admin users.
+//
+// The allowlist matches the basename of the binary, so both `rsync` and
+// `/usr/bin/rsync` are accepted; `/bin/bash` is rejected.
+//
+// Override via env var HOMENAS_SCHEDULER_ALLOWED_COMMANDS (comma-separated).
+const DEFAULT_ALLOWED_COMMANDS = new Set<string>([
+  // backup / sync
+  'rsync', 'rclone', 'restic', 'borg', 'duplicity', 'snapraid', 'snapraid-runner',
+  'btrbk', 'snapper', 'syncthing', 'unison',
+  // filesystem maintenance
+  'btrfs', 'zfs', 'zpool', 'mdadm', 'fstrim', 'e2fsck', 'xfs_repair',
+  // monitoring (read-only mostly)
+  'smartctl', 'hdparm', 'df', 'du', 'find', 'stat',
+])
+
+const ALLOWED_COMMANDS = (() => {
+  const override = process.env['HOMENAS_SCHEDULER_ALLOWED_COMMANDS']
+  if (!override) return DEFAULT_ALLOWED_COMMANDS
+  return new Set(override.split(',').map((c) => c.trim()).filter(Boolean))
+})()
+
+function assertCommandAllowed(command: string): void {
+  if (typeof command !== 'string' || !command) {
+    throw new Error('Scheduler command is required')
+  }
+  // Basename guards against `/bin/bash` (rejected) while accepting `/usr/bin/rsync`
+  // and bare `rsync`. We forbid path separators in the basename to block
+  // attempts like `bash\0rsync` or unicode lookalikes — basename sanitises.
+  const name = basename(command)
+  if (!ALLOWED_COMMANDS.has(name)) {
+    throw new Error(
+      `Scheduler command "${name}" is not in the allowlist. ` +
+      `Allowed: ${[...ALLOWED_COMMANDS].sort().join(', ')}`,
+    )
+  }
+}
 
 function computeNextRun(cronExpression: string): number | null {
   // Use node-cron to validate and get next run (approximate: add 1 minute from now and check)
@@ -98,13 +144,20 @@ export function createSchedulerService(db: Database) {
   }
 
   return {
-    /** Load all enabled tasks from DB and schedule them. Call on startup. */
+    /** Load all enabled tasks from DB and schedule them. Call on startup.
+     * Tasks whose command is no longer in the allowlist are skipped + logged
+     * (defensive against allowlist tightening between deploys). */
     initialize() {
       const tasks = repo.list()
       for (const task of tasks) {
-        if (task.enabled) {
-          scheduleTask(task.id, task.cronExpression, task.command, task.args)
+        if (!task.enabled) continue
+        try {
+          assertCommandAllowed(task.command)
+        } catch (err) {
+          console.warn(`[scheduler] skipping disallowed task ${task.id} (${task.name}):`, (err as Error).message)
+          continue
         }
+        scheduleTask(task.id, task.cronExpression, task.command, task.args)
       }
     },
 
@@ -113,6 +166,7 @@ export function createSchedulerService(db: Database) {
     },
 
     createTask(input: CreateTaskInput): ScheduledTask {
+      assertCommandAllowed(input.command)
       const record = repo.create({
         name: input.name,
         description: input.description,
@@ -132,6 +186,11 @@ export function createSchedulerService(db: Database) {
     updateTask(id: number, input: UpdateTaskInput): ScheduledTask {
       const existing = repo.findById(id)
       if (!existing) throw new Error('Task not found')
+
+      // Allowlist check on the new command (or the existing one if the update
+      // doesn't change it — both must remain in the allowlist).
+      const effectiveCommand = input.command ?? existing.command
+      assertCommandAllowed(effectiveCommand)
 
       const updated = repo.update(id, {
         name: input.name,
@@ -180,6 +239,7 @@ export function createSchedulerService(db: Database) {
     async runNow(id: number): Promise<ScheduledTask> {
       const task = repo.findById(id)
       if (!task) throw new Error('Task not found')
+      assertCommandAllowed(task.command)
 
       const startTime = Math.floor(Date.now() / 1000)
       try {
