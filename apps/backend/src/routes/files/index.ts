@@ -14,43 +14,78 @@ import {
   searchFiles,
   getFileInfo,
   getFileLocations,
-  validateWritablePath,
-  validatePath,
+  validateWritableRealPath,
+  validateRealPath,
 } from '../../services/files.service.js'
 import { logError, logInfo } from '../../lib/log-store.js'
 
-// Extensions that are executable/dangerous regardless of content
+// Extensions that are executable/dangerous regardless of content.
+// Includes web-renderable formats (html, svg, phtml…) that could be served
+// as webshells or used for stored-XSS if the file ends up exposed via SMB/HTTP.
 const BLOCKED_EXTENSIONS = new Set([
-  '.sh', '.bash', '.zsh', '.fish', '.py', '.rb', '.pl', '.php',
-  '.js', '.mjs', '.cjs', '.ts', '.exe', '.bat', '.cmd', '.ps1',
-  '.elf', '.bin', '.deb', '.rpm', '.apk', '.jar', '.war',
+  // Unix scripts
+  '.sh', '.bash', '.zsh', '.fish', '.py', '.py3', '.pyc', '.pyo', '.rb', '.pl', '.lua',
+  // PHP / web shells
+  '.php', '.php3', '.php4', '.php5', '.php7', '.phtml', '.phar', '.phps',
+  // Java / JSP
+  '.jsp', '.jspx', '.jar', '.war', '.class',
+  // .NET / ASP
+  '.asp', '.aspx', '.ashx', '.asmx', '.cgi',
+  // Web-renderable (XSS / stored payloads)
+  '.html', '.htm', '.xhtml', '.svg', '.svgz', '.mhtml', '.xht',
+  // JavaScript / TypeScript
+  '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx',
+  // Windows executables
+  '.exe', '.dll', '.bat', '.cmd', '.com', '.scr', '.pif', '.msi', '.msp', '.mst',
+  '.ps1', '.ps2', '.psc1', '.psc2', '.psm1', '.psd1',
+  '.vbs', '.vbe', '.vba', '.wsf', '.wsh', '.hta', '.lnk', '.scf', '.gadget',
+  // macOS / Linux binaries / packages
+  '.app', '.dmg', '.deb', '.rpm', '.apk', '.elf', '.bin', '.run', '.so', '.dylib',
 ])
 
-// Magic bytes for known dangerous file types that might be disguised
+// Magic bytes for known dangerous file types that might be disguised under a
+// different extension. Variable-length signatures supported.
 const BLOCKED_MAGIC: Array<{ sig: number[]; label: string }> = [
-  { sig: [0x7f, 0x45, 0x4c, 0x46], label: 'ELF executable' },       // ELF
-  { sig: [0x4d, 0x5a],             label: 'Windows executable' },    // MZ/PE
-  { sig: [0x23, 0x21],             label: 'Script (shebang)' },      // #!
-  { sig: [0xca, 0xfe, 0xba, 0xbe], label: 'Java class/fat binary' }, // Mach-O fat
+  { sig: [0x7f, 0x45, 0x4c, 0x46], label: 'ELF executable' },             // ELF
+  { sig: [0x4d, 0x5a],             label: 'Windows executable (PE)' },     // MZ
+  { sig: [0x23, 0x21],             label: 'Script (shebang)' },            // #!
+  { sig: [0xca, 0xfe, 0xba, 0xbe], label: 'Java class / Mach-O fat' },     // Java/Mach-O
   { sig: [0xfe, 0xed, 0xfa, 0xce], label: 'Mach-O 32-bit' },
   { sig: [0xfe, 0xed, 0xfa, 0xcf], label: 'Mach-O 64-bit' },
+  { sig: [0xcf, 0xfa, 0xed, 0xfe], label: 'Mach-O 64-bit (LE)' },
+  { sig: [0x4d, 0x53, 0x43, 0x46], label: 'Windows installer (MSI)' },     // MSCF
+  { sig: [0x3c, 0x3f, 0x70, 0x68, 0x70], label: 'PHP source' },            // <?php
+  { sig: [0x3c, 0x25, 0x40], label: 'JSP/ASP page' },                      // <%@
+  { sig: [0x3c, 0x68, 0x74, 0x6d, 0x6c], label: 'HTML document' },         // <html
+  { sig: [0x3c, 0x21, 0x44, 0x4f, 0x43, 0x54, 0x59, 0x50, 0x45], label: 'HTML doctype' }, // <!DOCTYPE
+  { sig: [0x3c, 0x73, 0x76, 0x67], label: 'SVG (XML payload)' },           // <svg
 ]
+
+const MAGIC_HEAD_BYTES = 16
 
 async function checkFileSafety(filePath: string, filename: string): Promise<void> {
   const ext = extname(filename).toLowerCase()
   if (BLOCKED_EXTENSIONS.has(ext)) {
     throw new Error(`File type not allowed: ${ext}`)
   }
-  // Read first 4 bytes to check magic signature
+  // Read first MAGIC_HEAD_BYTES bytes to check magic signature regardless of extension
   const fh = await open(filePath, 'r')
-  const buf = Buffer.alloc(4)
+  const buf = Buffer.alloc(MAGIC_HEAD_BYTES)
   try {
-    await fh.read(buf, 0, 4, 0)
+    await fh.read(buf, 0, MAGIC_HEAD_BYTES, 0)
   } finally {
     await fh.close()
   }
+  // Lower-case ASCII letters in the head, so HTML detection isn't bypassed by
+  // <HTML> / <Svg> casing tricks. Bytes that aren't letters stay untouched.
+  const lower = Buffer.from(buf)
+  for (let i = 0; i < lower.length; i++) {
+    const b = lower[i]!
+    if (b >= 0x41 && b <= 0x5a) lower[i] = b + 0x20
+  }
   for (const { sig, label } of BLOCKED_MAGIC) {
-    if (sig.every((byte, i) => buf[i] === byte)) {
+    if (sig.length > lower.length) continue
+    if (sig.every((byte, i) => lower[i] === byte)) {
       throw new Error(`Blocked file type detected: ${label}`)
     }
   }
@@ -197,7 +232,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
     let safePath: string
     try {
-      safePath = validatePath(path)
+      safePath = await validateRealPath(path)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       return reply.status(403).send({ error: 'Forbidden', message })
@@ -263,7 +298,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
     let safeDest: string
     try {
-      safeDest = validateWritablePath(pathValue)
+      safeDest = await validateWritableRealPath(pathValue)
     } catch (err) {
       await rm(tmpDir, { recursive: true, force: true })
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -276,7 +311,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
     for (const file of stagedFiles) {
       const destPath = join(safeDest, file.filename)
       try {
-        validateWritablePath(destPath)
+        await validateWritableRealPath(destPath)
       } catch (err) {
         await rm(tmpDir, { recursive: true, force: true })
         const message = err instanceof Error ? err.message : 'Unknown error'
