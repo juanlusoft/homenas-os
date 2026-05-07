@@ -183,7 +183,11 @@ function InstallSection() {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight
     }
-  }, [progress?.output])
+    // React Query returns a fresh array reference on every poll even when the
+    // contents are unchanged — depending on the array itself would scroll on
+    // every refetch (every 2s). Tracking the length is a cheap proxy that only
+    // fires when the log actually grows.
+  }, [progress?.output?.length])
 
   return (
     <SectionCard className="p-5">

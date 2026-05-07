@@ -62,7 +62,9 @@ export const activeBackupApi = {
     const filename = filePath.split('/').pop() ?? 'file'
     a.download = filename
     a.click()
-    URL.revokeObjectURL(url)
+    // Firefox sometimes revokes the URL before the download stream has actually
+    // started — defer the cleanup so the click() handler has time to kick in.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   },
 
   downloadAgentPackage: async (id: number, platform: 'windows' | 'linux' | 'mac', deviceName: string): Promise<void> => {
@@ -81,6 +83,8 @@ export const activeBackupApi = {
     a.href = url
     a.download = `homenas-agent-${deviceName}-${platform}.zip`
     a.click()
-    URL.revokeObjectURL(url)
+    // See note in downloadRestoreFile — defer revoke so Firefox doesn't kill
+    // the download mid-flight.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   },
 }
