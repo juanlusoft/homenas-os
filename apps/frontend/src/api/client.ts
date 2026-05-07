@@ -46,10 +46,18 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   return res.json()
 }
 
-// Silent fetch for background checks — does NOT trigger logout on 401
+// Silent fetch for background checks — does not throw on non-2xx so callers
+// can inspect the Response themselves. Mirrors `apiFetch` for the 401 case:
+// if the session is no longer valid we proactively log the user out (the
+// store handles any redirect side-effect) but we still return the response
+// instead of raising, so the caller's loop can decide what to do.
 export async function silentFetch(path: string): Promise<Response> {
   const { sessionId } = useAuthStore.getState()
-  return fetch(`/api${path}`, {
+  const res = await fetch(`/api${path}`, {
     headers: sessionId ? { 'X-Session-Id': sessionId } : {}
   })
+  if (res.status === 401) {
+    useAuthStore.getState().logout()
+  }
+  return res
 }
