@@ -176,7 +176,8 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
   const activeIfaceData = interfaces.find(i => i.name === activeIface) ?? primary
 
   // When an interface is selected, pre-fill its current IP into the static fields
-  // and detect if it's already configured (has an IP)
+  // and detect if it's already configured (has an IP). Depends on
+  // activeIfaceData (the source of truth), not on `data` directly.
   useEffect(() => {
     if (!activeIfaceData) return
     if (activeIfaceData.ip) {
@@ -187,7 +188,7 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
     }
     setMode(activeIfaceData.isDhcp ? 'dhcp' : 'static')
     setUserEdited(false)
-  }, [activeIface, data])
+  }, [activeIfaceData])
 
   // If the interface already has an IP and the user hasn't changed anything, allow skipping save
   const canContinueDirectly = (!!activeIfaceData?.ip && !userEdited) || saved

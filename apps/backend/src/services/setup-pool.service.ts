@@ -247,8 +247,13 @@ export async function configurePool(config: PoolConfig): Promise<void> {
     throw new Error('SnapRAID requires at least one parity disk')
   }
 
-  // 1. Format all disks
-  await Promise.all(disks.map(d => formatDisk(d.device, fsType, d.role)))
+  // 1. Format all disks. Sequential because formatDisk runs `vgchange -an`
+  // / `partprobe` / `udevadm settle` which are global to the host — running
+  // them concurrently for N disks deactivates LVM mid-format on a sibling and
+  // produces flaky failures during install.
+  for (const d of disks) {
+    await formatDisk(d.device, fsType, d.role)
+  }
 
   // 2. Create mount points and mount
   const mountEntries: { partition: string; mountPoint: string; role: DiskRole }[] = []

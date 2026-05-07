@@ -39,7 +39,11 @@ function Sparkline({
   fillColor?: string
   height?: number
 }) {
-  if (points.length < 2) return null
+  // Reserve the same vertical space even with <2 points so the dashboard
+  // doesn't reflow on the first render before the second data tick arrives.
+  if (points.length < 2) {
+    return <div style={{ width: '100%', height }} aria-hidden="true" />
+  }
   const w = 300
   const h = height
   const pad = 2
@@ -296,7 +300,11 @@ function NetworkCard({ data }: { data: SystemMetrics }) {
 
 function UptimeCard({ data }: { data: SystemMetrics }) {
   const t = useT()
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'homenas'
+  // Computed once on mount so the value is stable across re-renders; reading
+  // window.location in render also crashes if the component is ever pre-rendered.
+  const [hostname] = useState(() =>
+    typeof window !== 'undefined' ? window.location.hostname : 'homenas',
+  )
   return (
     <Card>
       <CardTitle icon={<Clock className="w-4 h-4" />} title={t.dashboard.uptime} />

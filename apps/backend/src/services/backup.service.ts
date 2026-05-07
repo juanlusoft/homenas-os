@@ -130,9 +130,12 @@ export function createBackupService(db: Database) {
       }
       runningJob = thisJob
 
-      // Capture output line-by-line
+      // Capture output line-by-line. Listener removed when the stream ends
+      // or errors so we don't leak references if proc.kill() leaves it
+      // half-open.
       if (proc.all) {
-        proc.all.on('data', (chunk: Buffer | string) => {
+        const allStream = proc.all
+        const onData = (chunk: Buffer | string) => {
           const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
           const lines = text.split('\n')
           for (const line of lines) {
@@ -143,7 +146,17 @@ export function createBackupService(db: Database) {
               if (outputLines.length > 1000) outputLines.shift()
             }
           }
-        })
+        }
+        const cleanup = () => {
+          allStream.off('data', onData)
+          allStream.off('end', cleanup)
+          allStream.off('error', cleanup)
+          allStream.off('close', cleanup)
+        }
+        allStream.on('data', onData)
+        allStream.once('end', cleanup)
+        allStream.once('error', cleanup)
+        allStream.once('close', cleanup)
       }
 
       // Handle completion. If cancelJob/deleteJob ran in the meantime,

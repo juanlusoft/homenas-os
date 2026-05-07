@@ -4,7 +4,13 @@ import type { DiskPartition } from '@homenas/shared'
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 
-const DEVICE_RE = /^\/dev\/[a-z]{1,3}[0-9]{0,2}[a-z0-9]*$/
+// Strict — matches setup-pool.service.ts. Accepts:
+//   /dev/sda, /dev/sda1   (SCSI / SATA)
+//   /dev/nvme0n1, /dev/nvme0n1p1   (NVMe with namespace + partition)
+//   /dev/mmcblk0, /dev/mmcblk0p1   (eMMC / SD)
+//   /dev/vda, /dev/xvda, /dev/hda  (virtual / Xen / IDE)
+// Rejects junk like /dev/aaaaa or /dev/sda99zzz.
+const DEVICE_RE = /^\/dev\/(?:sd[a-z]{1,2}\d{0,2}|nvme\d+n\d+(?:p\d+)?|mmcblk\d+(?:p\d+)?|[hvx]d[a-z]\d{0,2})$/
 const BROWSER_ID_RE = /^[a-z0-9_-]{1,32}$/
 
 function validateDevice(device: string): void {

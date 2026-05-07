@@ -251,7 +251,14 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
     const fileName = basename(safePath)
     const safeFileName = fileName.replace(/[\r\n"\\]/g, '_')
-    reply.header('Content-Disposition', `attachment; filename="${safeFileName}"`)
+    // RFC 5987 filename* — preserves UTF-8 names (acentos, ñ, kanji…) in browsers
+    // that support it. Plain `filename=` kept as ASCII fallback for legacy clients.
+    const asciiFallback = safeFileName.replace(/[^\x20-\x7E]/g, '_')
+    const utf8Encoded = encodeURIComponent(safeFileName)
+    reply.header(
+      'Content-Disposition',
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8Encoded}`,
+    )
     reply.header('Content-Length', fileStat.size)
     reply.header('Content-Type', 'application/octet-stream')
 

@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import { basename } from 'node:path'
 import * as nodeCron from 'node-cron'
 import { type ScheduledTask as CronJob } from 'node-cron'
+import { CronExpressionParser } from 'cron-parser'
 import type { Database } from 'better-sqlite3'
 import { createSchedulerRepo } from '../repositories/scheduler.repo.js'
 import type { CreateTaskInput, UpdateTaskInput, ScheduledTask } from '@homenas/shared'
@@ -58,12 +59,13 @@ function assertCommandAllowed(command: string): void {
 }
 
 function computeNextRun(cronExpression: string): number | null {
-  // Use node-cron to validate and get next run (approximate: add 1 minute from now and check)
+  // Real next-run calculation using cron-parser. Returns Unix seconds, or null
+  // if the expression is invalid (cron-parser throws synchronously).
   try {
     if (!nodeCron.validate(cronExpression)) return null
-    // node-cron doesn't expose a "next run" API — approximate by adding ~60s
-    // For production you'd use a cron-parser library, but this is a simple approximation
-    return Math.floor(Date.now() / 1000) + 60
+    const iter = CronExpressionParser.parse(cronExpression, { tz: 'UTC' })
+    const next = iter.next().getTime()
+    return Math.floor(next / 1000)
   } catch {
     return null
   }
