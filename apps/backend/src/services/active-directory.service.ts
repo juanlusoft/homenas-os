@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { execa } from 'execa'
-import { exec, sudoWrap } from '../lib/exec.js'
+import { exec, execWithInput, sudoWrap } from '../lib/exec.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -188,18 +188,36 @@ export async function provisionDomain(config: ProvisionConfig): Promise<void> {
     throw new Error('Admin password must be at least 8 characters')
   }
 
-  const result = await exec('samba-tool', [
+  // Two-phase to keep adminPassword out of /proc/<pid>/cmdline:
+  //  1. Provision the domain WITHOUT --adminpass — samba-tool generates a
+  //     random one and prints it. We never use that random value.
+  //  2. Immediately reset Administrator's password via stdin (interactive
+  //     mode), so the real password never appears in argv.
+  // The transient random password is only valid against the local LDAP
+  // socket between phases 1 and 2 (~milliseconds, no service is started).
+  const provision = await exec('samba-tool', [
     'domain', 'provision',
     '--use-rfc2307',
     `--domain=${domain.toUpperCase()}`,
     `--realm=${realm.toUpperCase()}`,
     '--server-role=dc',
     '--dns-backend=SAMBA_INTERNAL',
-    `--adminpass=${adminPassword}`,
   ])
 
-  if (result.exitCode !== 0) {
-    throw new Error(result.stderr || 'samba-tool domain provision failed')
+  if (provision.exitCode !== 0) {
+    throw new Error(provision.stderr || 'samba-tool domain provision failed')
+  }
+
+  // samba-tool prompts twice for confirmation; sending the password twice
+  // covers both behaviours (single-prompt versions just get extra stdin
+  // they ignore once they've closed the stream).
+  const setPwd = await execWithInput(
+    'samba-tool',
+    ['user', 'setpassword', 'Administrator'],
+    `${adminPassword}\n${adminPassword}\n`,
+  )
+  if (setPwd.exitCode !== 0) {
+    throw new Error(setPwd.stderr || 'samba-tool setpassword Administrator failed')
   }
 }
 
@@ -312,7 +330,13 @@ export async function resetPassword(username: string, newPassword: string): Prom
   if (!validateUsername(username)) throw new Error('Invalid username')
   if (newPassword.length < 8) throw new Error('Password must be at least 8 characters')
 
-  const result = await exec('samba-tool', ['user', 'setpassword', username, `--newpassword=${newPassword}`])
+  // samba-tool reads the new password from stdin when --newpassword is omitted.
+  // Sending it twice covers versions that prompt for confirmation.
+  const result = await execWithInput(
+    'samba-tool',
+    ['user', 'setpassword', username],
+    `${newPassword}\n${newPassword}\n`,
+  )
   if (result.exitCode !== 0) throw new Error(result.stderr || 'samba-tool user setpassword failed')
 }
 

@@ -112,12 +112,17 @@ async function deliverEmail(db: Database, subject: string, text: string): Promis
   if (!host || !to) return
 
   const pass = decryptSecret(passEnc)
+  // TLS verification is ON by default. Only opt out if the user has
+  // explicitly enabled `notif_email_insecure_tls` (for LAN SMTP relays
+  // with self-signed certs). Disabling it globally lets a MITM intercept
+  // SMTP credentials and rewrite alerts.
+  const insecureTls = (getSetting(db, 'notif_email_insecure_tls') ?? '0') === '1'
   const transporter = nodemailer.createTransport({
     host,
     port,
     secure,
     auth: user ? { user, pass } : undefined,
-    tls: { rejectUnauthorized: false }, // allow self-signed certs on LAN SMTP servers
+    ...(insecureTls ? { tls: { rejectUnauthorized: false } } : {}),
   })
 
   await transporter.sendMail({

@@ -253,19 +253,33 @@ function AddFolderModal({
 
 function DevicesTab() {
   const { data: devices, isLoading, error } = useSyncthingDevices()
+  const { data: folders } = useSyncthingFolders()
   const { data: syncStatus } = useSyncStatus()
   const removeDevice = useRemoveDevice()
   const [showAdd, setShowAdd] = useState(false)
   const t = useT()
 
+  // Sync % per device. We don't have per-(device,folder) data from the
+  // backend, so we approximate by taking the minimum completion across the
+  // folders that are actually shared with this device. Previously this used
+  // a single global Math.min, which made every device show the same %.
+  // TODO: expose Syncthing's /rest/db/completion per device+folder in the
+  // backend for an exact value.
   const getSyncPercent = (deviceId: string): number | null => {
-    // Overall completion is the average of all folders for this device
-    // The API returns per-folder completion; here we show the minimum
     if (!syncStatus || syncStatus.length === 0) return null
-    const min = Math.min(...syncStatus.map((s) => s.completion))
-    return min
-    // Note: Syncthing's /rest/db/completion can be called per-device+folder
-    // for full accuracy; we use the global folder average as an approximation here.
+    if (!folders || folders.length === 0) return null
+
+    const folderIdsForDevice = new Set(
+      folders
+        .filter((f) => f.devices.some((d) => d.deviceID === deviceId))
+        .map((f) => f.id)
+    )
+    if (folderIdsForDevice.size === 0) return null
+
+    const relevant = syncStatus.filter((s) => folderIdsForDevice.has(s.folderId))
+    if (relevant.length === 0) return null
+
+    return Math.min(...relevant.map((s) => s.completion))
   }
 
   return (

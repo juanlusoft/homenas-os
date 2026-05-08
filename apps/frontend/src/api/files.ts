@@ -100,10 +100,25 @@ export const filesApi = {
       headers: getHeaders(false),
     }).then((r) => handleResponse<FileInfo>(r)),
 
-  getDownloadUrl: (path: string): string => {
-    const { sessionId } = useAuthStore.getState()
-    // Include session via query param for direct browser download links
-    return `/api/files/download?path=${encodeURIComponent(path)}&_sid=${encodeURIComponent(sessionId ?? '')}`
+  // Downloads the file using the session header (NOT a query string), then
+  // returns a short-lived blob: URL safe to assign to `<a href>`. The caller
+  // is responsible for calling URL.revokeObjectURL() once the download starts.
+  //
+  // TODO(security): when the backend exposes POST /api/files/download-token,
+  // switch to that flow (request a one-shot token, then build a clean URL like
+  // `/api/files/download?path=...&token=...`). This avoids the blob round-trip
+  // for very large files and lets the browser stream straight to disk.
+  getDownloadUrl: async (path: string): Promise<string> => {
+    const res = await fetch(`/api/files/download?path=${encodeURIComponent(path)}`, {
+      headers: getHeaders(false),
+    })
+    if (res.status === 401) {
+      useAuthStore.getState().logout()
+      throw new Error('UNAUTHORIZED')
+    }
+    if (!res.ok) throw new Error(await res.text())
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
   },
 
   upload: (destDir: string, files: File[], onProgress?: (pct: number) => void): Promise<{ ok: boolean; files: string[] }> => {

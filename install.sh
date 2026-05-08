@@ -267,13 +267,26 @@ cd "$INSTALL_DIR"
 get_version
 info "HomeNas OS v${APP_VERSION}"
 
-# ── Install dependencies ──────────────────────────────────────────────────────
-info "Installing dependencies..."
-pnpm install --frozen-lockfile
+# ── Dedicated service user (must exist BEFORE pnpm install) ───────────────────
+# Creating the user up here means we can run `pnpm install` as the homenas
+# user, so npm postinstall scripts in transitive deps don't execute as root.
+info "Setting up homenas system user..."
+if ! id homenas &>/dev/null; then
+  useradd -r -s /usr/sbin/nologin -d "$INSTALL_DIR" -c "HomeNas OS service" homenas
+fi
+chown -R homenas:homenas "$INSTALL_DIR"
+git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
+sudo -u homenas git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
-# ── Build ─────────────────────────────────────────────────────────────────────
+# ── Install dependencies (as homenas, NOT root) ───────────────────────────────
+# postinstall scripts of any compromised npm transitive dep would otherwise
+# run as root with full system access.
+info "Installing dependencies..."
+sudo -u homenas pnpm install --frozen-lockfile
+
+# ── Build (as homenas) ────────────────────────────────────────────────────────
 info "Building frontend and backend..."
-NODE_ENV=production pnpm -r build
+sudo -u homenas NODE_ENV=production pnpm -r build
 
 # ── Self-signed TLS certificate ───────────────────────────────────────────────
 info "Generating self-signed TLS certificate..."
@@ -309,28 +322,23 @@ else
   fi
 fi
 
-# ── Dedicated service user ────────────────────────────────────────────────────
-info "Setting up homenas system user..."
-if ! id homenas &>/dev/null; then
-  useradd -r -s /usr/sbin/nologin -d "$INSTALL_DIR" -c "HomeNas OS service" homenas
-fi
-# Add to docker group so docker commands work without sudo
+# ── Docker group for homenas ──────────────────────────────────────────────────
+# Docker installed earlier in the script (or by an earlier install). Add the
+# user to the docker group so the homestore service can run docker commands
+# without needing sudo for them.
 usermod -aG docker homenas 2>/dev/null || warn "docker group not found — skipping (Docker not installed?)"
 
 # Sudoers: homenas can run any command as root without password.
-# Required for disk ops, mount, network config, service management, etc.
+# TODO(security): replace with an enumerated allowlist of /usr/bin/lsblk,
+# /usr/sbin/smartctl, /bin/mount, /bin/umount, /usr/bin/systemctl restart …
+# and the rest of the privileged commands the backend actually invokes.
+# Currently NOPASSWD: ALL means any RCE in the Node backend = root.
 cat > /etc/sudoers.d/homenas <<'SUDOEOF'
 homenas ALL=(root) NOPASSWD: ALL
 SUDOEOF
 chmod 440 /etc/sudoers.d/homenas
 
-# Fix ownership so homenas can read/write/execute the install dir (including git ops)
-chown -R homenas:homenas "$INSTALL_DIR"
 chmod 750 "$CERT_DIR"
-
-# Ensure git trusts this directory when run as homenas (or root via sudo)
-git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
-sudo -u homenas git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
 # ── Systemd service ───────────────────────────────────────────────────────────
 info "Creating systemd service..."

@@ -105,6 +105,6 @@ export function useCreateDevice() {
   return useMutation({
     mutationFn: (input: { name: string; hostname?: string | null; os_type: 'windows' | 'mac' | 'linux' }) =>
       activeBackupApi.createDevice(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['ab-devices'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['active-backup', 'devices'] }),
   })
 }

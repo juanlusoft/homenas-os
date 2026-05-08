@@ -36,11 +36,21 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls = 'w-full px-3 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-colors placeholder-gray-400 dark:placeholder-white/30'
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Treats backend-masked secrets ('' or '****') as "no change".
+// Returns true when the field should be stripped from the PATCH payload.
+function isMaskedSecret(v: string | undefined | null): boolean {
+  return v === '' || v === '****'
+}
+
 // ─── Email form ───────────────────────────────────────────────────────────────
 
 function EmailForm({ initial }: { initial: EmailConfig }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState<EmailConfig>(initial)
+  // Always start the password input empty so the user knows that typing
+  // overwrites the stored secret and leaving it blank keeps it intact.
+  const [form, setForm] = useState<EmailConfig>({ ...initial, password: '' })
   const [dirty, setDirty] = useState(false)
 
   const set = (patch: Partial<EmailConfig>) => {
@@ -49,7 +59,12 @@ function EmailForm({ initial }: { initial: EmailConfig }) {
   }
 
   const save = useMutation({
-    mutationFn: () => notificationsApi.updateEmail({ ...form }),
+    mutationFn: () => {
+      // Omit password if user didn't change it (kept as masked/empty).
+      const { password, ...rest } = form
+      const payload: Partial<EmailConfig> = isMaskedSecret(password) ? rest : { ...rest, password }
+      return notificationsApi.updateEmail(payload)
+    },
     onSuccess: () => { setDirty(false); void qc.invalidateQueries({ queryKey: ['notifications', 'config'] }) },
   })
 
@@ -92,7 +107,14 @@ function EmailForm({ initial }: { initial: EmailConfig }) {
           <input type="text" value={form.user} onChange={(e) => set({ user: e.target.value })} placeholder="alerts@example.com" className={inputCls} />
         </Field>
         <Field label="Contraseña">
-          <input type="password" value={form.password} onChange={(e) => set({ password: e.target.value })} placeholder="••••••••" className={inputCls} />
+          <input
+            type="password"
+            value={form.password}
+            onChange={(e) => set({ password: e.target.value })}
+            placeholder="••••••• (sin cambios)"
+            autoComplete="new-password"
+            className={inputCls}
+          />
         </Field>
       </div>
 
@@ -125,7 +147,8 @@ function EmailForm({ initial }: { initial: EmailConfig }) {
 
 function TelegramForm({ initial }: { initial: TelegramConfig }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState<TelegramConfig>(initial)
+  // Reset token field on mount — same rationale as the email password.
+  const [form, setForm] = useState<TelegramConfig>({ ...initial, token: '' })
   const [dirty, setDirty] = useState(false)
 
   const set = (patch: Partial<TelegramConfig>) => {
@@ -134,7 +157,12 @@ function TelegramForm({ initial }: { initial: TelegramConfig }) {
   }
 
   const save = useMutation({
-    mutationFn: () => notificationsApi.updateTelegram({ ...form }),
+    mutationFn: () => {
+      // Omit token if user didn't change it (kept as masked/empty).
+      const { token, ...rest } = form
+      const payload: Partial<TelegramConfig> = isMaskedSecret(token) ? rest : { ...rest, token }
+      return notificationsApi.updateTelegram(payload)
+    },
     onSuccess: () => { setDirty(false); void qc.invalidateQueries({ queryKey: ['notifications', 'config'] }) },
   })
 
@@ -157,7 +185,8 @@ function TelegramForm({ initial }: { initial: TelegramConfig }) {
           type="password"
           value={form.token}
           onChange={(e) => set({ token: e.target.value })}
-          placeholder="1234567890:ABCDef..."
+          placeholder="••••••• (sin cambios)"
+          autoComplete="new-password"
           className={inputCls}
         />
         <p className="text-xs text-gray-400 dark:text-white/30 mt-1">Crea un bot con @BotFather y pega el token aquí.</p>

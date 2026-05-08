@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Cloud,
   Download,
@@ -149,6 +149,69 @@ function statusBg(status: string): string {
     case 'cancelled': return 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
     default: return 'bg-black/10 dark:bg-white/10 text-gray-500 dark:text-white/40'
   }
+}
+
+// ─── Remote Row (with delete confirmation) ────────────────────────────────────
+
+function RemoteRow({ remote }: { remote: CloudRemote }) {
+  const deleteRemote = useDeleteRemote()
+  const [confirmDeleteRemote, setConfirmDeleteRemote] = useState<string | null>(null)
+
+  // Auto-clear confirmation state after 5s to avoid lingering "danger" UI
+  useEffect(() => {
+    if (confirmDeleteRemote === null) return
+    const timer = setTimeout(() => setConfirmDeleteRemote(null), 5_000)
+    return () => clearTimeout(timer)
+  }, [confirmDeleteRemote])
+
+  const isConfirming = confirmDeleteRemote === remote.name
+
+  return (
+    <div
+      className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 flex items-center gap-4"
+    >
+      <span className="text-2xl shrink-0">{remoteIcon(remote.type)}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{remote.name}</span>
+          <span className="text-xs px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 text-gray-500 dark:text-white/50">
+            {remoteLabel(remote.type)}
+          </span>
+        </div>
+        <RemoteInfoPill name={remote.name} />
+      </div>
+      {isConfirming ? (
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => {
+              deleteRemote.mutate(remote.name)
+              setConfirmDeleteRemote(null)
+            }}
+            disabled={deleteRemote.isPending}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
+            title="Confirmar eliminación"
+          >
+            Confirmar eliminación
+          </button>
+          <button
+            onClick={() => setConfirmDeleteRemote(null)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/40 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirmDeleteRemote(remote.name)}
+          disabled={deleteRemote.isPending}
+          className="p-1.5 rounded-lg text-gray-400 dark:text-white/30 hover:text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+          title="Delete remote"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  )
 }
 
 // ─── Remote Info Pill ─────────────────────────────────────────────────────────
@@ -468,7 +531,6 @@ function AddJobModal({
 function RemotesTab() {
   const t = useT()
   const { data: remotes, isLoading, error } = useCloudRemotes()
-  const deleteRemote = useDeleteRemote()
   const [showAdd, setShowAdd] = useState(false)
 
   return (
@@ -510,29 +572,7 @@ function RemotesTab() {
       {remotes && remotes.length > 0 && (
         <div className="space-y-2">
           {remotes.map((remote: CloudRemote) => (
-            <div
-              key={remote.id}
-              className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-4 flex items-center gap-4"
-            >
-              <span className="text-2xl shrink-0">{remoteIcon(remote.type)}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{remote.name}</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 text-gray-500 dark:text-white/50">
-                    {remoteLabel(remote.type)}
-                  </span>
-                </div>
-                <RemoteInfoPill name={remote.name} />
-              </div>
-              <button
-                onClick={() => deleteRemote.mutate(remote.name)}
-                disabled={deleteRemote.isPending}
-                className="p-1.5 rounded-lg text-gray-400 dark:text-white/30 hover:text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
-                title="Delete remote"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+            <RemoteRow key={remote.id} remote={remote} />
           ))}
         </div>
       )}

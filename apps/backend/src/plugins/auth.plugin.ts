@@ -59,8 +59,9 @@ async function authPlugin(fastify: FastifyInstance) {
       }
     }
 
-    // Sliding absolute expiry (7 days) + idle expiry (8 hours) — both reset on activity
-    sessionsRepo.updateExpiry(sessionId, nowSeconds + SESSION_TTL_SECONDS)
+    // Idle expiry resets on activity (8h sliding window).
+    // Absolute expiry (7d) stays fixed at creation — never extended, otherwise
+    // an active session lives forever and the "absolute" TTL is meaningless.
     sessionsRepo.updateIdleExpiry(sessionId, nowSeconds + IDLE_TTL_SECONDS)
 
     request.user = {

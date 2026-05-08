@@ -99,13 +99,15 @@ export async function writeFileAsRoot(
   content: string,
   mode: number = 0o644,
 ): Promise<void> {
-  const { writeFileSync, unlinkSync, mkdtempSync } = await import('node:fs')
+  // Use async fs APIs to avoid blocking the Fastify event loop while writing
+  // potentially large config blobs (smb.conf, exports, etc.).
+  const { writeFile, mkdtemp, unlink, rmdir } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const path       = await import('node:path')
 
-  const dir = mkdtempSync(path.join(tmpdir(), 'homenas-write-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'homenas-write-'))
   const tmp = path.join(dir, 'payload')
-  writeFileSync(tmp, content, { mode: 0o600 })
+  await writeFile(tmp, content, { mode: 0o600 })
   try {
     const modeStr = mode.toString(8).padStart(4, '0')
     const r = await exec('install', ['-m', modeStr, '-o', 'root', '-g', 'root', tmp, target])
@@ -113,7 +115,7 @@ export async function writeFileAsRoot(
       throw new Error(`writeFileAsRoot ${target} failed: ${r.stderr || r.stdout || `exit ${r.exitCode}`}`)
     }
   } finally {
-    try { unlinkSync(tmp) } catch {}
-    try { (await import('node:fs')).rmdirSync(dir) } catch {}
+    try { await unlink(tmp) } catch {}
+    try { await rmdir(dir) } catch {}
   }
 }

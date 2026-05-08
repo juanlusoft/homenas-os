@@ -183,7 +183,10 @@ function TreeNode({ path, depth, currentPath, onNavigate, hideRoot = false }: {
   onNavigate: (p: string) => void
   hideRoot?: boolean
 }) {
-  const [expanded, setExpanded] = useState(depth <= 1)
+  // Only auto-expand the root. With depth <= 1 we'd auto-fetch every direct
+  // child of the root on mount, producing N+1 directory listings on stores
+  // with many top-level folders. The user opens deeper levels with a click.
+  const [expanded, setExpanded] = useState(depth === 0)
   const { data: entries } = useDirectoryListing(expanded ? path : null)
 
   const dirs = entries?.filter((e) => e.type === 'dir') ?? []
@@ -312,9 +315,14 @@ export function FilesView() {
   const [searchQuery, setSearchQuery] = useState('')
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
-  // Once locations load, jump to the first one if we're still on the default
+  // Once locations load, jump to the first one — but ONLY on the very first
+  // mount. Re-running on currentPath change would steal navigation away from
+  // the user every time they go back to /mnt/ manually.
+  const initialJumpDone = useRef(false)
   useEffect(() => {
+    if (initialJumpDone.current) return
     if (locations.length > 0 && currentPath === '/mnt/' && locations[0]) {
+      initialJumpDone.current = true
       setCurrentPath(locations[0].path)
     }
   }, [locations, currentPath])
@@ -387,11 +395,23 @@ export function FilesView() {
   const handleContextAction = (action: string, entry: FileEntry, path: string) => {
     switch (action) {
       case 'download': {
-        const url = filesApi.getDownloadUrl(path)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = entry.name
-        a.click()
+        // getDownloadUrl is async: it fetches the file using the session
+        // header (no leak in URL) and returns a blob: URL. Revoke it after
+        // the browser has had a chance to start the download.
+        void filesApi
+          .getDownloadUrl(path)
+          .then((url) => {
+            const a = document.createElement('a')
+            a.href = url
+            a.download = entry.name
+            a.click()
+            // Defer revoke so the click handler can pick up the URL first
+            setTimeout(() => URL.revokeObjectURL(url), 1000)
+          })
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error('Download failed', err)
+          })
         break
       }
       case 'rename':
@@ -515,7 +535,11 @@ export function FilesView() {
                   onClick={() => navigate(crumb.path)}
                   className={cn(
                     'hover:text-gray-900 dark:hover:text-white transition-colors truncate',
-                    i === breadcrumbs.length - 1 ? 'text-white font-medium' : 'text-gray-500 dark:text-white/40',
+                    // Active crumb needs both light + dark variants — previously
+                    // only `text-white` was set which is unreadable in light mode.
+                    i === breadcrumbs.length - 1
+                      ? 'text-zinc-900 dark:text-white font-medium'
+                      : 'text-gray-500 dark:text-white/40',
                   )}
                 >
                   {i === 0 ? <Home className="w-3.5 h-3.5" /> : crumb.label}
@@ -642,8 +666,14 @@ export function FilesView() {
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onClick={(e) => toggleSelect(entry.name, e)}
-                            onChange={() => {}}
+                            // toggleSelect is wired to onClick (so we get the
+                            // shift/ctrl modifiers from the mouse event).
+                            // onChange is here only to silence React's
+                            // controlled-input warning — it intentionally does
+                            // nothing. e.stopPropagation prevents the row's
+                            // double-click handler from firing on toggle.
+                            onClick={(e) => { e.stopPropagation(); toggleSelect(entry.name, e) }}
+                            onChange={(e) => { e.stopPropagation() }}
                             className="w-3.5 h-3.5 accent-indigo-500 shrink-0"
                           />
                           {getFileIcon(entry)}

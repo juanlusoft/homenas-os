@@ -2,6 +2,27 @@ import { useAuthStore } from '../stores/authStore'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
+// Pulls a useful, short error message out of a non-2xx response.
+// - If the body looks like our standard JSON error envelope ({ message } /
+//   { error }), use that.
+// - Otherwise fall back to the raw text but truncate it so we don't render a
+//   full HTML error page in a toast/alert.
+async function extractErrorMessage(res: Response): Promise<string> {
+  const raw = await res.text()
+  if (!raw) return `HTTP ${res.status}`
+  try {
+    const parsed = JSON.parse(raw) as { message?: unknown; error?: unknown }
+    const msg = typeof parsed.message === 'string' ? parsed.message
+              : typeof parsed.error   === 'string' ? parsed.error
+              : null
+    if (msg) return msg
+  } catch {
+    // not JSON — fall through to truncated text
+  }
+  const trimmed = raw.trim()
+  return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed
+}
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const { sessionId, csrfToken } = useAuthStore.getState()
   const method = (options?.method ?? 'GET').toUpperCase()
@@ -21,14 +42,22 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     useAuthStore.getState().logout()
     throw new Error('UNAUTHORIZED')
   }
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw new Error(await extractErrorMessage(res))
   return res.json()
 }
 
-// Silent fetch for background checks — does NOT trigger logout on 401
+// Silent fetch for background checks — does not throw on non-2xx so callers
+// can inspect the Response themselves. Mirrors `apiFetch` for the 401 case:
+// if the session is no longer valid we proactively log the user out (the
+// store handles any redirect side-effect) but we still return the response
+// instead of raising, so the caller's loop can decide what to do.
 export async function silentFetch(path: string): Promise<Response> {
   const { sessionId } = useAuthStore.getState()
-  return fetch(`/api${path}`, {
+  const res = await fetch(`/api${path}`, {
     headers: sessionId ? { 'X-Session-Id': sessionId } : {}
   })
+  if (res.status === 401) {
+    useAuthStore.getState().logout()
+  }
+  return res
 }

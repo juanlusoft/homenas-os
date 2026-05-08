@@ -93,6 +93,36 @@ export function validateWritablePath(inputPath: string): string {
   return normalized
 }
 
+// Async variant for write operations: resolves symlinks (the path itself or its
+// parent if the path doesn't exist yet) and re-validates that the resolved
+// location is still inside a writable root. Prevents symlink-based escapes
+// such as /mnt/storage/evil → /etc, which would otherwise let a user with
+// upload/delete permission rm -rf arbitrary system paths via sudo.
+export async function validateWritableRealPath(inputPath: string): Promise<string> {
+  const normalized = validateWritablePath(inputPath)
+
+  try {
+    const resolved = await realpath(normalized)
+    return validateWritablePath(resolved)
+  } catch (err) {
+    // ENOENT — path doesn't exist yet (upload destination, mkdir target).
+    // Validate the parent directory's real path instead.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+  }
+
+  const parent = dirname(normalized)
+  try {
+    const realParent = await realpath(parent)
+    validateWritablePath(realParent.endsWith('/') ? realParent : `${realParent}/`)
+    return join(realParent, basename(normalized))
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new Error('Parent directory does not exist')
+    }
+    throw err
+  }
+}
+
 /** Prevents deleting the pool root directories themselves */
 function validateNotRoot(p: string): void {
   const normalized = normalize(p)
@@ -162,7 +192,7 @@ export async function listDirectory(inputPath: string): Promise<FileEntry[]> {
 // ─── createDirectory ──────────────────────────────────────────────────────────
 
 export async function createDirectory(inputPath: string): Promise<void> {
-  const safePath = validateWritablePath(inputPath)
+  const safePath = await validateWritableRealPath(inputPath)
   const result = await exec('mkdir', ['-p', safePath])
   if (result.exitCode !== 0) {
     throw new Error(`mkdir failed: ${result.stderr}`)
@@ -175,7 +205,7 @@ export async function createDirectory(inputPath: string): Promise<void> {
 // ─── deleteItem ───────────────────────────────────────────────────────────────
 
 export async function deleteItem(inputPath: string): Promise<void> {
-  const safePath = validateWritablePath(inputPath)
+  const safePath = await validateWritableRealPath(inputPath)
   validateNotRoot(safePath)
 
   const result = await exec('rm', ['-rf', safePath])
@@ -187,9 +217,9 @@ export async function deleteItem(inputPath: string): Promise<void> {
 // ─── renameItem ───────────────────────────────────────────────────────────────
 
 export async function renameItem(oldPath: string, newPath: string): Promise<void> {
-  const safeOld = validateWritablePath(oldPath)
+  const safeOld = await validateWritableRealPath(oldPath)
   // New path must stay within the same writable area
-  const safeNew = validateWritablePath(newPath)
+  const safeNew = await validateWritableRealPath(newPath)
 
   // newPath must remain in same parent directory
   if (dirname(safeOld) !== dirname(safeNew)) {
@@ -205,8 +235,8 @@ export async function renameItem(oldPath: string, newPath: string): Promise<void
 // ─── moveItem ─────────────────────────────────────────────────────────────────
 
 export async function moveItem(source: string, destination: string): Promise<void> {
-  const safeSrc = validateWritablePath(source)
-  const safeDst = validateWritablePath(destination)
+  const safeSrc = await validateWritableRealPath(source)
+  const safeDst = await validateWritableRealPath(destination)
 
   const result = await exec('mv', [safeSrc, safeDst])
   if (result.exitCode !== 0) {
@@ -217,8 +247,8 @@ export async function moveItem(source: string, destination: string): Promise<voi
 // ─── copyItem ─────────────────────────────────────────────────────────────────
 
 export async function copyItem(source: string, destination: string): Promise<void> {
-  const safeSrc = validatePath(source)  // source can be read-only
-  const safeDst = validateWritablePath(destination)
+  const safeSrc = await validateRealPath(source)  // source can be read-only
+  const safeDst = await validateWritableRealPath(destination)
 
   const result = await exec('cp', ['-r', safeSrc, safeDst])
   if (result.exitCode !== 0) {
@@ -235,8 +265,11 @@ export async function searchFiles(basePath: string, query: string): Promise<stri
     throw new Error('Search query is required')
   }
 
-  // Sanitize query: no shell metacharacters — we pass it directly as an arg
-  const safeQuery = query.replace(/[`$\\]/g, '')
+  // Sanitize query: strip shell metacharacters and glob breakers. exec runs
+  // with shell:false so this is defense-in-depth, but it also avoids the
+  // user accidentally producing weird find globs (e.g. "*?[1-9]").
+  const safeQuery = query.replace(/[`$\\;|&<>(){}[\]*?!^"']/g, '').slice(0, 128)
+  if (!safeQuery.trim()) return []
 
   const result = await exec('find', [
     safePath,

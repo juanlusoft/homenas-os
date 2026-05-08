@@ -973,7 +973,7 @@ export async function updateNfsExport(
 
   if (!found) throw new Error(`Export "${path}" not found`)
 
-  writeExportsFile(newLines.join('\n'))
+  await writeExportsFile(newLines.join('\n'))
   await reloadExports()
 
   const updated = parseNfsExports(newLines.join('\n'))
@@ -1002,7 +1002,7 @@ export async function deleteNfsExport(path: string): Promise<void> {
 
   if (!found) throw new Error(`Export "${path}" not found`)
 
-  writeExportsFile(newLines.join('\n'))
+  await writeExportsFile(newLines.join('\n'))
   await reloadExports()
 }
 

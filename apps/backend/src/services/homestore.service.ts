@@ -439,6 +439,10 @@ export function buildDockerRunCommand(config: AppConfig): string[] {
   }
 
   for (const v of config.volumes) {
+    // Validate hostPath against an allowlist — without this an admin could
+    // mount `/`, `/etc`, /proc, etc. and read or modify anything from the
+    // container, defeating the docker isolation.
+    assertSafeHostPath(v.hostPath)
     // Append `:ro` when the user explicitly marked the mount read-only. `rw`
     // is the docker default, so we omit the suffix to keep argv concise.
     const suffix = v.mode === 'ro' ? ':ro' : ''
@@ -452,7 +456,12 @@ export function buildDockerRunCommand(config: AppConfig): string[] {
     }
   }
 
+  // extraArgs are user-supplied docker run flags. Without filtering, an
+  // admin could pass --privileged, --cap-add=SYS_ADMIN, --pid=host,
+  // -v /:/host, --device=/dev/sda, etc. and break out of the container
+  // to root on the host. Allowlist of safe runtime tuning flags only.
   for (const arg of config.extraArgs) {
+    assertSafeExtraArg(arg)
     args.push(arg)
   }
 
@@ -461,6 +470,66 @@ export function buildDockerRunCommand(config: AppConfig): string[] {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const ALLOWED_VOLUME_PREFIXES = [
+  '/opt/homestore/',
+  '/mnt/storage/',
+  '/mnt/disks/',
+  '/mnt/network/',
+  '/mnt/parity1/', '/mnt/parity2/', '/mnt/parity3/',
+] as const
+
+const BLOCKED_VOLUME_PATHS = new Set([
+  '/', '/etc', '/etc/', '/proc', '/proc/', '/sys', '/sys/',
+  '/root', '/root/', '/var', '/var/', '/usr', '/usr/', '/boot', '/boot/',
+  '/dev', '/dev/', '/run', '/run/',
+])
+
+function assertSafeHostPath(hostPath: string): void {
+  if (typeof hostPath !== 'string' || !hostPath) {
+    throw new Error('Volume hostPath is required')
+  }
+  if (hostPath.includes('..') || hostPath.includes('\0')) {
+    throw new Error(`Volume hostPath rejected: ${hostPath}`)
+  }
+  if (BLOCKED_VOLUME_PATHS.has(hostPath)) {
+    throw new Error(`Volume hostPath blocked: ${hostPath}`)
+  }
+  const ok = ALLOWED_VOLUME_PREFIXES.some((p) => hostPath === p.replace(/\/$/, '') || hostPath.startsWith(p))
+  if (!ok) {
+    throw new Error(
+      `Volume hostPath must be inside one of: ${ALLOWED_VOLUME_PREFIXES.join(', ')} (got "${hostPath}")`,
+    )
+  }
+}
+
+// Allowlist of docker-run flags that admins may add via extraArgs.
+// Anything else (especially --privileged, --cap-add, --device, --pid,
+// --network=host, --userns, --security-opt, -v, --mount) is rejected
+// to keep the container from breaking out to the host.
+const SAFE_EXTRA_ARG_FLAGS = new Set([
+  '--memory-swap', '--memory-swappiness', '--memory-reservation', '--kernel-memory',
+  '--cpu-shares', '--cpu-period', '--cpu-quota', '--cpuset-cpus', '--cpuset-mems',
+  '--blkio-weight', '--ulimit', '--shm-size', '--oom-kill-disable', '--oom-score-adj',
+  '--pids-limit', '--read-only', '--tmpfs', '--init',
+  '--restart', '--label',
+])
+
+function assertSafeExtraArg(arg: string): void {
+  if (typeof arg !== 'string' || !arg) return
+  if (arg.includes('\0') || arg.includes('\n')) {
+    throw new Error('extraArgs contain null/newline characters')
+  }
+  // Non-flag tokens (values for the previous flag) are allowed through.
+  if (!arg.startsWith('-')) return
+  // Match either `--flag` or `--flag=value`
+  const flagName = arg.split('=')[0]!
+  if (!SAFE_EXTRA_ARG_FLAGS.has(flagName)) {
+    throw new Error(
+      `extraArg "${flagName}" is not in the allowlist (would let the container escape the sandbox)`,
+    )
+  }
+}
 
 function validateAppId(id: string): void {
   if (!/^[a-zA-Z0-9_-]+$/.test(id) || id.length > 64) {
@@ -712,7 +781,15 @@ export async function uninstallApp(id: string, removeData: boolean): Promise<voi
 
   if (removeData) {
     for (const v of config.volumes) {
-      if (v.hostPath.includes('..')) continue  // safety guard
+      // Re-validate hostPath against the allowlist — a config could
+      // theoretically have been tampered with on disk between install
+      // and uninstall, and this is a destructive `rm -rf` running as
+      // root. Better to skip than wipe /etc by accident.
+      try {
+        assertSafeHostPath(v.hostPath)
+      } catch {
+        continue
+      }
       if (existsSync(v.hostPath)) {
         const rmDataResult = await exec('rm', ['-rf', v.hostPath])
         if (rmDataResult.exitCode !== 0) {

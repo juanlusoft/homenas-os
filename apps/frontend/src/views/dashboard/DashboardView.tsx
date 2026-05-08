@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Cpu,
   MemoryStick,
@@ -39,7 +39,11 @@ function Sparkline({
   fillColor?: string
   height?: number
 }) {
-  if (points.length < 2) return null
+  // Reserve the same vertical space even with <2 points so the dashboard
+  // doesn't reflow on the first render before the second data tick arrives.
+  if (points.length < 2) {
+    return <div style={{ width: '100%', height }} aria-hidden="true" />
+  }
   const w = 300
   const h = height
   const pad = 2
@@ -57,12 +61,12 @@ function Sparkline({
 }
 
 function useHistory<T>(value: T | undefined, maxLen = HISTORY): T[] {
-  const buf = useRef<T[]>([])
+  const [buf, setBuf] = useState<T[]>([])
   useEffect(() => {
     if (value === undefined) return
-    buf.current = [...buf.current.slice(-(maxLen - 1)), value]
+    setBuf((prev) => [...prev.slice(-(maxLen - 1)), value])
   }, [value, maxLen])
-  return buf.current
+  return buf
 }
 
 // ─── Shared UI primitives ─────────────────────────────────────────────────────
@@ -296,7 +300,11 @@ function NetworkCard({ data }: { data: SystemMetrics }) {
 
 function UptimeCard({ data }: { data: SystemMetrics }) {
   const t = useT()
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'homenas'
+  // Computed once on mount so the value is stable across re-renders; reading
+  // window.location in render also crashes if the component is ever pre-rendered.
+  const [hostname] = useState(() =>
+    typeof window !== 'undefined' ? window.location.hostname : 'homenas',
+  )
   return (
     <Card>
       <CardTitle icon={<Clock className="w-4 h-4" />} title={t.dashboard.uptime} />

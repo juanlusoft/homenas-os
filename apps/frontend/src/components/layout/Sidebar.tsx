@@ -70,17 +70,25 @@ export function Sidebar() {
   })
   const { data: updateStatus } = useUpdateStatus()
   const updateApp = useUpdateApp()
-  const { data: process } = useUpdateProcess()
   const hasUpdate  = (updateStatus?.app.pendingCommits.length ?? 0) > 0
+  // Only poll the (relatively expensive) update process when we know an update
+  // is pending or we've just kicked one off. Once it returns status='updating'
+  // we keep polling because the hook stays enabled while isUpdating is true.
+  const { data: process } = useUpdateProcess({ enabled: hasUpdate || updateApp.isPending })
   const isUpdating = process?.status === 'updating' || updateApp.isPending
   const [confirmUpdate, setConfirmUpdate] = useState(false)
   const [confirmReboot, setConfirmReboot] = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const handleConfirmUpdate = () => {
     setConfirmUpdate(false)
+    setUpdateError(null)
     updateApp.mutate(undefined, {
       onSuccess: () => navigate('/system'),
+      onError: (err) => {
+        setUpdateError(err instanceof Error ? err.message : String(err))
+      },
     })
   }
 
@@ -152,6 +160,21 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Update error toast (only when collapsed banner can't show it inline) */}
+      {updateError && !collapsed && (
+        <div className="shrink-0 mx-2 mb-1 rounded-lg px-3 py-2 bg-red-500/10 border border-red-500/30">
+          <p className="text-xs text-red-700 dark:text-red-300 font-medium leading-snug break-words">
+            {updateError}
+          </p>
+          <button
+            onClick={() => setUpdateError(null)}
+            className="mt-1 text-[10px] text-red-700/80 dark:text-red-300/80 hover:text-red-700 dark:hover:text-red-300 underline underline-offset-2"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {/* Update available banner */}
       {(hasUpdate || isUpdating) && (

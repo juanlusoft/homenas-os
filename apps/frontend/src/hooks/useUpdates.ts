@@ -11,11 +11,14 @@ export function useUpdateStatus() {
   })
 }
 
-export function useUpdateProcess() {
+export function useUpdateProcess(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true
   return useQuery({
     queryKey: ['updates', 'process'],
     queryFn: () => updatesApi.getProcess(),
-    // Poll every 2s while active, otherwise every 30s
+    enabled,
+    // Poll every 2s while active, otherwise every 30s.
+    // When the query is disabled this interval is a no-op anyway.
     refetchInterval: (query) => {
       const status = query.state.data?.status
       return status === 'updating' ? 2_000 : 30_000

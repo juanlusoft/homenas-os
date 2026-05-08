@@ -296,19 +296,39 @@ async function dbPlugin(fastify: FastifyInstance) {
     fastify.log.error({ details: integrityRows.map(r => r.integrity_check) }, 'DB integrity check FAILED — consider restoring from backup')
   }
 
-  // Seed default admin if no users exist
+  // Seed default admin if no users exist. The initial password is written to
+  // a root-owned 0600 file ONCE so it doesn't end up persisted in journald,
+  // log rotators, SIEM forwarders, or `pino-roll` files. The setup wizard
+  // reads it from there and prompts the user to change it.
   const userCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count
   if (userCount === 0) {
-    // Generate a random initial password — displayed once in logs, changed via setup wizard
     const initialPassword = randomBytes(10).toString('base64url') // ~14 URL-safe chars
     const passwordHash = bcryptjs.hashSync(initialPassword, 10)
     db.prepare(
       `INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)`
     ).run('admin', passwordHash, 'admin')
-    fastify.log.info(
-      { initialPassword },
-      '*** FIRST RUN: default admin created. Use this password in the setup wizard, then change it immediately. ***'
-    )
+
+    const credPath = '/opt/homenas-v3/data/initial-admin-password.txt'
+    try {
+      const { writeFileSync, mkdirSync, chmodSync } = await import('node:fs')
+      const { dirname } = await import('node:path')
+      mkdirSync(dirname(credPath), { recursive: true })
+      writeFileSync(credPath, `${initialPassword}\n`, { mode: 0o600 })
+      chmodSync(credPath, 0o600)
+      fastify.log.info(
+        '*** FIRST RUN: default admin created. Initial password written to %s — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***',
+        credPath,
+      )
+    } catch (err) {
+      // If we can't write the file (read-only fs, perms…), we still have to
+      // give the user some way to log in. Falls back to logging the password
+      // (the original behaviour) but logs a loud warning.
+      fastify.log.warn({ err }, 'Could not write initial password file, falling back to log output (PASSWORD WILL BE PERSISTED IN LOGS)')
+      fastify.log.info(
+        { initialPassword },
+        '*** FIRST RUN: default admin created. Use this password in the setup wizard, then change it immediately. ***',
+      )
+    }
   }
 
   // Purge expired sessions on startup

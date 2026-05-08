@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ShieldCheck,
   HardDrive,
@@ -286,6 +286,27 @@ function FileBrowser({ deviceId, versions }: { deviceId: number; versions: Versi
   const [browsePath, setBrowsePath] = useState('/')
   const [pathHistory, setPathHistory] = useState<string[]>(['/'])
   const [downloadingFile, setDownloadingFile] = useState<Record<string, boolean>>({})
+
+  // If the versions list changes (new backup ran, retention pruned the old one,
+  // device switched) and our cached selection is no longer present, fall back
+  // to the most recent version and reset the path so the browser doesn't try
+  // to query a stale (versionId, path) tuple.
+  useEffect(() => {
+    if (versions.length === 0) {
+      if (selectedVersion !== '') {
+        setSelectedVersion('')
+        setBrowsePath('/')
+        setPathHistory(['/'])
+      }
+      return
+    }
+    const stillExists = versions.some(v => v.version === selectedVersion)
+    if (!stillExists) {
+      setSelectedVersion(versions[0].version)
+      setBrowsePath('/')
+      setPathHistory(['/'])
+    }
+  }, [versions, selectedVersion])
 
   const { data: entries, isLoading, error } = useAbBrowse(
     deviceId,
@@ -821,8 +842,18 @@ export function ActiveBackupView() {
         const online   = devices.filter(d => getLastSeenStatus(d.last_seen).online).length
         const pending  = devices.filter(d => d.status === 'pending').length
         const lastRuns = devices.map(d => d.last_run_at).filter((t): t is number => !!t).sort((a, b) => b - a)
+        // TODO: read this from the backend's configured TZ instead of hardcoding.
+        // Backend currently runs in Europe/Madrid; without an explicit timeZone
+        // the browser's local TZ wins, which produces wrong-looking timestamps
+        // when the user is travelling or the NAS is in a different region.
         const lastBackupStr = lastRuns.length
-          ? new Date(lastRuns[0] * 1000).toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+          ? new Date(lastRuns[0] * 1000).toLocaleString(undefined, {
+              day: '2-digit',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Europe/Madrid',
+            })
           : '—'
         return (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

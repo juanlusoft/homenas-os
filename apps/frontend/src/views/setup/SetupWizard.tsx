@@ -176,7 +176,8 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
   const activeIfaceData = interfaces.find(i => i.name === activeIface) ?? primary
 
   // When an interface is selected, pre-fill its current IP into the static fields
-  // and detect if it's already configured (has an IP)
+  // and detect if it's already configured (has an IP). Depends on
+  // activeIfaceData (the source of truth), not on `data` directly.
   useEffect(() => {
     if (!activeIfaceData) return
     if (activeIfaceData.ip) {
@@ -187,7 +188,7 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
     }
     setMode(activeIfaceData.isDhcp ? 'dhcp' : 'static')
     setUserEdited(false)
-  }, [activeIface, data])
+  }, [activeIfaceData])
 
   // If the interface already has an IP and the user hasn't changed anything, allow skipping save
   const canContinueDirectly = (!!activeIfaceData?.ip && !userEdited) || saved
@@ -587,14 +588,30 @@ export function SetupWizard() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const loginStore      = useAuthStore((s) => s.login)
 
-  // Auto-login with admin/homenas1 so the user never sees the login screen
+  // Auto-login with admin/homenas1 so the user never sees the login screen.
+  // Uses an AbortController so an unmount mid-request cancels in-flight work,
+  // and a `cancelled` flag so we never call setState/navigate after unmount.
+  // `setAutoLogging(false)` runs in `finally` so the spinner doesn't get stuck
+  // when the request errors out.
   useEffect(() => {
     if (isAuthenticated) return
+    const ctrl = new AbortController()
+    let cancelled = false
     setAutoLogging(true)
-    setupApi.autologin()
-      .then(result => { loginStore(result); setAutoLogging(false) })
-      .catch(() => { navigate('/login', { replace: true }) })
-  }, [isAuthenticated])
+    setupApi.autologin({ signal: ctrl.signal })
+      .then((result) => { if (!cancelled) loginStore(result) })
+      .catch((err) => {
+        if (cancelled || ctrl.signal.aborted) return
+        // Log so devs notice when autologin is misconfigured server-side
+        if (err instanceof Error && err.name !== 'AbortError') {
+          // eslint-disable-next-line no-console
+          console.warn('Setup autologin failed, redirecting to /login', err)
+        }
+        navigate('/login', { replace: true })
+      })
+      .finally(() => { if (!cancelled) setAutoLogging(false) })
+    return () => { cancelled = true; ctrl.abort() }
+  }, [isAuthenticated, loginStore, navigate])
 
   if (autoLogging || !isAuthenticated) return <PageSpinner />
 
