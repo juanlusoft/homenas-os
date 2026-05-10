@@ -282,7 +282,14 @@ sudo -u homenas git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/n
 # postinstall scripts of any compromised npm transitive dep would otherwise
 # run as root with full system access.
 info "Installing dependencies..."
-sudo -u homenas pnpm install --frozen-lockfile
+# pnpm v10 ignores build scripts in non-interactive mode even con onlyBuiltDependencies;
+# --allow-build overrides la policy para este install (v10 only flag).
+PNPM_MAJOR=$(sudo -u homenas pnpm --version 2>/dev/null | grep -oE '^[0-9]+' || echo 9)
+if [[ "${PNPM_MAJOR}" -ge 10 ]]; then
+  sudo -u homenas pnpm install --frozen-lockfile --allow-build=better-sqlite3,esbuild
+else
+  sudo -u homenas pnpm install --frozen-lockfile
+fi
 
 # ── Build (as homenas) ────────────────────────────────────────────────────────
 info "Building frontend and backend..."
