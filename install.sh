@@ -80,6 +80,13 @@ if (( NODE_VER < 18 )); then
 fi
 info "Node.js $(node --version) OK"
 
+# ── npm (upgrade to latest) ───────────────────────────────────────────────────
+# Keeps npm up to date against supply chain vulnerabilities in the registry
+# client itself and ensures latest audit/integrity features are available.
+info "Upgrading npm to latest..."
+npm install -g npm@latest --loglevel=error
+info "npm $(npm --version) OK"
+
 # ── pnpm ─────────────────────────────────────────────────────────────────────
 info "Checking pnpm..."
 if ! command -v pnpm &>/dev/null; then
