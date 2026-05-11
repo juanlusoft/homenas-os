@@ -84,8 +84,16 @@ info "Node.js $(node --version) OK"
 # Keeps npm up to date against supply chain vulnerabilities in the registry
 # client itself and ensures latest audit/integrity features are available.
 info "Upgrading npm to latest..."
-npm install -g npm@latest --loglevel=error
-info "npm $(npm --version) OK"
+if npm install -g npm@latest --loglevel=error 2>/dev/null; then
+  info "npm $(npm --version) OK"
+else
+  warn "npm upgrade failed (broken bundled npm) — reinstalling via Node.js corepack..."
+  if corepack enable npm 2>/dev/null && npm install -g npm@latest --loglevel=error 2>/dev/null; then
+    info "npm $(npm --version) OK"
+  else
+    warn "npm upgrade skipped — continuing with $(npm --version 2>/dev/null || echo 'unknown')"
+  fi
+fi
 
 # ── pnpm ─────────────────────────────────────────────────────────────────────
 info "Checking pnpm..."
@@ -288,8 +296,30 @@ sudo -u homenas git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/n
 # ── Install dependencies (as homenas, NOT root) ───────────────────────────────
 # postinstall scripts of any compromised npm transitive dep would otherwise
 # run as root with full system access.
+# --ignore-scripts: skip ALL install scripts during resolution so that pnpm v11+
+# doesn't abort with ERR_PNPM_IGNORED_BUILDS (exit 1) when the lockfile was
+# generated with an older pnpm that stored build approvals in package.json.
+# Native addons are compiled explicitly in the next step.
 info "Installing dependencies..."
-sudo -u homenas pnpm install --frozen-lockfile
+sudo -u homenas pnpm install --frozen-lockfile --ignore-scripts
+
+# Compile native addons that require a build step (better-sqlite3, esbuild).
+# pnpm rebuild is unreliable here because pnpm v11 uses a content-addressable
+# virtual store — the rebuild command may not locate the package correctly when
+# the lockfile was generated with an older pnpm. We call node-pre-gyp/npm
+# directly inside the package directory instead.
+info "Building native addons (better-sqlite3)..."
+SQLITE3_PKG=$(find "${INSTALL_DIR}/node_modules/.pnpm" -maxdepth 2 -name "better-sqlite3" -type d 2>/dev/null | grep "node_modules/better-sqlite3$" | head -1)
+if [[ -n "${SQLITE3_PKG}" ]]; then
+  if ! ls "${SQLITE3_PKG}"/build/Release/better_sqlite3.node &>/dev/null; then
+    (cd "${SQLITE3_PKG}" && npm install --ignore-scripts=false 2>&1 | tail -3) \
+      || warn "better-sqlite3 native build failed — app may not start"
+  else
+    info "better-sqlite3 already compiled"
+  fi
+else
+  warn "better-sqlite3 package not found in virtual store"
+fi
 
 # ── Build (as homenas) ────────────────────────────────────────────────────────
 info "Building frontend and backend..."
@@ -313,6 +343,9 @@ if [[ ! -f "$CERT_PATH" || ! -f "$KEY_PATH" ]]; then
 else
   info "Certificate already exists — skipping"
 fi
+chown root:homenas "$CERT_DIR"   # homenas user must be able to enter the dir
+chmod 750 "$CERT_DIR"
+chown homenas:homenas "$KEY_PATH" "$CERT_PATH"
 chmod 600 "$KEY_PATH" "$CERT_PATH"
 
 # ── Docker (needed for the docker management panel) ──────────────────────────
@@ -344,8 +377,6 @@ cat > /etc/sudoers.d/homenas <<'SUDOEOF'
 homenas ALL=(root) NOPASSWD: ALL
 SUDOEOF
 chmod 440 /etc/sudoers.d/homenas
-
-chmod 750 "$CERT_DIR"
 
 # ── Systemd service ───────────────────────────────────────────────────────────
 info "Creating systemd service..."

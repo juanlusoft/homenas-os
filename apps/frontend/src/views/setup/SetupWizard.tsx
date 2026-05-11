@@ -94,9 +94,11 @@ function StepAccount({ onNext }: { onNext: () => void }) {
 
   const handleSubmit = async () => {
     setClientError(null)
-    if (username.length < 5)   { setClientError('El usuario debe tener al menos 5 caracteres'); return }
-    if (password.length < 6)   { setClientError('La contraseña debe tener al menos 6 caracteres'); return }
-    if (password !== confirm)  { setClientError('Las contraseñas no coinciden'); return }
+    if (username.length < 5)          { setClientError('El usuario debe tener al menos 5 caracteres'); return }
+    if (password.length < 8)          { setClientError('La contraseña debe tener al menos 8 caracteres'); return }
+    if (!/[A-Z]/.test(password))      { setClientError('La contraseña debe incluir al menos una letra mayúscula'); return }
+    if (!/[0-9]/.test(password))      { setClientError('La contraseña debe incluir al menos un número'); return }
+    if (password !== confirm)         { setClientError('Las contraseñas no coinciden'); return }
     try {
       const result = await changeAccount.mutateAsync({ username, newPassword: password, confirmPassword: confirm })
       // Update stored username so sidebar shows the new one
@@ -129,7 +131,7 @@ function StepAccount({ onNext }: { onNext: () => void }) {
             className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-white/30 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-white/50 mb-1.5">Contraseña <span className="text-gray-400 dark:text-white/30">(mín. 6 caracteres)</span></label>
+          <label className="block text-xs font-medium text-gray-500 dark:text-white/50 mb-1.5">Contraseña <span className="text-gray-400 dark:text-white/30">(mín. 8 car., mayúscula y número)</span></label>
           <input type="password" value={password} onChange={e => setPassword(e.target.value)}
             placeholder="••••••" autoComplete="new-password"
             className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-white/30 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40" />
