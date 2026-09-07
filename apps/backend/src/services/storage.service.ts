@@ -264,6 +264,18 @@ export async function listDisks(): Promise<Disk[]> {
 
     const smart = smartAvailable ? await getSmartData(device.name) : null
 
+    // FS type and mount point usually live on the partition, not the parent
+    // disk (e.g. /dev/sdc has no fstype/mountpoint, but /dev/sdc1 does). Fall
+    // back to the first partition that carries them so the UI shows real data.
+    let fsType = device.fstype || null
+    let mountPoint = device.mountpoint || null
+    if ((!fsType || !mountPoint) && device.children) {
+      const mountedChild = device.children.find(c => c.mountpoint)
+      const fsChild = device.children.find(c => c.fstype)
+      if (!mountPoint && mountedChild?.mountpoint) mountPoint = mountedChild.mountpoint
+      if (!fsType) fsType = mountedChild?.fstype ?? fsChild?.fstype ?? null
+    }
+
     // Sanitise model string: some USB bridges report a short numeric string
     // (e.g. "456") instead of a real model name.  Replace with a generic
     // label derived from the detected disk type so the UI stays readable.
@@ -288,8 +300,8 @@ export async function listDisks(): Promise<Disk[]> {
       serial: device.serial?.trim() || null,
       sizeBytes,
       usedBytes,
-      fsType: device.fstype || null,
-      mountPoint: device.mountpoint || null,
+      fsType,
+      mountPoint,
       smart,
     })
   }
