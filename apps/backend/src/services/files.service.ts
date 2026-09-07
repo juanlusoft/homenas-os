@@ -422,6 +422,10 @@ export interface FileLocation {
  * Reads /proc/mounts to find fuse.mergerfs pools dynamically — no hardcoded paths.
  * Falls back to /mnt/ if no mergerfs mount is detected (dev environment).
  */
+// Filesystem types of real disks we surface as navigable locations when mounted
+// directly under /mnt (e.g. a dedicated backup drive).
+const REAL_DISK_FSTYPES = new Set(['ext4', 'ext3', 'ext2', 'xfs', 'btrfs', 'f2fs', 'vfat', 'exfat', 'ntfs', 'ntfs3'])
+
 export async function getFileLocations(): Promise<FileLocation[]> {
   const locations: FileLocation[] = []
 
@@ -445,6 +449,19 @@ export async function getFileLocations(): Promise<FileLocation[]> {
         const normalized = decoded.endsWith('/') ? decoded : `${decoded}/`
         const label = decoded.split('/').filter(Boolean).pop() ?? decoded
         locations.push({ path: normalized, label, type: 'rclone' })
+      }
+
+      // Real disk filesystems mounted directly under /mnt (e.g. a dedicated
+      // /mnt/backup drive) — show them as generic navigable locations. Excludes
+      // the pool's own backing disks (/mnt/disks/*), which are only sub-mounts.
+      if (REAL_DISK_FSTYPES.has(fsType ?? '') && mountPoint) {
+        const decoded = mountPoint.replace(/\\040/g, ' ')
+        // Exactly one path segment under /mnt (so /mnt/backup yes, /mnt/disks/x no)
+        if (/^\/mnt\/[^/]+\/?$/.test(decoded) && !decoded.startsWith('/mnt/disks/')) {
+          const normalized = decoded.endsWith('/') ? decoded : `${decoded}/`
+          const label = decoded.split('/').filter(Boolean).pop() ?? decoded
+          locations.push({ path: normalized, label, type: 'generic' })
+        }
       }
     }
   } catch {
