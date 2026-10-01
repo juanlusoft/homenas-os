@@ -1,0 +1,302 @@
+From https://github.com/juanlusoft/homenas-os
+   6991794..8349ad3  main              -> origin/main
+ * [new branch]      fix/network-rates -> origin/fix/network-rates
+Updating 6991794..8349ad3
+Fast-forward
+ apps/backend/src/services/network.service.ts       | 124 +++--
+ apps/backend/src/services/system.service.ts        |  86 +--
+ apps/backend/tests/backend-network-rates.test.ts   |  94 ++++
+ apps/frontend/src/components/layout/Sidebar.tsx    |   1 -
+ apps/frontend/src/lib/utils.ts                     |   9 +
+ .../frontend/src/views/dashboard/DashboardView.tsx |  33 +-
+ apps/frontend/src/views/network/BandwidthChart.tsx |  39 +-
+ apps/frontend/src/views/network/NetworkView.tsx    |   3 +
+ apps/frontend/tests/regressions.test.mjs           |  83 +++
+ docs/NETWORK-RATES-REPAIR.md                       |  24 +
+ docs/WORK-LOG.md                                   |   4 +
+ docs/validation/network-rates-audit.log            |   1 +
+ docs/validation/network-rates-before.log           |   1 +
+ docs/validation/network-rates-build.log            |  69 +++
+ docs/validation/network-rates-lint.log             |  15 +
+ docs/validation/network-rates-production.log       |   5 +
+ docs/validation/network-rates-tests.log            | 586 +++++++++++++++++++++
+ 17 files changed, 1036 insertions(+), 141 deletions(-)
+ create mode 100644 apps/backend/tests/backend-network-rates.test.ts
+ create mode 100644 docs/NETWORK-RATES-REPAIR.md
+ create mode 100644 docs/validation/network-rates-audit.log
+ create mode 100644 docs/validation/network-rates-before.log
+ create mode 100644 docs/validation/network-rates-build.log
+ create mode 100644 docs/validation/network-rates-lint.log
+ create mode 100644 docs/validation/network-rates-production.log
+ create mode 100644 docs/validation/network-rates-tests.log
+npm warn Unknown user config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Scope: all 4 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+Done in 1.3s using pnpm v9.15.9
+npm warn Unknown user config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Scope: 3 of 4 workspace projects
+packages/shared build$ tsc
+packages/shared build: Done
+apps/backend build$ tsc
+apps/frontend build$ tsc && vite build
+apps/backend build: Done
+apps/frontend build: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+apps/frontend build:   - `__dirname` (vite.config.ts:10:39). Use `import.meta.dirname` instead
+apps/frontend build: Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+apps/frontend build: vite v8.3.1 building client environment for production...
+apps/frontend build: transforming...
+apps/frontend build: ✓ 1774 modules transformed.
+apps/frontend build: rendering chunks...
+apps/frontend build: computing gzip size...
+apps/frontend build: dist/index.html                              0.52 kB │ gzip:   0.32 kB
+apps/frontend build: dist/assets/index-DEJZEIoc.css              74.48 kB │ gzip:  11.63 kB
+apps/frontend build: dist/assets/check-mZyDNZFV.js                0.11 kB │ gzip:   0.13 kB
+apps/frontend build: dist/assets/chevron-down-B9D2XLOp.js         0.11 kB │ gzip:   0.13 kB
+apps/frontend build: dist/assets/play-BSoL_IrO.js                 0.12 kB │ gzip:   0.13 kB
+apps/frontend build: dist/assets/square-C0QQPXw-.js               0.13 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/plus-Bo412N-N.js                 0.14 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/x-CtWFnnYt.js                    0.14 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/clock-DzZ44x0B.js                0.17 kB │ gzip:   0.16 kB
+apps/frontend build: dist/assets/circle-check-big-C0jGYHKn.js     0.18 kB │ gzip:   0.17 kB
+apps/frontend build: dist/assets/circle-x-KhYBDmxh.js             0.19 kB │ gzip:   0.17 kB
+apps/frontend build: dist/assets/database-BFx71TY6.js             0.23 kB │ gzip:   0.19 kB
+apps/frontend build: dist/assets/circle-alert-Ylj7Jcyg.js         0.23 kB │ gzip:   0.18 kB
+apps/frontend build: dist/assets/download-B1y1tKmu.js             0.25 kB │ gzip:   0.21 kB
+apps/frontend build: dist/assets/triangle-alert-BK9YX-m3.js       0.25 kB │ gzip:   0.20 kB
+apps/frontend build: dist/assets/pencil-Bmp8U_wu.js               0.26 kB │ gzip:   0.21 kB
+apps/frontend build: dist/assets/wifi-DTE0zY7N.js                 0.26 kB │ gzip:   0.19 kB
+apps/frontend build: dist/assets/shield-check-BdruBI-j.js         0.30 kB │ gzip:   0.24 kB
+apps/frontend build: dist/assets/file-text-J5EV9wQg.js            0.32 kB │ gzip:   0.20 kB
+apps/frontend build: dist/assets/server-CZCTDQex.js               0.32 kB │ gzip:   0.20 kB
+apps/frontend build: dist/assets/trash-2-BMI4Ye8_.js              0.34 kB │ gzip:   0.24 kB
+apps/frontend build: dist/assets/folder-open-BotJavwJ.js          0.46 kB │ gzip:   0.31 kB
+apps/frontend build: dist/assets/useSystem-DNR7adyh.js            0.80 kB │ gzip:   0.41 kB
+apps/frontend build: dist/assets/shield-vLnn26Xr.js               0.85 kB │ gzip:   0.42 kB
+apps/frontend build: dist/assets/useScheduler-BpoB4SwD.js         1.31 kB │ gzip:   0.44 kB
+apps/frontend build: dist/assets/useDocker-C0ntu20u.js            1.57 kB │ gzip:   0.65 kB
+apps/frontend build: dist/assets/useStorage-JJir-VnM.js           3.32 kB │ gzip:   0.89 kB
+apps/frontend build: dist/assets/useNetwork-DflYPDR4.js           4.80 kB │ gzip:   1.00 kB
+apps/frontend build: dist/assets/LoginView-BCT0lpkE.js            5.79 kB │ gzip:   1.87 kB
+apps/frontend build: dist/assets/src-DRSgDbh3.js                 10.79 kB │ gzip:   3.33 kB
+apps/frontend build: dist/assets/client-DxPf6roi.js              12.20 kB │ gzip:   4.82 kB
+apps/frontend build: dist/assets/NetworkDrivesView-BRfZ83DY.js   13.00 kB │ gzip:   3.57 kB
+apps/frontend build: dist/assets/SchedulerView-C1lKZjqf.js       15.56 kB │ gzip:   3.70 kB
+apps/frontend build: dist/assets/HomeStoreView-BCs2XwC-.js       19.40 kB │ gzip:   4.51 kB
+apps/frontend build: dist/assets/SyncthingView-Dp3TWWAk.js       20.39 kB │ gzip:   4.08 kB
+apps/frontend build: dist/assets/DashboardView-BPrfACVK.js       20.85 kB │ gzip:   4.82 kB
+apps/frontend build: dist/assets/container-form-Boo8goIY.js      22.91 kB │ gzip:   4.95 kB
+apps/frontend build: dist/assets/DockerView-C9V8Bria.js          24.80 kB │ gzip:   6.01 kB
+apps/frontend build: dist/assets/SetupWizard-B4qkH2nm.js         25.00 kB │ gzip:   5.70 kB
+apps/frontend build: dist/assets/UsersView-DflZEDUI.js           25.34 kB │ gzip:   5.31 kB
+apps/frontend build: dist/assets/BackupView-BMjOygRQ.js          26.99 kB │ gzip:   5.43 kB
+apps/frontend build: dist/assets/index.esm-BRBk98Q4.js           27.93 kB │ gzip:  10.22 kB
+apps/frontend build: dist/assets/FilesView-C5WUj-Ap.js           28.22 kB │ gzip:   7.64 kB
+apps/frontend build: dist/assets/CloudBackupView-CWsfrrFJ.js     32.01 kB │ gzip:   6.67 kB
+apps/frontend build: dist/assets/SystemView-D3Hmc-qs.js          38.73 kB │ gzip:   8.73 kB
+apps/frontend build: dist/assets/StorageView-CWDflqri.js         52.86 kB │ gzip:   9.79 kB
+apps/frontend build: dist/assets/types-CHTUHh1Q.js               58.08 kB │ gzip:  13.49 kB
+apps/frontend build: dist/assets/NetworkView-CJdwy4nf.js         61.85 kB │ gzip:  10.94 kB
+apps/frontend build: dist/assets/index-xF_WxNTW.js              392.26 kB │ gzip: 123.56 kB
+apps/frontend build: ✓ built in 674ms
+apps/frontend build: Done
+npm warn Unknown user config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> @homenas/backend@1.0.2 test <installation>/apps/backend
+> tsx --test tests/*.test.ts
+
+{"level":30,"time":1790866099934,"pid":11712,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backup-cron-XmgGBR/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790866100121,"pid":11712,"hostname":"pitest","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100131,"pid":11712,"hostname":"pitest","reqId":"req-1","res":{"statusCode":200},"responseTime":9.697077999999692,"msg":"request completed"}
+{"level":30,"time":1790866100132,"pid":11712,"hostname":"pitest","reqId":"req-2","req":{"method":"POST","url":"/api/backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100144,"pid":11712,"hostname":"pitest","reqId":"req-2","res":{"statusCode":201},"responseTime":11.734231000000364,"msg":"request completed"}
+{"level":30,"time":1790866100145,"pid":11712,"hostname":"pitest","reqId":"req-3","req":{"method":"DELETE","url":"/api/backup/jobs/5","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100148,"pid":11712,"hostname":"pitest","reqId":"req-3","res":{"statusCode":200},"responseTime":2.5835990000000493,"msg":"request completed"}
+{"level":30,"time":1790866100148,"pid":11712,"hostname":"pitest","reqId":"req-4","req":{"method":"POST","url":"/api/cloud-backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100154,"pid":11712,"hostname":"pitest","reqId":"req-4","res":{"statusCode":201},"responseTime":5.50884700000006,"msg":"request completed"}
+{"level":30,"time":1790866100155,"pid":11712,"hostname":"pitest","reqId":"req-5","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/2","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100157,"pid":11712,"hostname":"pitest","reqId":"req-5","res":{"statusCode":200},"responseTime":2.376875999999811,"msg":"request completed"}
+{"level":30,"time":1790866100158,"pid":11712,"hostname":"pitest","reqId":"req-6","req":{"method":"PUT","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100162,"pid":11712,"hostname":"pitest","reqId":"req-6","res":{"statusCode":200},"responseTime":4.448990999999751,"msg":"request completed"}
+{"level":30,"time":1790866100163,"pid":11712,"hostname":"pitest","reqId":"req-7","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100166,"pid":11712,"hostname":"pitest","reqId":"req-7","res":{"statusCode":200},"responseTime":3.109247999999752,"msg":"request completed"}
+{"level":30,"time":1790866100167,"pid":11712,"hostname":"pitest","reqId":"req-8","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100171,"pid":11712,"hostname":"pitest","reqId":"req-8","res":{"statusCode":200},"responseTime":4.128842999999961,"msg":"request completed"}
+{"level":30,"time":1790866100172,"pid":11712,"hostname":"pitest","reqId":"req-9","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100174,"pid":11712,"hostname":"pitest","reqId":"req-9","res":{"statusCode":200},"responseTime":2.288691000000199,"msg":"request completed"}
+{"level":30,"time":1790866100175,"pid":11712,"hostname":"pitest","reqId":"req-a","req":{"method":"DELETE","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100207,"pid":11712,"hostname":"pitest","reqId":"req-a","res":{"statusCode":200},"responseTime":31.998964000000342,"msg":"request completed"}
+✔ backup cron initializes persisted jobs, preserves runners/contracts, refreshes API edits and stops cleanly (593.558043ms)
+✔ actual node-cron clock dispatches an enabled persisted backup without running system commands (793.034049ms)
+✔ dashboard chooses active default eth0 even when down eth1 exists with zero counters (4.804326ms)
+✔ multiple clients share one sampling window instead of consuming each other network rates (2.489598ms)
+✔ overlapping asynchronous reads are coalesced; counter reset and interface recreation establish valid baselines (2.568172ms)
+✔ kernel counter parsing handles attached values and iproute2 nested stats64 byte counters (0.616797ms)
+✔ a failed proc read clears the previous baseline rather than inventing a rate when reading recovers (0.95104ms)
+{"level":30,"time":1790866099926,"pid":11719,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-retired-modules-86aqrv/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790866100088,"pid":11719,"hostname":"pitest","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100098,"pid":11719,"hostname":"pitest","reqId":"req-1","res":{"statusCode":200},"responseTime":10.117893999999978,"msg":"request completed"}
+{"level":30,"time":1790866100100,"pid":11719,"hostname":"pitest","reqId":"req-2","req":{"method":"GET","url":"/api/ad/status","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100100,"pid":11719,"hostname":"pitest","reqId":"req-2","msg":"Route GET:/api/ad/status not found"}
+{"level":30,"time":1790866100101,"pid":11719,"hostname":"pitest","reqId":"req-2","res":{"statusCode":404},"responseTime":1.093594999999823,"msg":"request completed"}
+{"level":30,"time":1790866100102,"pid":11719,"hostname":"pitest","reqId":"req-3","req":{"method":"GET","url":"/api/ad/users","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100102,"pid":11719,"hostname":"pitest","reqId":"req-3","msg":"Route GET:/api/ad/users not found"}
+{"level":30,"time":1790866100102,"pid":11719,"hostname":"pitest","reqId":"req-3","res":{"statusCode":404},"responseTime":0.7424460000002,"msg":"request completed"}
+{"level":30,"time":1790866100103,"pid":11719,"hostname":"pitest","reqId":"req-4","req":{"method":"GET","url":"/api/ad/groups","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100103,"pid":11719,"hostname":"pitest","reqId":"req-4","msg":"Route GET:/api/ad/groups not found"}
+{"level":30,"time":1790866100104,"pid":11719,"hostname":"pitest","reqId":"req-4","res":{"statusCode":404},"responseTime":0.724945999999818,"msg":"request completed"}
+{"level":30,"time":1790866100104,"pid":11719,"hostname":"pitest","reqId":"req-5","req":{"method":"GET","url":"/api/ad/computers","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100105,"pid":11719,"hostname":"pitest","reqId":"req-5","msg":"Route GET:/api/ad/computers not found"}
+{"level":30,"time":1790866100106,"pid":11719,"hostname":"pitest","reqId":"req-5","res":{"statusCode":404},"responseTime":1.296114000000216,"msg":"request completed"}
+{"level":30,"time":1790866100106,"pid":11719,"hostname":"pitest","reqId":"req-6","req":{"method":"POST","url":"/api/ad/install","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100106,"pid":11719,"hostname":"pitest","reqId":"req-6","msg":"Route POST:/api/ad/install not found"}
+{"level":30,"time":1790866100107,"pid":11719,"hostname":"pitest","reqId":"req-6","res":{"statusCode":404},"responseTime":0.6742420000000493,"msg":"request completed"}
+{"level":30,"time":1790866100107,"pid":11719,"hostname":"pitest","reqId":"req-7","req":{"method":"POST","url":"/api/ad/provision","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100108,"pid":11719,"hostname":"pitest","reqId":"req-7","msg":"Route POST:/api/ad/provision not found"}
+{"level":30,"time":1790866100109,"pid":11719,"hostname":"pitest","reqId":"req-7","res":{"statusCode":404},"responseTime":0.609668000000056,"msg":"request completed"}
+{"level":30,"time":1790866100109,"pid":11719,"hostname":"pitest","reqId":"req-8","req":{"method":"POST","url":"/api/ad/restart","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100110,"pid":11719,"hostname":"pitest","reqId":"req-8","msg":"Route POST:/api/ad/restart not found"}
+{"level":30,"time":1790866100110,"pid":11719,"hostname":"pitest","reqId":"req-8","res":{"statusCode":404},"responseTime":0.6125390000001971,"msg":"request completed"}
+{"level":30,"time":1790866100110,"pid":11719,"hostname":"pitest","reqId":"req-9","req":{"method":"GET","url":"/api/active-backup/devices","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100111,"pid":11719,"hostname":"pitest","reqId":"req-9","msg":"Route GET:/api/active-backup/devices not found"}
+{"level":30,"time":1790866100111,"pid":11719,"hostname":"pitest","reqId":"req-9","res":{"statusCode":404},"responseTime":0.5917789999998604,"msg":"request completed"}
+{"level":30,"time":1790866100112,"pid":11719,"hostname":"pitest","reqId":"req-a","req":{"method":"POST","url":"/api/active-backup/devices","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100112,"pid":11719,"hostname":"pitest","reqId":"req-a","msg":"Route POST:/api/active-backup/devices not found"}
+{"level":30,"time":1790866100112,"pid":11719,"hostname":"pitest","reqId":"req-a","res":{"statusCode":404},"responseTime":0.6782419999999547,"msg":"request completed"}
+{"level":30,"time":1790866100113,"pid":11719,"hostname":"pitest","reqId":"req-b","req":{"method":"DELETE","url":"/api/active-backup/devices/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100113,"pid":11719,"hostname":"pitest","reqId":"req-b","msg":"Route DELETE:/api/active-backup/devices/1 not found"}
+{"level":30,"time":1790866100113,"pid":11719,"hostname":"pitest","reqId":"req-b","res":{"statusCode":404},"responseTime":0.5239830000000438,"msg":"request completed"}
+{"level":30,"time":1790866100114,"pid":11719,"hostname":"pitest","reqId":"req-c","req":{"method":"POST","url":"/api/active-backup/devices/1/backup","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100114,"pid":11719,"hostname":"pitest","reqId":"req-c","msg":"Route POST:/api/active-backup/devices/1/backup not found"}
+{"level":30,"time":1790866100114,"pid":11719,"hostname":"pitest","reqId":"req-c","res":{"statusCode":404},"responseTime":0.46331499999996595,"msg":"request completed"}
+{"level":30,"time":1790866100115,"pid":11719,"hostname":"pitest","reqId":"req-d","req":{"method":"GET","url":"/api/active-backup/devices/1/agent-package?platform=linux","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100115,"pid":11719,"hostname":"pitest","reqId":"req-d","msg":"Route GET:/api/active-backup/devices/1/agent-package?platform=linux not found"}
+{"level":30,"time":1790866100115,"pid":11719,"hostname":"pitest","reqId":"req-d","res":{"statusCode":404},"responseTime":0.44053800000028787,"msg":"request completed"}
+{"level":30,"time":1790866100115,"pid":11719,"hostname":"pitest","reqId":"req-e","req":{"method":"POST","url":"/api/active-backup/agent/heartbeat","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100116,"pid":11719,"hostname":"pitest","reqId":"req-e","msg":"Route POST:/api/active-backup/agent/heartbeat not found"}
+{"level":30,"time":1790866100116,"pid":11719,"hostname":"pitest","reqId":"req-e","res":{"statusCode":404},"responseTime":0.5182239999999183,"msg":"request completed"}
+{"level":30,"time":1790866100116,"pid":11719,"hostname":"pitest","reqId":"req-f","req":{"method":"POST","url":"/api/active-backup/agent/backup/start","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100117,"pid":11719,"hostname":"pitest","reqId":"req-f","msg":"Route POST:/api/active-backup/agent/backup/start not found"}
+{"level":30,"time":1790866100117,"pid":11719,"hostname":"pitest","reqId":"req-f","res":{"statusCode":404},"responseTime":0.47611199999983,"msg":"request completed"}
+{"level":30,"time":1790866100117,"pid":11719,"hostname":"pitest","reqId":"req-g","req":{"method":"POST","url":"/api/active-backup/agent/backup/file","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100117,"pid":11719,"hostname":"pitest","reqId":"req-g","msg":"Route POST:/api/active-backup/agent/backup/file not found"}
+{"level":30,"time":1790866100117,"pid":11719,"hostname":"pitest","reqId":"req-g","res":{"statusCode":404},"responseTime":0.3520010000002003,"msg":"request completed"}
+{"level":30,"time":1790866100118,"pid":11719,"hostname":"pitest","reqId":"req-h","req":{"method":"POST","url":"/api/active-backup/agent/backup/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100118,"pid":11719,"hostname":"pitest","reqId":"req-h","msg":"Route POST:/api/active-backup/agent/backup/complete not found"}
+{"level":30,"time":1790866100118,"pid":11719,"hostname":"pitest","reqId":"req-h","res":{"statusCode":404},"responseTime":0.3432610000004388,"msg":"request completed"}
+{"level":30,"time":1790866100118,"pid":11719,"hostname":"pitest","reqId":"req-i","req":{"method":"GET","url":"/api/backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100120,"pid":11719,"hostname":"pitest","reqId":"req-i","res":{"statusCode":200},"responseTime":1.4293550000002142,"msg":"request completed"}
+{"level":30,"time":1790866100120,"pid":11719,"hostname":"pitest","reqId":"req-j","req":{"method":"GET","url":"/api/cloud-backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100122,"pid":11719,"hostname":"pitest","reqId":"req-j","res":{"statusCode":200},"responseTime":1.652892999999949,"msg":"request completed"}
+✔ retired Active Directory/Active Backup APIs return 404; legacy database records and ordinary backups survive restart (624.460801ms)
+{"level":30,"time":1790866100571,"pid":11759,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-T9dWXb/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790866100747,"pid":11759,"hostname":"pitest","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100760,"pid":11759,"hostname":"pitest","reqId":"req-1","res":{"statusCode":200},"responseTime":12.19675099999995,"msg":"request completed"}
+{"level":30,"time":1790866100762,"pid":11759,"hostname":"pitest","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100764,"pid":11759,"hostname":"pitest","reqId":"req-2","res":{"statusCode":200},"responseTime":2.086579000000256,"msg":"request completed"}
+{"level":30,"time":1790866100764,"pid":11759,"hostname":"pitest","reqId":"req-3","req":{"method":"POST","url":"/api/setup/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866100767,"pid":11759,"hostname":"pitest","reqId":"req-3","res":{"statusCode":409},"responseTime":2.22591199999988,"msg":"request completed"}
+{"level":30,"time":1790866100768,"pid":11759,"hostname":"pitest","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866101277,"pid":11759,"hostname":"pitest","reqId":"req-4","res":{"statusCode":200},"responseTime":508.97006599999986,"msg":"request completed"}
+{"level":30,"time":1790866101278,"pid":11759,"hostname":"pitest","reqId":"req-5","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866101279,"pid":11759,"hostname":"pitest","reqId":"req-5","res":{"statusCode":403},"responseTime":1.3440040000000408,"msg":"request completed"}
+{"level":30,"time":1790866101280,"pid":11759,"hostname":"pitest","reqId":"req-6","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866101281,"pid":11759,"hostname":"pitest","reqId":"req-6","res":{"statusCode":401},"responseTime":1.239650999999867,"msg":"request completed"}
+{"level":30,"time":1790866101282,"pid":11759,"hostname":"pitest","reqId":"req-7","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866101283,"pid":11759,"hostname":"pitest","reqId":"req-7","res":{"statusCode":200},"responseTime":1.313521000000037,"msg":"request completed"}
+{"level":30,"time":1790866101284,"pid":11759,"hostname":"pitest","reqId":"req-8","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866101798,"pid":11759,"hostname":"pitest","reqId":"req-8","res":{"statusCode":200},"responseTime":514.3261709999997,"msg":"request completed"}
+{"level":30,"time":1790866101803,"pid":11759,"hostname":"pitest","reqId":"req-9","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866102285,"pid":11759,"hostname":"pitest","reqId":"req-9","res":{"statusCode":401},"responseTime":481.0543339999999,"msg":"request completed"}
+{"level":30,"time":1790866102285,"pid":11759,"hostname":"pitest","reqId":"req-a","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866102761,"pid":11759,"hostname":"pitest","reqId":"req-a","res":{"statusCode":401},"responseTime":475.4854690000002,"msg":"request completed"}
+{"level":30,"time":1790866102762,"pid":11759,"hostname":"pitest","reqId":"req-b","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866103216,"pid":11759,"hostname":"pitest","reqId":"req-b","res":{"statusCode":401},"responseTime":454.56069800000023,"msg":"request completed"}
+{"level":30,"time":1790866103217,"pid":11759,"hostname":"pitest","reqId":"req-c","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866103665,"pid":11759,"hostname":"pitest","reqId":"req-c","res":{"statusCode":401},"responseTime":447.72290299999986,"msg":"request completed"}
+{"level":30,"time":1790866103666,"pid":11759,"hostname":"pitest","reqId":"req-d","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866104114,"pid":11759,"hostname":"pitest","reqId":"req-d","res":{"statusCode":401},"responseTime":448.0232930000002,"msg":"request completed"}
+{"level":30,"time":1790866104115,"pid":11759,"hostname":"pitest","reqId":"req-e","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866104117,"pid":11759,"hostname":"pitest","reqId":"req-e","res":{"statusCode":429},"responseTime":2.0845240000007834,"msg":"request completed"}
+{"level":30,"time":1790866104117,"pid":11759,"hostname":"pitest","reqId":"req-f","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866104118,"pid":11759,"hostname":"pitest","reqId":"req-f","res":{"statusCode":401},"responseTime":0.7002060000004349,"msg":"request completed"}
+✔ bootstrap credential changes revoke other sessions; authenticated wizard can resume; 2FA failures lock account (3800.133502ms)
+{"level":30,"time":1790866104245,"pid":11759,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-Rao1Lx/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+✔ scheduler rejects untrusted binaries, combined rsync interpreter flags and unsafe toggle (398.740955ms)
+✔ path guards accept dotted names, reject symlink escapes/missing leaves and pool roots (4.794419ms)
+✔ upload safety checks binary signatures and case-insensitive text signatures (7.228276ms)
+✔ Compose validates relative binds, device access, inherited definitions and volume driver bypasses (27.83851ms)
+{"level":30,"time":1790866104684,"pid":11759,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-JisK2v/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+✔ DDNS retries failed providers at unchanged IP and updates newly configured domains (187.806533ms)
+✔ Cloudflare selects the correct CPU binary and passwords respect bcrypt byte limits (2.746599ms)
+✔ updater launches the repository-pinned pnpm through npm exec, never the incompatible global executable (108.410885ms)
+✔ application fast-forward refuses upstream collisions with ignored local custom files (281.399791ms)
+{"level":30,"time":1790866103331,"pid":11823,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-bootstrap-vNe7zr/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790866103441,"pid":11823,"hostname":"pitest","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866103449,"pid":11823,"hostname":"pitest","reqId":"req-1","res":{"statusCode":200},"responseTime":7.407795000000078,"msg":"request completed"}
+{"level":30,"time":1790866103450,"pid":11823,"hostname":"pitest","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866103451,"pid":11823,"hostname":"pitest","reqId":"req-2","res":{"statusCode":200},"responseTime":1.281355000000076,"msg":"request completed"}
+{"level":30,"time":1790866103452,"pid":11823,"hostname":"pitest","reqId":"req-3","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866103452,"pid":11823,"hostname":"pitest","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866104348,"pid":11823,"hostname":"pitest","reqId":"req-3","res":{"statusCode":200},"responseTime":895.882623,"msg":"request completed"}
+{"level":30,"time":1790866104351,"pid":11823,"hostname":"pitest","reqId":"req-4","res":{"statusCode":409},"responseTime":898.79313,"msg":"request completed"}
+{"level":30,"time":1790866104353,"pid":11823,"hostname":"pitest","reqId":"req-5","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866104802,"pid":11823,"hostname":"pitest","reqId":"req-5","res":{"statusCode":200},"responseTime":448.0589219999997,"msg":"request completed"}
+✔ independent review: a concurrently revoked bootstrap session cannot overwrite administrator password (1735.879133ms)
+{"level":30,"time":1790866104937,"pid":11823,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-6hzlfK/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790866105058,"pid":11823,"hostname":"pitest","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866105061,"pid":11823,"hostname":"pitest","reqId":"req-1","res":{"statusCode":401},"responseTime":2.7554509999999937,"msg":"request completed"}
+▶ independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+  ✔ password (253.9573ms)
+{"level":30,"time":1790866105189,"pid":11823,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-EzGFNZ/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790866105260,"pid":11823,"hostname":"pitest","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866105278,"pid":11823,"hostname":"pitest","reqId":"req-1","res":{"statusCode":401},"responseTime":18.401209999999992,"msg":"request completed"}
+  ✔ totp (214.625763ms)
+{"level":30,"time":1790866105403,"pid":11823,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-xgWIof/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790866105464,"pid":11823,"hostname":"pitest","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866105466,"pid":11823,"hostname":"pitest","reqId":"req-1","res":{"statusCode":401},"responseTime":2.676266000000396,"msg":"request completed"}
+  ✔ delete (189.133555ms)
+{"level":30,"time":1790866105597,"pid":11823,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-To1l8y/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790866105663,"pid":11823,"hostname":"pitest","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790866105667,"pid":11823,"hostname":"pitest","reqId":"req-1","res":{"statusCode":429},"responseTime":3.4383229999994,"msg":"request completed"}
+  ✔ lockout (202.938532ms)
+✔ independent review: login cannot issue sessions from stale password, TOTP or deleted-user state (866.727813ms)
+{"level":30,"time":1790866103978,"pid":11885,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-cron-close-LKoyxE/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+✔ independent review: server hook cancels backups before SQLite closes (330.288572ms)
+{"level":30,"time":1790866104205,"pid":11885,"hostname":"pitest","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-ddns-close-SN3gPN/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+✔ independent review: closing waits for in-flight DDNS before SQLite closes (221.924281ms)
+✔ independent review: update and storage modules resolve actual tsc production layout (3.041507ms)
+✔ independent storage review: branch policies and cache subpaths never measure root (777.926789ms)
+✔ format entrypoints refuse root before destructive commands; add/create mount only mocked disks and persist UUID (2954.116122ms)
+✔ missing logical cache branch measures only its existing mounted NAS ancestor (18.581488ms)
+✔ format guard resolves NVMe root without truncating namespace (3.634749ms)
+✔ format guard refuses unknown topology, duplicates, mounted children and LVM (1.727597ms)
+✔ format guard protects every physical ancestor of LVM/RAID root (0.628946ms)
+✔ format lock excludes concurrent entrypoints and releases after failures (1.463559ms)
+✔ backup rejects attached and bundled shell execution flags (1.407726ms)
+✔ metrics avoid counting virtual guest CPU twice and parse attached RX counter (2.037782ms)
+✔ disk persistence replaces only matching mountpoints and preserves unrelated entries (0.942243ms)
+✔ cloud remote config rejects INI directive injection and executable password commands (1.000317ms)
+✔ project-root discovery supports source and compiled backend nesting (6.019088ms)
+✔ flat lsblk topology is refused and disconnected disks are never formatted (1.064947ms)
+✔ multi-view pools select storage alias instead of first archive; ambiguity fails closed (0.693057ms)
+✔ primary pool resolver follows a real storage symlink with temporary mounts (56.183761ms)
+✔ database downloads use live SQLite with custom data directory; SSH command failures do not report success (372.818098ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 42
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11511.37023
+.env: OK
+<local-extension>: OK
+/etc/fstab: OK
+/etc/samba/smb.conf: OK
+/etc/snapraid.conf: OK
+curl: (7) Failed to connect to 127.0.0.1 port 443 after 0 ms: Could not connect to server
+curl: (7) Failed to connect to 127.0.0.1 port 443 after 0 ms: Could not connect to server
+{"status":"ok"}active
+8349ad3

@@ -22,3 +22,11 @@ Las lecturas se realizan sin modificar interfaces, rutas, discos, recursos compa
 Corregido y verificado localmente: **6 instaladores + 42 backend + 19 navegador = 67 pruebas**, build, lint/typecheck, auditoría sin vulnerabilidades conocidas y smoke HTTPS compilado (React/login/TOTP/exportación SQLite). El revisor independiente repitió backend42/frontend19/typecheck/diff, sin hallazgos confirmados abiertos. Logs `docs/validation/network-rates-*.log`.
 
 Los contratos y unidades API se conservan. Primera muestra tras arranque devuelve cero hasta disponer de una segunda lectura; la caché de un segundo es intencional. Selección IPv4/default y fallback operativo probados; rutas exclusivamente IPv6 y policy routing complejo quedan sin validación en otro entorno. Publicación e instalación NAS se registran a continuación.
+
+## NAS: corregido y verificado
+
+Código `8349ad3` publicado e instalado mediante merge fast-forward protegido, lockfile y `npm exec --offline --yes --package=pnpm@9.15.9 -- pnpm`. Respaldo privado de compilados anterior a la actualización. Build Node24/ARM64 y **42/42 backend** pasan en el NAS; sólo se reinició la aplicación tras compilar. `.env`, extensión local, fstab, Samba y SnapRAID conservan sus hashes.
+
+Navegador real contra el NAS: dashboard elige eth0, tres muestras RX/TX positivas, etiquetas dashboard y gráfica de Red muestran velocidades positivas; contadores acumulados positivos. Syncthing, AD y Active Backup ausentes del menú. Se usó sesión existente, sólo GET de monitorización, sin configurar red, ejecutar copias ni modificar datos. El primer intento del harness encontró dos etiquetas RX (tabla y gráfica); se delimitó el selector a la gráfica y se repitió con éxito. No se alteraron comprobaciones de la aplicación para conseguir el resultado.
+
+Para comprobarlo: recargar el panel, esperar dos actualizaciones de métricas y abrir Red; revisar RX/TX y seleccionar la interfaz activa en la gráfica. En ausencia de tráfico real las tasas cero son válidas. Instalación/arranque mantienen las instrucciones de esta versión y de `MODULE-REMOVAL.md`; usar pnpm9.15.9 o la invocación npm exec fijada si existe un pnpm global incompatible. No se verificaron topologías IPv6/policy routing ni hotplug físico. No hay reparación confirmada pendiente dentro de este cambio.
