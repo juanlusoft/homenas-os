@@ -17,7 +17,7 @@ Para publicación se han omitido IP, MAC, hostname, usuario personal, rutas pers
 
 1. Se transfirió el árbol local reparado excluyendo Git, dependencias del anfitrión, dist, datos, certificados y `.env`; se incluyeron los cinco agentes previamente compilados. Se preparó `/opt/homenas-repair-stage-20261001` como usuario de servicio.
 2. En el NAS: `npm exec --yes --package=pnpm@9.15.9 -- pnpm install --frozen-lockfile` y `pnpm -r build` mediante ese pnpm. SQLite11.10 se compiló nativamente para Node24/ARM64. La instalación global anterior de pnpm no se sustituyó.
-3. Se ejecutaron pruebas del backend en staging y, al final, en la aplicación instalada: **38/38 PASS**. Integración del agente ARM64 real con Fastify/SQLite/archivos temporales: PASS.
+3. Se ejecutaron pruebas del backend en staging y, al final, en la aplicación instalada: **39/39 PASS**. Integración del agente ARM64 real con Fastify/SQLite/archivos temporales: PASS.
 4. Se copió la aplicación anterior a `/var/backups/homenas-repair-20261001/application`, directorio padre root0700. Tras detener únicamente `homenas`, se refrescó la copia DB/WAL con el proceso parado. Se preservaron unidades, `.env`, certificados y todos los datos externos.
 5. Se sincronizaron fuentes/dependencias/builds; se creó rama remota local `repair/audit-20261001`, sin commits ni push. Se arrancó `homenas` y comprobó salud HTTPS. El ajuste final de caché se compiló y aplicó con otro restart del mismo servicio. No se reinició el equipo.
 
@@ -29,7 +29,7 @@ El [script aplicado](validation/homepinas-upgrade-command.sh) es evidencia de es
 |---|---|
 | Referencia antes de actualizar | Login navegador,8API y4vistas PASS; status tomaba incorrectamente `/mnt/pool-archive`. |
 | Compilación y SQLite | [build ARM](validation/homepinas-build.log), [build final](validation/homepinas-build-final.log); instalación frozen y carga SQLite nativa PASS. |
-| Regresiones en NAS | [backend38](validation/homepinas-backend-tests.log):38PASS,0fallos/omitidos; comandos destructivos sustituidos por fixtures incluso en NAS real. |
+| Regresiones en NAS | [backend39](validation/homepinas-backend-tests.log):39PASS,0fallos/omitidos; comandos destructivos sustituidos por fixtures incluso en NAS real. |
 | Go real en ARM64 | [integración](validation/homepinas-agent-integration.log): TCP→Fastify→SQLite, archivos vacíos/multichunk, hardlinks, recuperación de base ausente y errores/manifest preservado PASS, todo temporal. |
 | Interfaz y API instaladas | [browser final](validation/homepinas-browser-final.log): login y8API200,4vistas sin errores JS; principal `/mnt/pool`, seis discos y una rama cache lógica, incluso ausente su subdirectorio. |
 | Archivos por API sobre pool real | [flujo completo](validation/homepinas-browser-after.log): hashes SHA256 de tres fixtures antes/después; descarga UTF-8/vacío/archivo grande, subida multipart de1MB/vacío, rename/copy/mkdir/move, verificación de contenido y borrado del directorio temporal PASS. No se leyó contenido de archivos del usuario. |
@@ -47,7 +47,7 @@ Los [checks de navegador](validation/homepinas-browser-check.mjs) requieren `HOM
 
 ## Arranque, rollback y límites
 
-Arranque comprobado: `sudo systemctl start homenas`; salud: `curl -skf https://127.0.0.1/api/health` desde NAS. Panel en `https://TEST_NAS_HOST`. Fuentes/build instalados en `/opt/homenas-v3`; la rama y cambios están sin publicar. Las actualizaciones Git rechazan el árbol modificado para proteger la reparación local.
+Arranque comprobado: `sudo systemctl start homenas`; salud: `curl -skf https://127.0.0.1/api/health` desde NAS. Panel en `https://TEST_NAS_HOST`. Fuentes/build instalados en `/opt/homenas-v3`; las reparaciones están publicadas en `origin/main` y el checkout está en `main`, con árbol limpio y upstream configurado. Los archivos locales adicionales permanecen conservados.
 
 Para volver a la referencia anterior se dispone de la copia completa indicada: detener `homenas`, apartar la aplicación actual, restaurar esa copia a `/opt/homenas-v3` y arrancar el servicio. **Rollback preparado, no ejecutado.** Restaurar la DB de la copia devuelve usuarios/configuración al momento del respaldo; hay que conservar primero cualquier cambio posterior. Los datos del pool están fuera de esa carpeta.
 
@@ -64,3 +64,9 @@ Pendiente de autorización: [configuración de journal persistente](validation/h
 ### Registro persistente activado con autorización
 
 El usuario autorizó activarlo. Se instaló `/etc/systemd/journald.conf.d/60-homenas-repair-diagnostics.conf` root0644: Storage=persistent, SystemMaxUse=64M, SystemKeepFree=512M, MaxRetentionSec=7day. Se creó el directorio mediante systemd-tmpfiles, reinició únicamente journald y ejecutó flush/sync. Se escribió un marcador y recuperó con `journalctl --directory=/var/log/journal`; archivos journal presentes en disco y `journalctl --verify` PASS. Consumo11.1MB inicial y19.1MB después de crear también el journal de usuario. Journald y homenas activos, NRestarts0 de aplicación, ningún error de journald; boot13:26:10 sin nuevo reinicio. Watchdog intacto. La causa del reinicio anterior sigue sin determinar; el nuevo registro permite investigar eventos posteriores.
+
+## Publicación y ventilador
+
+Con autorización del usuario se publicaron las reparaciones en `main` y `repair/audit-20261001` (commit de código73dd2d1, seguimiento documental4fab0fd). El NAS se alineó verificando igualdad del árbol con origin/main antes de mover HEAD: sin reset hard, datos y fuente local adicional conservados. El actualizador añade `--no-overwrite-ignore` para impedir futuras colisiones; backend recompilado y **39/39 pruebas en el NAS publicado PASS**. Checkout main limpio, upstream origin/main.
+
+Después de publicar, a petición del usuario, se ajustó el ventilador al50%. El controlador emc2305 estaba en cur_state10/10, PWM255; fan-speed.service imponía100% mientras nas-fan-50.service imponía50%. Se respaldó la unidad original e instaló `/etc/systemd/system/fan-speed.service.d/50-percent.conf` para actuar sobre el cooling device emc2305 con state5. Se reiniciaron ambas unidades; control térmico del kernel conservado. Lectura verificada: **state5/10, PWM128/255,1552rpm y CPU35.6°C**. La configuración persistirá al arrancar; el kernel puede aumentar ventilación por temperatura. No se reinició el equipo ni se cambiaron discos/montajes.

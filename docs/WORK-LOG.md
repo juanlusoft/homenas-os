@@ -8,6 +8,8 @@ Aplicación NAS actualizada desde referencia original, con instalación frozen/b
 
 Reinicio inesperado confirmado por usuario/agente como no solicitado: sin auditpower/journalprevio,pstorevacío/watchdogvendor60s no concluyentes. Aplicación/pools/autostart postbootPASS. Usuarioautoriza journald persistente64MB7días512MKeepFree: instalado yverificado markerendisco/verifyPASS, sinreboot ywatchdogintacto. Causaoriginalpendiente.
 
-Para publicación: docs/harness sanitizados, gitignore runtime/secretos y merge --no-overwrite-ignore probado contra colisiónignored. Alinear NAS con commit publicado preservando archivos locales; verificar tree antes de moverHEAD, sin reset hard. Usuarios autorizan después ventilador50%; control emc2305/two services+cron descubierto, todavía sinmodificarhasta cerrar publicación.
+Para publicación: docs/harness sanitizados, gitignore runtime/secretos y merge --no-overwrite-ignore probado contra colisiónignored. Alinear NAS con commit publicado preservando archivos locales; verificar tree antes de moverHEAD, sin reset hard. Usuario autorizó ventilador50% después de publicar: drop-in fan-speed, thermal state5/10 PWM128 verificados; control térmico conservado.
 
 Pendientes: destructivos/montajes/drain/paridad/cloud/red/Docker y plataformas nativas Windows/macOS; TOCTOUexterno,hotplug/sudoALL/APIACL/growthmultipool. No certificación completa ni ausencia de fallos. Información de conexión privada en Honcho; no contraseñas en archivos.
+
+Cierrepublicación: código73dd2d1+doc4fab0fd publicados enmain/repair; NASmain limpioorigin/main,39testsPASS allí, archivo adicional preservado y mergeignored protegido. Ventilador50% persistente verificado1552rpm35.6°C. Sin nueva reparación confirmada abierta del grupo; reboot inexplicado anterior continúa pendiente de evidencia posterior.
