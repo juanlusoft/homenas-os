@@ -1,3 +1,5 @@
+> Registro histórico de la reparación inicial. Active Directory y Active Backup se retiraron posteriormente por petición del usuario; las referencias a sus agentes, ZIP y comandos Go ya no describen la versión vigente. Véase [MODULE-REMOVAL.md](MODULE-REMOVAL.md).
+
 # Reparación de interfaz homenas-os — 2026-10-01
 
 Agente utilizado: subagente Codex `frontend`, siguiendo íntegramente la definición real **Frontend Developer**, `$HOME/.claude/agents/engineering-frontend-developer.md`. Ámbito exclusivo: `apps/frontend`; contratos backend/shared consultados y coordinados con agentes backend/almacenamiento. No se ejecutaron operaciones de almacenamiento real.

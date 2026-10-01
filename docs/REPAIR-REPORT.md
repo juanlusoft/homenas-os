@@ -1,3 +1,5 @@
+> Registro histórico de la reparación inicial. Active Directory y Active Backup se retiraron posteriormente por petición del usuario; las referencias a sus agentes, ZIP y comandos Go ya no describen la versión vigente. Véase [MODULE-REMOVAL.md](MODULE-REMOVAL.md).
+
 # Reparación de homenas-os — 2026-10-01
 
 Checkout original `332d4c2`, rama local `repair/audit-20261001`. Se conserva esta versión antigua: Fastify/SQLite, React/Vite, agente Go y servicios NAS Linux. No se ha usado el comportamiento de TiesOS moderno como especificación. Las reparaciones se prepararon en una rama separada y el usuario autorizó posteriormente su publicación en `main` para el actualizador. Posteriormente el usuario autorizó actualizar su HomePiNAS y se actualizó únicamente la aplicación, conservando discos/configuración; no hubo operaciones destructivas ni ejecución del instalador privilegiado.

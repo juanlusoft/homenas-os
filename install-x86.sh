@@ -385,8 +385,6 @@ sudo -u homenas pnpm --filter @homenas/backend exec node --input-type=module -e 
 
 info "Building frontend and backend (NODE_ENV=production)..."
 sudo -u homenas NODE_ENV=production pnpm -r build
-info "Building Active Backup clients..."
-sudo -u homenas node scripts/build-agent.mjs
 
 # ── TLS certificate ───────────────────────────────────────────────────────────
 

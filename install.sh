@@ -320,8 +320,6 @@ sudo -u homenas pnpm --filter @homenas/backend exec node --input-type=module -e 
 # ── Build (as homenas) ────────────────────────────────────────────────────────
 info "Building frontend and backend..."
 sudo -u homenas NODE_ENV=production pnpm -r build
-info "Building Active Backup clients..."
-sudo -u homenas node scripts/build-agent.mjs
 
 # ── Self-signed TLS certificate ───────────────────────────────────────────────
 info "Generating self-signed TLS certificate..."

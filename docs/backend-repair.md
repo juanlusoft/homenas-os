@@ -1,3 +1,5 @@
+> Registro histórico de la reparación inicial. Active Directory y Active Backup se retiraron posteriormente por petición del usuario; las referencias a sus agentes, ZIP y comandos Go ya no describen la versión vigente. Véase [MODULE-REMOVAL.md](MODULE-REMOVAL.md).
+
 # Reparaciones backend y seguridad — 2026-10-01
 
 Ámbito: backend Fastify/SQLite, autenticación y autorización, gestor de ficheros, scheduler, Docker/HomeStore, DDNS, Cloudflare y AD. Se leyeron completas las definiciones locales The Agents `engineering-backend-architect.md` (Backend Architect) y `security-appsec-engineer.md` (Application Security Engineer), aplicadas por el subagente Codex `backend_security`. No son procesos externos independientes; la coordinación y revisión final corresponden al agente raíz.

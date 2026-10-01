@@ -1,3 +1,5 @@
+> Registro histórico de la reparación inicial. Active Directory y Active Backup se retiraron posteriormente por petición del usuario; las referencias a sus agentes, ZIP y comandos Go ya no describen la versión vigente. Véase [MODULE-REMOVAL.md](MODULE-REMOVAL.md).
+
 # Revisión independiente de reparaciones — 2026-10-01
 
 Revisor: subagente Codex `independent_review`, distinto de quienes implementaron. Se leyeron completas las definiciones reales The Agents **Code Reviewer** (`$HOME/agency-agents/engineering/engineering-code-reviewer.md`) y **API Tester** (`$HOME/.claude/agents/testing-api-tester.md`). Se aplicaron a revisión y pruebas locales; no se ejecutaron agentes externos mediante un runtime distinto. No hay AGENTS.md propio en este checkout; se aplicaron las instrucciones globales del usuario, incluido Honcho por hito.

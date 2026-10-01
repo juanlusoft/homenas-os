@@ -58,7 +58,7 @@ try {
   const page = await browser.newPage({ ignoreHTTPSErrors:true })
   await page.route('**/api/**', (route: any) => {
     const pathname=new URL(route.request().url()).pathname
-    if (pathname.startsWith('/api/auth/') || pathname.startsWith('/api/setup/status') || pathname==='/api/health' || pathname.startsWith('/api/active-backup/devices') || pathname==='/api/system/db-backup') return route.continue()
+    if (pathname.startsWith('/api/auth/') || pathname.startsWith('/api/setup/status') || pathname==='/api/health' || pathname.startsWith('/api/active-backup/') || pathname.startsWith('/api/ad/') || pathname==='/api/system/db-backup') return route.continue()
     return route.fulfill({status:503,json:{message:'Monitoring disabled in isolated production smoke'}})
   })
   await page.goto(origin+'/login')
@@ -77,21 +77,21 @@ try {
   const downloads = await page.evaluate(async () => {
     const state = JSON.parse(sessionStorage.getItem('homenas-auth')!).state
     const headers = { 'X-Session-Id': state.sessionId, 'X-CSRF-Token': state.csrfToken, 'Content-Type': 'application/json' }
-    const created = await fetch('/api/active-backup/devices',{method:'POST',headers,body:JSON.stringify({name:'prod-download',hostname:'localhost',os_type:'windows'})})
-    const device = await created.json()
-    const responses = []
-    for (const [platform, arch] of [['windows','amd64'],['linux','amd64'],['linux','arm64'],['mac','amd64'],['mac','arm64']]) {
-      const response = await fetch(`/api/active-backup/devices/${device.id}/agent-package?platform=${platform}&arch=${arch}`,{headers,signal:AbortSignal.timeout(15000)})
-      responses.push({status:response.status,type:response.headers.get('content-type'),size:(await response.arrayBuffer()).byteLength})
+    const removed = []
+    for (const url of ['/api/active-backup/devices', '/api/ad/status']) {
+      const response = await fetch(url, { headers })
+      removed.push(response.status)
     }
-    const invalid = await fetch(`/api/active-backup/devices/${device.id}/agent-package?platform=windows&arch=arm64`,{headers})
     const db = await fetch('/api/system/db-backup',{headers})
-    return { created:created.status, responses, invalid:invalid.status, dbStatus:db.status, dbSize:(await db.arrayBuffer()).byteLength }
+    return { removed, dbStatus:db.status, dbSize:(await db.arrayBuffer()).byteLength }
   })
-  assert.equal(downloads.created,201);for (const response of downloads.responses) {assert.equal(response.status,200);assert.equal(response.type,'application/zip');assert.ok(response.size>1000)};assert.equal(downloads.invalid,400)
+  assert.deepEqual(downloads.removed, [404, 404])
+  assert.equal(await page.locator('a[href="/active-directory"], a[href="/active-backup"]').count(), 0)
+  assert.equal(await page.locator('a[href="/backup"]').count(), 1)
+  assert.equal(await page.locator('a[href="/cloud-backup"]').count(), 1)
   assert.equal(downloads.dbStatus,200);assert.ok(downloads.dbSize>1000)
   assert.ok((await get('/')).headers['strict-transport-security'])
-  console.log('PASS compiled HTTPS server + production React static/fallback + real login/TOTP/session + API404 + security headers + compiled agent ZIP/database downloads; temp DB/cert/logs, host monitoring blocked')
+  console.log('PASS compiled HTTPS server + production React static/fallback + real login/TOTP/session + API404 + security headers + removed module APIs/menu + database download; temp DB/cert/logs, host monitoring blocked')
 } finally {
   await browser?.close()
   if (child && child.exitCode===null) {

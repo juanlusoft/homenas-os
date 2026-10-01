@@ -1,3 +1,5 @@
+> Registro histórico de la reparación inicial. Active Directory y Active Backup se retiraron posteriormente por petición del usuario; las referencias a sus agentes, ZIP y comandos Go ya no describen la versión vigente. Véase [MODULE-REMOVAL.md](MODULE-REMOVAL.md).
+
 # Reparaciones de almacenamiento, sistema y copias (2026-10-01)
 
 Trabajo del subagente Codex `storage_system`, aplicando las definiciones reales The Agents **DevOps Automator** (`$HOME/.claude/agents/engineering-devops-automator.md`) y **Application Security Engineer** (`$HOME/.claude/agents/security-appsec-engineer.md`). No se ejecutaron formateos, montajes, instaladores, reinicios ni cambios de servicios reales. Las pruebas de comandos sustituyen PATH completo por ejecutables simulados; las copias usan SQLite y ficheros temporales.

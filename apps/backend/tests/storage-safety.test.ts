@@ -67,7 +67,7 @@ test('project-root discovery supports source and compiled backend nesting', () =
   const root = findProjectRoot(import.meta.url)
   assert.equal(findProjectRoot(pathToFileURL(join(root, 'apps/backend/src/services/updates.service.ts')).href), root)
   assert.equal(findProjectRoot(pathToFileURL(join(root, 'apps/backend/dist/src/services/updates.service.js')).href), root)
-  assert.equal(findProjectRoot(pathToFileURL(join(root, 'apps/backend/dist/src/routes/active-backup/index.js')).href), root)
+  assert.equal(findProjectRoot(pathToFileURL(join(root, 'apps/backend/dist/src/routes/storage/index.js')).href), root)
 })
 
 test('flat lsblk topology is refused and disconnected disks are never formatted', () => {

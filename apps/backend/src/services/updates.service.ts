@@ -227,11 +227,6 @@ async function runAppUpdate(): Promise<void> {
       throw new Error(`pnpm build failed: ${buildResult.stderr}`)
     }
 
-    append('> node scripts/build-agent.mjs')
-    const agentBuild = await run('node', ['scripts/build-agent.mjs'])
-    append(agentBuild.all ?? '')
-    if (agentBuild.exitCode !== 0) throw new Error(`Agent build failed: ${agentBuild.stderr}`)
-
     // Restart service — needs sudo (homenas has NOPASSWD: ALL in sudoers)
     append('> systemctl restart homenas.service')
     const restartResult = await execa(...sudoWrap('systemctl', ['restart', 'homenas.service']), {

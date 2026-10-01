@@ -9,9 +9,6 @@
     "lint": "pnpm typecheck && git diff --check && bash -n install.sh install-x86.sh uninstall.sh",
     "test": "pnpm test:installers && pnpm --filter @homenas/backend test && pnpm --filter @homenas/frontend test",
     "test:installers": "node --test tests/installers.test.mjs",
-    "test:integration": "pnpm --filter @homenas/backend exec tsx tests/agent-integration.ts",
-    "test:go": "cd apps/agent && go test -race ./...",
-    "build:agent": "node scripts/build-agent.mjs",
     "test:production": "pnpm --filter @homenas/backend exec tsx tests/production-integration.ts"
   },
   "devDependencies": {

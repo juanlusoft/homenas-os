@@ -279,21 +279,16 @@ test('delayed 401 from downloads/list/upload cannot log out a newer session', as
     '/files/list': unauthorized,
     '/files/upload': unauthorized,
     '/system/db-backup': unauthorized,
-    '/active-backup/devices/1/restore/download': unauthorized,
-    '/active-backup/devices/1/agent-package': unauthorized,
   })
   const result = await page.evaluate(async input => {
     const { useAuthStore } = await import('/src/stores/authStore.ts')
     const { filesApi } = await import('/src/api/files.ts')
     const { systemApi } = await import('/src/api/system.ts')
-    const { activeBackupApi } = await import('/src/api/active-backup.ts')
     const operations = [
       () => filesApi.getDownloadUrl('/tmp/test'),
       () => filesApi.list('/tmp'),
       () => filesApi.upload('/tmp', [new File(['test'], 'test.txt')]),
       () => systemApi.db.backup(),
-      () => activeBackupApi.downloadRestoreFile(1, 'version', '/tmp/test'),
-      () => activeBackupApi.downloadAgentPackage(1, 'linux', 'test-device'),
     ]
     const outcomes = []
     const realFetch = window.fetch
@@ -324,8 +319,8 @@ test('delayed 401 from downloads/list/upload cannot log out a newer session', as
     XMLHttpRequest.prototype.send = realSend
     return outcomes
   }, auth())
-  assert.deepEqual(result, Array.from({ length: 6 }, () => ({ message: 'UNAUTHORIZED', session: 'session-b' })))
-  assert.deepEqual(requests, Array.from({ length: 6 }, () => 'session-a'))
+  assert.deepEqual(result, Array.from({ length: 4 }, () => ({ message: 'UNAUTHORIZED', session: 'session-b' })))
+  assert.deepEqual(requests, Array.from({ length: 4 }, () => 'session-a'))
 })
 
 test('401 from the current download session logs out consistently', async t => {
@@ -335,21 +330,16 @@ test('401 from the current download session logs out consistently', async t => {
     '/files/list': unauthorized,
     '/files/upload': unauthorized,
     '/system/db-backup': unauthorized,
-    '/active-backup/devices/1/restore/download': unauthorized,
-    '/active-backup/devices/1/agent-package': unauthorized,
   })
   const result = await page.evaluate(async input => {
     const { useAuthStore } = await import('/src/stores/authStore.ts')
     const { filesApi } = await import('/src/api/files.ts')
     const { systemApi } = await import('/src/api/system.ts')
-    const { activeBackupApi } = await import('/src/api/active-backup.ts')
     const operations = [
       () => filesApi.getDownloadUrl('/tmp/test'),
       () => filesApi.list('/tmp'),
       () => filesApi.upload('/tmp', [new File(['test'], 'test.txt')]),
       () => systemApi.db.backup(),
-      () => activeBackupApi.downloadRestoreFile(1, 'version', '/tmp/test'),
-      () => activeBackupApi.downloadAgentPackage(1, 'linux', 'test-device'),
     ]
     const outcomes = []
     for (const operation of operations) {
@@ -359,56 +349,28 @@ test('401 from the current download session logs out consistently', async t => {
     }
     return outcomes
   }, auth())
-  assert.deepEqual(result, Array.from({ length: 6 }, () => ({ message: 'UNAUTHORIZED', loggedOut: true })))
+  assert.deepEqual(result, Array.from({ length: 4 }, () => ({ message: 'UNAUTHORIZED', loggedOut: true })))
 })
 
-test('agent package requests preserve default API and select Linux/macOS architectures explicitly', async t => {
-  const requests = []
-  const page = await pageFor(t, {
-    '/active-backup/devices/1/agent-package': route => {
-      requests.push(Object.fromEntries(new URL(route.request().url()).searchParams))
-      return route.fulfill({ status: 409, json: { message: 'Package request captured without downloading' } })
-    },
-  })
-  await page.evaluate(async () => {
-    const { activeBackupApi } = await import('/src/api/active-backup.ts')
-    for (const [platform, arch] of [['linux', undefined], ['linux', 'amd64'], ['linux', 'arm64'], ['mac', 'amd64'], ['mac', 'arm64'], ['windows', 'amd64']]) {
-      await activeBackupApi.downloadAgentPackage(1, platform, 'test-device', arch).catch(() => {})
-    }
-  })
-  assert.deepEqual(requests, [
-    { platform: 'linux' },
-    { platform: 'linux', arch: 'amd64' },
-    { platform: 'linux', arch: 'arm64' },
-    { platform: 'mac', arch: 'amd64' },
-    { platform: 'mac', arch: 'arm64' },
-    { platform: 'windows', arch: 'amd64' },
-  ])
-})
 
-test('agent install modal offers each supported processor and sends its selection', async t => {
-  const requests = []
+test('retired features are absent from routes/menu while local/cloud backup remain', async t => {
   const page = await pageFor(t, {
     '/setup/status': json({ complete: true }),
-    '/active-backup/devices': json({ items: [{ id: 1, name: 'virtual-device', os_type: 'linux', status: 'active', retention_days: 30, last_seen: null, last_run_at: null, schedule_cron: null }], total: 1 }),
-    '/active-backup/devices/1/progress': json({ running: false }),
-    '/active-backup/devices/1/agent-package': route => {
-      requests.push(Object.fromEntries(new URL(route.request().url()).searchParams))
-      return route.fulfill({ status: 409, json: { message: 'Package request captured' } })
-    },
+    '/backup/jobs': json([]),
+    '/backup/progress': json({ running: false }),
   })
   await page.evaluate(async input => { const { useAuthStore } = await import('/src/stores/authStore.ts'); useAuthStore.getState().login(input) }, auth())
-  await page.goto(`${origin}active-backup`)
-  await page.getByTitle('How to connect agent', { exact: true }).click()
-  for (const label of ['Windows x86-64', 'Linux x86-64', 'Linux ARM64', 'macOS Intel', 'macOS Apple Silicon']) {
-    await page.getByRole('button', { name: `Descargar agente ${label}`, exact: false }).click()
-  }
-  await page.getByText('Package request captured', { exact: true }).waitFor()
-  assert.deepEqual(requests, [
-    { platform: 'windows', arch: 'amd64' },
-    { platform: 'linux', arch: 'amd64' },
-    { platform: 'linux', arch: 'arm64' },
-    { platform: 'mac', arch: 'amd64' },
-    { platform: 'mac', arch: 'arm64' },
-  ])
+  await page.goto(`${origin}backup`)
+  await page.locator('aside a[href="/backup"]').waitFor()
+  assert.equal(await page.locator('aside a[href="/active-directory"]').count(), 0)
+  assert.equal(await page.locator('aside a[href="/active-backup"]').count(), 0)
+  assert.equal(await page.locator('aside a[href="/cloud-backup"]').count(), 1)
+  const paths = await page.evaluate(async () => {
+    const { router } = await import('/src/router.tsx')
+    return router.routes.flatMap(route => [route.path, ...(route.children || []).map(child => child.path)])
+  })
+  assert.equal(paths.includes('active-directory'), false)
+  assert.equal(paths.includes('active-backup'), false)
+  assert.equal(paths.includes('backup'), true)
+  assert.equal(paths.includes('cloud-backup'), true)
 })

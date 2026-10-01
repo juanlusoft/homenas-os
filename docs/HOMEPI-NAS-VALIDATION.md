@@ -1,3 +1,5 @@
+> Registro histórico de la reparación inicial. Active Directory y Active Backup se retiraron posteriormente por petición del usuario; las referencias a sus agentes, ZIP y comandos Go ya no describen la versión vigente. Véase [MODULE-REMOVAL.md](MODULE-REMOVAL.md).
+
 # Actualización y comprobación real de HomePiNAS — 2026-10-01
 
 Actualización autorizada por el usuario al ofrecer un NAS de prueba con la versión anterior y facilitar el acceso. Se encontró mediante mDNS y se verificó estrictamente la clave de host SSH contra la identidad ya conocida. No se guardaron contraseñas en archivos, informes ni Honcho; SSH funcionó con la clave existente.

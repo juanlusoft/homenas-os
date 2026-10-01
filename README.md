@@ -38,8 +38,8 @@ El instalador hace todo solo: instala dependencias, configura el servicio y arra
 - **Unidades de red** — conecta y monta carpetas remotas (WebDAV, SFTP, S3, SMB, FTP, Backblaze B2)
 
 ### Copias de seguridad
+- **Copia local** — copias programadas entre carpetas locales
 - **Copia en la nube** — sincroniza con cualquier servicio compatible con rclone (Dropbox, Google Drive, Backblaze, etc.)
-- **Copia activa** — agente ligero para Windows, Linux y Mac que hace backup a tu NAS directamente
 
 ### Red y acceso
 - **Samba** — comparte carpetas con Windows, Mac y Linux de tu red local automáticamente
@@ -127,7 +127,7 @@ The installer handles everything: installs dependencies, sets up the service and
 
 ### Backups
 - **Cloud backup** — sync with any rclone-compatible service (Dropbox, Google Drive, Backblaze, etc.)
-- **Active backup** — lightweight agent for Windows, Linux and Mac that backs up directly to your NAS
+- **Local backup** — scheduled copies between local folders
 
 ### Network & access
 - **Samba** — share folders with Windows, Mac and Linux on your local network automatically

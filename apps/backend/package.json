@@ -18,7 +18,6 @@
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/static": "^10.1.5",
     "@homenas/shared": "workspace:*",
-    "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.10.0",
     "cron-parser": "^5.5.0",
@@ -35,7 +34,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/archiver": "^7.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.18",
     "@types/node-cron": "^3.0.11",
