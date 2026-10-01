@@ -1,0 +1,1 @@
+PASS actual NAS served React menu: Programador/Syncthing/AD/AB absent; local/cloud navigation present; real auth/local/cloud APIs200, removed APIs404. Existing session reused without printing credentials; monitoring blocked; no backup job executed.

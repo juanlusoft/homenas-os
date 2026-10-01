@@ -29,3 +29,5 @@ Cierre TX/RX/Syncthing:8349ad3 publicadoNAS mainlimpio ybuild+42tests allíPASS;
 Petición posterior: ocultar Programador delmenú. NASconsultareadonly scheduled_tasks total0/habilitadas0; timerscache/SnapRAIDactivosindependientes. SóloSidebar enlace/importCalendar retirados; ruta/API/servicio preservados. Regresiónmenúausente/rutapresente ajustada. Pendiente build/pruebasfront/indreview/push/NAS.
 
 OcultarProgramador validaciónlocal: buildglobal/frontend19/lintPASS; revisiónindependientefocalmenú/ruta+typecheck/diffPASS,sinhallazgos. Ningunarchivo backend/rutasReact/instaladores/timers tocado. Publicar/desplegar frontend yverificarmenúrealNAS.
+
+Cierre ocultarProgramador:8108672 publicadomain/fix-hidescheduler e instaladoNASfrontendstagebuild/typecheckPASS, rsync limitadodistgenerado(backupprivado). Sinreiniciarbackendni modificarSQLite/servicios. BrowserrealNAVProgramador/Syncthing/ADABausentes+backuplocal/cloud200PASS, app/cachetimer/SnapRAIDtimeractivos, checkoutlimpio. Localfrontend19/globalbuild/lint eindreviewPASS. Recargarpanel. Evidencia validation/hide-scheduler-nas-browser.log.
