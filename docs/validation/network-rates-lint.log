@@ -1,0 +1,15 @@
+
+> homenas-os-v3@1.0.3 lint <checkout>
+> pnpm typecheck && git diff --check && bash -n install.sh install-x86.sh uninstall.sh
+
+
+> homenas-os-v3@1.0.3 typecheck <checkout>
+> pnpm -r typecheck
+
+Scope: 3 of 4 workspace projects
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/backend typecheck$ tsc --noEmit
+apps/frontend typecheck$ tsc --noEmit
+apps/backend typecheck: Done
+apps/frontend typecheck: Done

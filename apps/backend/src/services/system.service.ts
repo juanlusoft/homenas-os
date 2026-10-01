@@ -1,5 +1,6 @@
 import os from 'os'
 import { readFile } from 'fs/promises'
+import { getNetworkTrafficSample, type NetworkTrafficSample } from './network.service.js'
 import type { SystemMetrics } from '@homenas/shared'
 
 // ─── Module-level state for rate calculations ─────────────────────────────────
@@ -15,16 +16,8 @@ interface CoreSnapshot {
   total: number
 }
 
-interface NetSnapshot {
-  timestamp: number
-  rxBytes: number
-  txBytes: number
-  interface: string
-}
-
 let prevProcStat: ProcStatSnapshot | null = null
 let prevCoreSnapshots: CoreSnapshot[] | null = null
-let prevNetSnapshot: NetSnapshot | null = null
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,14 +53,14 @@ export function parseNetDev(content: string, iface: string): { rxBytes: number; 
   return { rxBytes, txBytes }
 }
 
-// Detect usable network interface: prefer eth1, fallback to first non-lo
-function detectInterface(content: string): string {
-  const lines = content.split('\n').slice(2) // skip header lines
-  const interfaces = lines
-    .map(l => l.trim().split(':')[0]?.trim())
-    .filter((name): name is string => !!name && name !== 'lo')
-  if (interfaces.includes('eth1')) return 'eth1'
-  return interfaces[0] ?? 'eth0'
+/** Prefer the live default route, rather than a hardcoded Ethernet port. */
+export function selectNetworkInterface(names: readonly string[], routes: string | null, states: Readonly<Record<string, string | null>> = {}): string | null {
+  const usable = names.filter(name => name !== 'lo' && !['down', 'notpresent', 'lowerlayerdown', 'dormant'].includes(states[name]?.toLowerCase() ?? ''))
+  const defaults = (routes ?? '').split('\n').map(line => line.trim().split(/\s+/))
+    .filter(cols => usable.includes(cols[0] ?? '') && cols[1] === '00000000' && cols[7] === '00000000' && (parseInt(cols[3] ?? '0', 16) & 1) !== 0)
+    .sort((a, b) => Number(a[6]) - Number(b[6]))
+  if (defaults[0]?.[0]) return defaults[0][0]
+  return usable.find(name => states[name]?.toLowerCase() === 'up') ?? usable[0] ?? null
 }
 
 // ─── CPU metrics ──────────────────────────────────────────────────────────────
@@ -246,51 +239,24 @@ async function getSwap(): Promise<{ swapTotalBytes: number | null; swapUsedBytes
 
 // ─── Network metrics ──────────────────────────────────────────────────────────
 
-async function getNetworkMetrics(): Promise<SystemMetrics['network']> {
-  const content = await readFileSafe('/proc/net/dev')
-  if (!content) {
-    return {
-      interface: 'N/A',
-      rxBytesPerSec: 0,
-      txBytesPerSec: 0,
-      rxTotal: 0,
-      txTotal: 0,
-    }
-  }
-
-  const iface = detectInterface(content)
-  const parsed = parseNetDev(content, iface)
-  const now = Date.now()
-
-  if (!parsed) {
-    return {
-      interface: iface,
-      rxBytesPerSec: 0,
-      txBytesPerSec: 0,
-      rxTotal: 0,
-      txTotal: 0,
-    }
-  }
-
-  let rxBytesPerSec = 0
-  let txBytesPerSec = 0
-
-  if (prevNetSnapshot && prevNetSnapshot.interface === iface) {
-    const elapsed = (now - prevNetSnapshot.timestamp) / 1000
-    if (elapsed > 0) {
-      rxBytesPerSec = Math.max(0, (parsed.rxBytes - prevNetSnapshot.rxBytes) / elapsed)
-      txBytesPerSec = Math.max(0, (parsed.txBytes - prevNetSnapshot.txBytes) / elapsed)
-    }
-  }
-
-  prevNetSnapshot = { timestamp: now, rxBytes: parsed.rxBytes, txBytes: parsed.txBytes, interface: iface }
-
+export async function getNetworkMetrics(dependencies: {
+  sample?: () => Promise<NetworkTrafficSample[]>
+  read?: (path: string) => Promise<string | null>
+} = {}): Promise<SystemMetrics['network']> {
+  const sample = dependencies.sample ?? getNetworkTrafficSample
+  const read = dependencies.read ?? readFileSafe
+  const [samples, routes] = await Promise.all([sample(), read('/proc/net/route')])
+  const names = samples.map(current => current.name)
+  const states = Object.fromEntries(await Promise.all(names.map(async name => [name, (await read(`/sys/class/net/${name}/operstate`))?.trim() ?? null])))
+  const name = selectNetworkInterface(names, routes, states)
+  const selected = samples.find(current => current.name === name)
+  if (!selected) return { interface: 'N/A', rxBytesPerSec: 0, txBytesPerSec: 0, rxTotal: 0, txTotal: 0 }
   return {
-    interface: iface,
-    rxBytesPerSec,
-    txBytesPerSec,
-    rxTotal: parsed.rxBytes,
-    txTotal: parsed.txBytes,
+    interface: selected.name,
+    rxBytesPerSec: selected.rxBytesPerSec,
+    txBytesPerSec: selected.txBytesPerSec,
+    rxTotal: selected.rxBytes,
+    txTotal: selected.txBytes,
   }
 }
 

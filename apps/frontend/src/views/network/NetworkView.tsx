@@ -1,3 +1,4 @@
+import { BandwidthChart } from './BandwidthChart'
 import { InterfacesCard } from './InterfacesCard'
 import { IpConfigCard } from './IpConfigCard'
 import { WireguardCard } from './WireguardCard'
@@ -17,6 +18,8 @@ export function NetworkView() {
 
       {/* Full-width: Interfaces table */}
       <InterfacesCard />
+
+      <BandwidthChart />
 
       {/* Full-width: IP configuration (DHCP / static) */}
       <IpConfigCard />

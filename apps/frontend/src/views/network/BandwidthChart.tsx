@@ -1,17 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Activity } from 'lucide-react'
+import { formatTransferRate } from '../../lib/utils'
 import { useNetworkBandwidthStats } from '../../hooks/useNetwork'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const HISTORY_LEN = 60
-
-function formatBps(bps: number): string {
-  if (bps < 1024) return `${bps.toFixed(0)} B/s`
-  if (bps < 1024 ** 2) return `${(bps / 1024).toFixed(1)} KB/s`
-  if (bps < 1024 ** 3) return `${(bps / 1024 ** 2).toFixed(1)} MB/s`
-  return `${(bps / 1024 ** 3).toFixed(2)} GB/s`
-}
 
 // ─── History state keyed by interface name ────────────────────────────────────
 
@@ -84,7 +78,7 @@ function drawChart(
 // ─── BandwidthChart ───────────────────────────────────────────────────────────
 
 export function BandwidthChart() {
-  const { data } = useNetworkBandwidthStats()
+  const { data, dataUpdatedAt, isLoading, error } = useNetworkBandwidthStats()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const historyRef = useRef<HistoryMap>(new Map())
   const [selectedIface, setSelectedIface] = useState<string>('')
@@ -95,8 +89,8 @@ export function BandwidthChart() {
 
   // Auto-select first active interface once data arrives
   useEffect(() => {
-    if (!selectedIface && activeIfaces.length > 0) {
-      setSelectedIface(activeIfaces[0]!.name)
+    if (!activeIfaces.some(iface => iface.name === selectedIface)) {
+      setSelectedIface(activeIfaces[0]?.name ?? '')
     }
   }, [activeIfaces, selectedIface])
 
@@ -115,6 +109,14 @@ export function BandwidthChart() {
       if (h.tx.length > HISTORY_LEN) h.tx.shift()
     }
 
+    const names = new Set(data.interfaces.map(iface => iface.name))
+    for (const name of historyRef.current.keys()) {
+      if (!names.has(name)) historyRef.current.delete(name)
+    }
+  }, [data, dataUpdatedAt])
+
+  // Switching interface redraws the same samples without recording them again.
+  useEffect(() => {
     // Redraw
     if (canvasRef.current && selectedIface) {
       const h = historyRef.current.get(selectedIface)
@@ -129,12 +131,11 @@ export function BandwidthChart() {
         drawChart(canvas, h.rx, h.tx)
       }
     }
-  }, [data, selectedIface])
+  }, [data, dataUpdatedAt, selectedIface])
 
   const currentIface = interfaces.find((i) => i.name === selectedIface)
-  const currentHistory = historyRef.current.get(selectedIface)
-  const latestRx = currentHistory ? (currentHistory.rx[currentHistory.rx.length - 1] ?? 0) : 0
-  const latestTx = currentHistory ? (currentHistory.tx[currentHistory.tx.length - 1] ?? 0) : 0
+  const latestRx = currentIface?.rxBytesPerSec ?? 0
+  const latestTx = currentIface?.txBytesPerSec ?? 0
 
   return (
     <div className="bg-black/5 dark:bg-white/5 backdrop-blur border border-black/10 dark:border-white/10 rounded-xl shadow-lg overflow-hidden">
@@ -146,9 +147,10 @@ export function BandwidthChart() {
         {/* Interface selector */}
         {activeIfaces.length > 1 && (
           <select
+            aria-label="Interfaz de ancho de banda"
             value={selectedIface}
             onChange={(e) => setSelectedIface(e.target.value)}
-            className="ml-2 bg-black/10 dark:bg-white/10 text-white/80 text-xs rounded-lg border border-black/10 dark:border-white/10 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            className="ml-2 bg-black/10 dark:bg-white/10 text-gray-700 dark:text-white/80 text-xs rounded-lg border border-black/10 dark:border-white/10 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400"
           >
             {activeIfaces.map((i) => (
               <option key={i.name} value={i.name} className="bg-gray-900">
@@ -166,12 +168,12 @@ export function BandwidthChart() {
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-green-400" />
             <span className="text-gray-500 dark:text-white/50">RX</span>
-            <span className="text-green-700 dark:text-green-400">{formatBps(latestRx)}</span>
+            <span className="text-green-700 dark:text-green-400">{formatTransferRate(latestRx)}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-indigo-400" />
             <span className="text-gray-500 dark:text-white/50">TX</span>
-            <span className="text-indigo-600 dark:text-indigo-400">{formatBps(latestTx)}</span>
+            <span className="text-indigo-600 dark:text-indigo-400">{formatTransferRate(latestTx)}</span>
           </span>
         </div>
       </div>
@@ -180,10 +182,11 @@ export function BandwidthChart() {
       <div className="px-2 py-3">
         {!currentIface && activeIfaces.length === 0 ? (
           <div className="flex items-center justify-center h-24 text-gray-400 dark:text-white/30 text-sm">
-            No network interfaces available
+            {isLoading ? 'Loading network rates…' : error ? `Error loading network rates: ${error.message}` : 'No network interfaces available'}
           </div>
         ) : (
           <canvas
+            aria-label={`Network throughput ${selectedIface}: RX ${formatTransferRate(latestRx)}, TX ${formatTransferRate(latestTx)}`}
             ref={canvasRef}
             className="w-full"
             style={{ height: '120px', display: 'block' }}

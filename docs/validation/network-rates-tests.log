@@ -1,0 +1,586 @@
+
+> homenas-os-v3@1.0.3 test <checkout>
+> pnpm test:installers && pnpm --filter @homenas/backend test && pnpm --filter @homenas/frontend test
+
+
+> homenas-os-v3@1.0.3 test:installers <checkout>
+> node --test tests/installers.test.mjs
+
+TAP version 13
+# Subtest: install.sh: native rebuild failure aborts before build and never executes as root
+ok 1 - install.sh: native rebuild failure aborts before build and never executes as root
+  ---
+  duration_ms: 5.225874
+  type: 'test'
+  ...
+# Subtest: install.sh: successful native checks run SQLite smoke check and build as service user
+ok 2 - install.sh: successful native checks run SQLite smoke check and build as service user
+  ---
+  duration_ms: 6.45029
+  type: 'test'
+  ...
+# Subtest: install.sh: rejects unsupported Node versions before build
+ok 3 - install.sh: rejects unsupported Node versions before build
+  ---
+  duration_ms: 417.23177
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: native rebuild failure aborts before build and never executes as root
+ok 4 - install-x86.sh: native rebuild failure aborts before build and never executes as root
+  ---
+  duration_ms: 4.17397
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: successful native checks run SQLite smoke check and build as service user
+ok 5 - install-x86.sh: successful native checks run SQLite smoke check and build as service user
+  ---
+  duration_ms: 6.39485
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: rejects unsupported Node versions before build
+ok 6 - install-x86.sh: rejects unsupported Node versions before build
+  ---
+  duration_ms: 479.567089
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 972.907143
+
+> @homenas/backend@1.0.2 test <checkout>/apps/backend
+> tsx --test tests/*.test.ts
+
+TAP version 13
+# {"level":30,"time":1790865991950,"pid":2188646,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backup-cron-TcODJR/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790865991986,"pid":2188646,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991989,"pid":2188646,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":200},"responseTime":3.045009999999934,"msg":"request completed"}
+# {"level":30,"time":1790865991990,"pid":2188646,"hostname":"jlu.app","reqId":"req-2","req":{"method":"POST","url":"/api/backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991993,"pid":2188646,"hostname":"jlu.app","reqId":"req-2","res":{"statusCode":201},"responseTime":3.214513000000011,"msg":"request completed"}
+# {"level":30,"time":1790865991993,"pid":2188646,"hostname":"jlu.app","reqId":"req-3","req":{"method":"DELETE","url":"/api/backup/jobs/5","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991994,"pid":2188646,"hostname":"jlu.app","reqId":"req-3","res":{"statusCode":200},"responseTime":0.6667200000000548,"msg":"request completed"}
+# {"level":30,"time":1790865991994,"pid":2188646,"hostname":"jlu.app","reqId":"req-4","req":{"method":"POST","url":"/api/cloud-backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991999,"pid":2188646,"hostname":"jlu.app","reqId":"req-4","res":{"statusCode":201},"responseTime":4.768322000000012,"msg":"request completed"}
+# {"level":30,"time":1790865991999,"pid":2188646,"hostname":"jlu.app","reqId":"req-5","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/2","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992000,"pid":2188646,"hostname":"jlu.app","reqId":"req-5","res":{"statusCode":200},"responseTime":0.5838400000000092,"msg":"request completed"}
+# {"level":30,"time":1790865992000,"pid":2188646,"hostname":"jlu.app","reqId":"req-6","req":{"method":"PUT","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992001,"pid":2188646,"hostname":"jlu.app","reqId":"req-6","res":{"statusCode":200},"responseTime":0.9981279999999515,"msg":"request completed"}
+# {"level":30,"time":1790865992001,"pid":2188646,"hostname":"jlu.app","reqId":"req-7","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992002,"pid":2188646,"hostname":"jlu.app","reqId":"req-7","res":{"statusCode":200},"responseTime":0.4999840000000404,"msg":"request completed"}
+# {"level":30,"time":1790865992002,"pid":2188646,"hostname":"jlu.app","reqId":"req-8","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992003,"pid":2188646,"hostname":"jlu.app","reqId":"req-8","res":{"statusCode":200},"responseTime":0.5136159999999563,"msg":"request completed"}
+# {"level":30,"time":1790865992003,"pid":2188646,"hostname":"jlu.app","reqId":"req-9","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992004,"pid":2188646,"hostname":"jlu.app","reqId":"req-9","res":{"statusCode":200},"responseTime":1.0378079999999272,"msg":"request completed"}
+# {"level":30,"time":1790865992005,"pid":2188646,"hostname":"jlu.app","reqId":"req-a","req":{"method":"DELETE","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992005,"pid":2188646,"hostname":"jlu.app","reqId":"req-a","res":{"statusCode":200},"responseTime":0.46646400000008725,"msg":"request completed"}
+# Subtest: backup cron initializes persisted jobs, preserves runners/contracts, refreshes API edits and stops cleanly
+ok 1 - backup cron initializes persisted jobs, preserves runners/contracts, refreshes API edits and stops cleanly
+  ---
+  duration_ms: 158.52705
+  type: 'test'
+  ...
+# Subtest: actual node-cron clock dispatches an enabled persisted backup without running system commands
+ok 2 - actual node-cron clock dispatches an enabled persisted backup without running system commands
+  ---
+  duration_ms: 994.920639
+  type: 'test'
+  ...
+# Subtest: dashboard chooses active default eth0 even when down eth1 exists with zero counters
+ok 3 - dashboard chooses active default eth0 even when down eth1 exists with zero counters
+  ---
+  duration_ms: 1.082848
+  type: 'test'
+  ...
+# Subtest: multiple clients share one sampling window instead of consuming each other network rates
+ok 4 - multiple clients share one sampling window instead of consuming each other network rates
+  ---
+  duration_ms: 0.5272
+  type: 'test'
+  ...
+# Subtest: overlapping asynchronous reads are coalesced; counter reset and interface recreation establish valid baselines
+ok 5 - overlapping asynchronous reads are coalesced; counter reset and interface recreation establish valid baselines
+  ---
+  duration_ms: 0.302
+  type: 'test'
+  ...
+# Subtest: kernel counter parsing handles attached values and iproute2 nested stats64 byte counters
+ok 6 - kernel counter parsing handles attached values and iproute2 nested stats64 byte counters
+  ---
+  duration_ms: 0.202128
+  type: 'test'
+  ...
+# Subtest: a failed proc read clears the previous baseline rather than inventing a rate when reading recovers
+ok 7 - a failed proc read clears the previous baseline rather than inventing a rate when reading recovers
+  ---
+  duration_ms: 0.242097
+  type: 'test'
+  ...
+# {"level":30,"time":1790865991949,"pid":2188652,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-retired-modules-FhY1tU/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790865991977,"pid":2188652,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991980,"pid":2188652,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":200},"responseTime":3.083793000000014,"msg":"request completed"}
+# {"level":30,"time":1790865991981,"pid":2188652,"hostname":"jlu.app","reqId":"req-2","req":{"method":"GET","url":"/api/ad/status","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991981,"pid":2188652,"hostname":"jlu.app","reqId":"req-2","msg":"Route GET:/api/ad/status not found"}
+# {"level":30,"time":1790865991981,"pid":2188652,"hostname":"jlu.app","reqId":"req-2","res":{"statusCode":404},"responseTime":0.34958499999993364,"msg":"request completed"}
+# {"level":30,"time":1790865991982,"pid":2188652,"hostname":"jlu.app","reqId":"req-3","req":{"method":"GET","url":"/api/ad/users","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991982,"pid":2188652,"hostname":"jlu.app","reqId":"req-3","msg":"Route GET:/api/ad/users not found"}
+# {"level":30,"time":1790865991982,"pid":2188652,"hostname":"jlu.app","reqId":"req-3","res":{"statusCode":404},"responseTime":0.2778240000000096,"msg":"request completed"}
+# {"level":30,"time":1790865991982,"pid":2188652,"hostname":"jlu.app","reqId":"req-4","req":{"method":"GET","url":"/api/ad/groups","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991982,"pid":2188652,"hostname":"jlu.app","reqId":"req-4","msg":"Route GET:/api/ad/groups not found"}
+# {"level":30,"time":1790865991982,"pid":2188652,"hostname":"jlu.app","reqId":"req-4","res":{"statusCode":404},"responseTime":0.24563200000000052,"msg":"request completed"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-5","req":{"method":"GET","url":"/api/ad/computers","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-5","msg":"Route GET:/api/ad/computers not found"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-5","res":{"statusCode":404},"responseTime":0.1915039999998953,"msg":"request completed"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-6","req":{"method":"POST","url":"/api/ad/install","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-6","msg":"Route POST:/api/ad/install not found"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-6","res":{"statusCode":404},"responseTime":0.17731199999991532,"msg":"request completed"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-7","req":{"method":"POST","url":"/api/ad/provision","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-7","msg":"Route POST:/api/ad/provision not found"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-7","res":{"statusCode":404},"responseTime":0.16828799999996136,"msg":"request completed"}
+# {"level":30,"time":1790865991983,"pid":2188652,"hostname":"jlu.app","reqId":"req-8","req":{"method":"POST","url":"/api/ad/restart","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991984,"pid":2188652,"hostname":"jlu.app","reqId":"req-8","msg":"Route POST:/api/ad/restart not found"}
+# {"level":30,"time":1790865991984,"pid":2188652,"hostname":"jlu.app","reqId":"req-8","res":{"statusCode":404},"responseTime":0.10152000000005046,"msg":"request completed"}
+# {"level":30,"time":1790865991984,"pid":2188652,"hostname":"jlu.app","reqId":"req-9","req":{"method":"GET","url":"/api/active-backup/devices","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991985,"pid":2188652,"hostname":"jlu.app","reqId":"req-9","msg":"Route GET:/api/active-backup/devices not found"}
+# {"level":30,"time":1790865991985,"pid":2188652,"hostname":"jlu.app","reqId":"req-9","res":{"statusCode":404},"responseTime":0.7148160000000416,"msg":"request completed"}
+# {"level":30,"time":1790865991985,"pid":2188652,"hostname":"jlu.app","reqId":"req-a","req":{"method":"POST","url":"/api/active-backup/devices","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-a","msg":"Route POST:/api/active-backup/devices not found"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-a","res":{"statusCode":404},"responseTime":0.22459200000002966,"msg":"request completed"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-b","req":{"method":"DELETE","url":"/api/active-backup/devices/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-b","msg":"Route DELETE:/api/active-backup/devices/1 not found"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-b","res":{"statusCode":404},"responseTime":0.10196799999994255,"msg":"request completed"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-c","req":{"method":"POST","url":"/api/active-backup/devices/1/backup","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-c","msg":"Route POST:/api/active-backup/devices/1/backup not found"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-c","res":{"statusCode":404},"responseTime":0.08828800000003412,"msg":"request completed"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-d","req":{"method":"GET","url":"/api/active-backup/devices/1/agent-package?platform=linux","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-d","msg":"Route GET:/api/active-backup/devices/1/agent-package?platform=linux not found"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-d","res":{"statusCode":404},"responseTime":0.1370560000000296,"msg":"request completed"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-e","req":{"method":"POST","url":"/api/active-backup/agent/heartbeat","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991986,"pid":2188652,"hostname":"jlu.app","reqId":"req-e","msg":"Route POST:/api/active-backup/agent/heartbeat not found"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-e","res":{"statusCode":404},"responseTime":0.13436799999999494,"msg":"request completed"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-f","req":{"method":"POST","url":"/api/active-backup/agent/backup/start","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-f","msg":"Route POST:/api/active-backup/agent/backup/start not found"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-f","res":{"statusCode":404},"responseTime":0.07230400000003101,"msg":"request completed"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-g","req":{"method":"POST","url":"/api/active-backup/agent/backup/file","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-g","msg":"Route POST:/api/active-backup/agent/backup/file not found"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-g","res":{"statusCode":404},"responseTime":0.07481600000005528,"msg":"request completed"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-h","req":{"method":"POST","url":"/api/active-backup/agent/backup/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-h","msg":"Route POST:/api/active-backup/agent/backup/complete not found"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-h","res":{"statusCode":404},"responseTime":0.11830400000008012,"msg":"request completed"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-i","req":{"method":"GET","url":"/api/backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991987,"pid":2188652,"hostname":"jlu.app","reqId":"req-i","res":{"statusCode":200},"responseTime":0.46505600000000413,"msg":"request completed"}
+# {"level":30,"time":1790865991988,"pid":2188652,"hostname":"jlu.app","reqId":"req-j","req":{"method":"GET","url":"/api/cloud-backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991988,"pid":2188652,"hostname":"jlu.app","reqId":"req-j","res":{"statusCode":200},"responseTime":0.40217600000005405,"msg":"request completed"}
+# Subtest: retired Active Directory/Active Backup APIs return 404; legacy database records and ordinary backups survive restart
+ok 8 - retired Active Directory/Active Backup APIs return 404; legacy database records and ordinary backups survive restart
+  ---
+  duration_ms: 162.23694
+  type: 'test'
+  ...
+# {"level":30,"time":1790865991980,"pid":2188654,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-GJoVHw/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790865992009,"pid":2188654,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992012,"pid":2188654,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":200},"responseTime":3.132272999999941,"msg":"request completed"}
+# {"level":30,"time":1790865992013,"pid":2188654,"hostname":"jlu.app","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992013,"pid":2188654,"hostname":"jlu.app","reqId":"req-2","res":{"statusCode":200},"responseTime":0.521951999999942,"msg":"request completed"}
+# {"level":30,"time":1790865992013,"pid":2188654,"hostname":"jlu.app","reqId":"req-3","req":{"method":"POST","url":"/api/setup/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992014,"pid":2188654,"hostname":"jlu.app","reqId":"req-3","res":{"statusCode":409},"responseTime":0.45049600000004375,"msg":"request completed"}
+# {"level":30,"time":1790865992014,"pid":2188654,"hostname":"jlu.app","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992239,"pid":2188654,"hostname":"jlu.app","reqId":"req-4","res":{"statusCode":200},"responseTime":224.67973000000006,"msg":"request completed"}
+# {"level":30,"time":1790865992239,"pid":2188654,"hostname":"jlu.app","reqId":"req-5","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992239,"pid":2188654,"hostname":"jlu.app","reqId":"req-5","res":{"statusCode":403},"responseTime":0.3281600000000253,"msg":"request completed"}
+# {"level":30,"time":1790865992240,"pid":2188654,"hostname":"jlu.app","reqId":"req-6","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992240,"pid":2188654,"hostname":"jlu.app","reqId":"req-6","res":{"statusCode":401},"responseTime":0.23177599999985432,"msg":"request completed"}
+# {"level":30,"time":1790865992240,"pid":2188654,"hostname":"jlu.app","reqId":"req-7","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992240,"pid":2188654,"hostname":"jlu.app","reqId":"req-7","res":{"statusCode":200},"responseTime":0.25947199999995973,"msg":"request completed"}
+# {"level":30,"time":1790865992240,"pid":2188654,"hostname":"jlu.app","reqId":"req-8","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992464,"pid":2188654,"hostname":"jlu.app","reqId":"req-8","res":{"statusCode":200},"responseTime":223.417602,"msg":"request completed"}
+# {"level":30,"time":1790865992465,"pid":2188654,"hostname":"jlu.app","reqId":"req-9","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992687,"pid":2188654,"hostname":"jlu.app","reqId":"req-9","res":{"statusCode":401},"responseTime":221.82201800000007,"msg":"request completed"}
+# {"level":30,"time":1790865992688,"pid":2188654,"hostname":"jlu.app","reqId":"req-a","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992909,"pid":2188654,"hostname":"jlu.app","reqId":"req-a","res":{"statusCode":401},"responseTime":221.34763399999997,"msg":"request completed"}
+# {"level":30,"time":1790865992909,"pid":2188654,"hostname":"jlu.app","reqId":"req-b","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865993131,"pid":2188654,"hostname":"jlu.app","reqId":"req-b","res":{"statusCode":401},"responseTime":221.1123050000001,"msg":"request completed"}
+# {"level":30,"time":1790865993131,"pid":2188654,"hostname":"jlu.app","reqId":"req-c","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865993352,"pid":2188654,"hostname":"jlu.app","reqId":"req-c","res":{"statusCode":401},"responseTime":221.219474,"msg":"request completed"}
+# {"level":30,"time":1790865993352,"pid":2188654,"hostname":"jlu.app","reqId":"req-d","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865993573,"pid":2188654,"hostname":"jlu.app","reqId":"req-d","res":{"statusCode":401},"responseTime":220.9212809999999,"msg":"request completed"}
+# {"level":30,"time":1790865993573,"pid":2188654,"hostname":"jlu.app","reqId":"req-e","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865993574,"pid":2188654,"hostname":"jlu.app","reqId":"req-e","res":{"statusCode":429},"responseTime":0.4739359999998669,"msg":"request completed"}
+# {"level":30,"time":1790865993574,"pid":2188654,"hostname":"jlu.app","reqId":"req-f","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865993574,"pid":2188654,"hostname":"jlu.app","reqId":"req-f","res":{"statusCode":401},"responseTime":0.19177600000011807,"msg":"request completed"}
+# Subtest: bootstrap credential changes revoke other sessions; authenticated wizard can resume; 2FA failures lock account
+ok 9 - bootstrap credential changes revoke other sessions; authenticated wizard can resume; 2FA failures lock account
+  ---
+  duration_ms: 1700.271283
+  type: 'test'
+  ...
+# {"level":30,"time":1790865993645,"pid":2188654,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-r7cZta/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: scheduler rejects untrusted binaries, combined rsync interpreter flags and unsafe toggle
+ok 10 - scheduler rejects untrusted binaries, combined rsync interpreter flags and unsafe toggle
+  ---
+  duration_ms: 88.530177
+  type: 'test'
+  ...
+# Subtest: path guards accept dotted names, reject symlink escapes/missing leaves and pool roots
+ok 11 - path guards accept dotted names, reject symlink escapes/missing leaves and pool roots
+  ---
+  duration_ms: 2.160832
+  type: 'test'
+  ...
+# Subtest: upload safety checks binary signatures and case-insensitive text signatures
+ok 12 - upload safety checks binary signatures and case-insensitive text signatures
+  ---
+  duration_ms: 2.094433
+  type: 'test'
+  ...
+# Subtest: Compose validates relative binds, device access, inherited definitions and volume driver bypasses
+ok 13 - Compose validates relative binds, device access, inherited definitions and volume driver bypasses
+  ---
+  duration_ms: 7.877747
+  type: 'test'
+  ...
+# {"level":30,"time":1790865993747,"pid":2188654,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-sMXTBE/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: DDNS retries failed providers at unchanged IP and updates newly configured domains
+ok 14 - DDNS retries failed providers at unchanged IP and updates newly configured domains
+  ---
+  duration_ms: 80.502174
+  type: 'test'
+  ...
+# Subtest: Cloudflare selects the correct CPU binary and passwords respect bcrypt byte limits
+ok 15 - Cloudflare selects the correct CPU binary and passwords respect bcrypt byte limits
+  ---
+  duration_ms: 0.897008
+  type: 'test'
+  ...
+# Subtest: updater launches the repository-pinned pnpm through npm exec, never the incompatible global executable
+ok 16 - updater launches the repository-pinned pnpm through npm exec, never the incompatible global executable
+  ---
+  duration_ms: 70.257001
+  type: 'test'
+  ...
+# Subtest: application fast-forward refuses upstream collisions with ignored local custom files
+ok 17 - application fast-forward refuses upstream collisions with ignored local custom files
+  ---
+  duration_ms: 150.266423
+  type: 'test'
+  ...
+# {"level":30,"time":1790865991959,"pid":2188667,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-bootstrap-6SnMd2/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790865991987,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991990,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":200},"responseTime":2.8906409999999596,"msg":"request completed"}
+# {"level":30,"time":1790865991991,"pid":2188667,"hostname":"jlu.app","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991991,"pid":2188667,"hostname":"jlu.app","reqId":"req-2","res":{"statusCode":200},"responseTime":0.5039679999999862,"msg":"request completed"}
+# {"level":30,"time":1790865991991,"pid":2188667,"hostname":"jlu.app","reqId":"req-3","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865991991,"pid":2188667,"hostname":"jlu.app","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992438,"pid":2188667,"hostname":"jlu.app","reqId":"req-3","res":{"statusCode":200},"responseTime":446.65632500000015,"msg":"request completed"}
+# {"level":30,"time":1790865992438,"pid":2188667,"hostname":"jlu.app","reqId":"req-4","res":{"statusCode":409},"responseTime":446.984597,"msg":"request completed"}
+# {"level":30,"time":1790865992439,"pid":2188667,"hostname":"jlu.app","reqId":"req-5","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992660,"pid":2188667,"hostname":"jlu.app","reqId":"req-5","res":{"statusCode":200},"responseTime":221.36805000000004,"msg":"request completed"}
+# Subtest: independent review: a concurrently revoked bootstrap session cannot overwrite administrator password
+ok 18 - independent review: a concurrently revoked bootstrap session cannot overwrite administrator password
+  ---
+  duration_ms: 803.813928
+  type: 'test'
+  ...
+# {"level":30,"time":1790865992730,"pid":2188667,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-I1Q3QW/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790865992743,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992744,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":401},"responseTime":0.8289609999999357,"msg":"request completed"}
+# Subtest: independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+    # Subtest: password
+    ok 1 - password
+      ---
+      duration_ms: 81.554718
+      type: 'test'
+      ...
+# {"level":30,"time":1790865992811,"pid":2188667,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-w4EDTf/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790865992826,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992827,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":401},"responseTime":0.6875520000000961,"msg":"request completed"}
+    # Subtest: totp
+    ok 2 - totp
+      ---
+      duration_ms: 81.412718
+      type: 'test'
+      ...
+# {"level":30,"time":1790865992892,"pid":2188667,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-yyJMyR/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790865992904,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992905,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":401},"responseTime":0.750016000000187,"msg":"request completed"}
+    # Subtest: delete
+    ok 3 - delete
+      ---
+      duration_ms: 81.866206
+      type: 'test'
+      ...
+# {"level":30,"time":1790865992974,"pid":2188667,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-SXzJI4/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790865992985,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790865992987,"pid":2188667,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":429},"responseTime":1.601647999999841,"msg":"request completed"}
+    # Subtest: lockout
+    ok 4 - lockout
+      ---
+      duration_ms: 78.535341
+      type: 'test'
+      ...
+    1..4
+ok 19 - independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+  ---
+  duration_ms: 324.81396
+  type: 'test'
+  ...
+# {"level":30,"time":1790865991951,"pid":2188678,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-cron-close-Nt8Gvb/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: independent review: server hook cancels backups before SQLite closes
+ok 20 - independent review: server hook cancels backups before SQLite closes
+  ---
+  duration_ms: 130.44496
+  type: 'test'
+  ...
+# {"level":30,"time":1790865992046,"pid":2188678,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-ddns-close-5cpyit/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: independent review: closing waits for in-flight DDNS before SQLite closes
+ok 21 - independent review: closing waits for in-flight DDNS before SQLite closes
+  ---
+  duration_ms: 86.679584
+  type: 'test'
+  ...
+# Subtest: independent review: update and storage modules resolve actual tsc production layout
+ok 22 - independent review: update and storage modules resolve actual tsc production layout
+  ---
+  duration_ms: 1.880337
+  type: 'test'
+  ...
+# Subtest: independent storage review: branch policies and cache subpaths never measure root
+ok 23 - independent storage review: branch policies and cache subpaths never measure root
+  ---
+  duration_ms: 278.562711
+  type: 'test'
+  ...
+# Subtest: format entrypoints refuse root before destructive commands; add/create mount only mocked disks and persist UUID
+ok 24 - format entrypoints refuse root before destructive commands; add/create mount only mocked disks and persist UUID
+  ---
+  duration_ms: 1118.153421
+  type: 'test'
+  ...
+# Subtest: missing logical cache branch measures only its existing mounted NAS ancestor
+ok 25 - missing logical cache branch measures only its existing mounted NAS ancestor
+  ---
+  duration_ms: 9.390324
+  type: 'test'
+  ...
+# Subtest: format guard resolves NVMe root without truncating namespace
+ok 26 - format guard resolves NVMe root without truncating namespace
+  ---
+  duration_ms: 1.79624
+  type: 'test'
+  ...
+# Subtest: format guard refuses unknown topology, duplicates, mounted children and LVM
+ok 27 - format guard refuses unknown topology, duplicates, mounted children and LVM
+  ---
+  duration_ms: 0.441473
+  type: 'test'
+  ...
+# Subtest: format guard protects every physical ancestor of LVM/RAID root
+ok 28 - format guard protects every physical ancestor of LVM/RAID root
+  ---
+  duration_ms: 0.350256
+  type: 'test'
+  ...
+# Subtest: format lock excludes concurrent entrypoints and releases after failures
+ok 29 - format lock excludes concurrent entrypoints and releases after failures
+  ---
+  duration_ms: 0.414032
+  type: 'test'
+  ...
+# Subtest: backup rejects attached and bundled shell execution flags
+ok 30 - backup rejects attached and bundled shell execution flags
+  ---
+  duration_ms: 0.60048
+  type: 'test'
+  ...
+# Subtest: metrics avoid counting virtual guest CPU twice and parse attached RX counter
+ok 31 - metrics avoid counting virtual guest CPU twice and parse attached RX counter
+  ---
+  duration_ms: 0.947584
+  type: 'test'
+  ...
+# Subtest: disk persistence replaces only matching mountpoints and preserves unrelated entries
+ok 32 - disk persistence replaces only matching mountpoints and preserves unrelated entries
+  ---
+  duration_ms: 0.421504
+  type: 'test'
+  ...
+# Subtest: cloud remote config rejects INI directive injection and executable password commands
+ok 33 - cloud remote config rejects INI directive injection and executable password commands
+  ---
+  duration_ms: 0.436112
+  type: 'test'
+  ...
+# Subtest: project-root discovery supports source and compiled backend nesting
+ok 34 - project-root discovery supports source and compiled backend nesting
+  ---
+  duration_ms: 1.264928
+  type: 'test'
+  ...
+# Subtest: flat lsblk topology is refused and disconnected disks are never formatted
+ok 35 - flat lsblk topology is refused and disconnected disks are never formatted
+  ---
+  duration_ms: 0.810865
+  type: 'test'
+  ...
+# Subtest: multi-view pools select storage alias instead of first archive; ambiguity fails closed
+ok 36 - multi-view pools select storage alias instead of first archive; ambiguity fails closed
+  ---
+  duration_ms: 0.231904
+  type: 'test'
+  ...
+# Subtest: primary pool resolver follows a real storage symlink with temporary mounts
+ok 37 - primary pool resolver follows a real storage symlink with temporary mounts
+  ---
+  duration_ms: 10.810516
+  type: 'test'
+  ...
+# Subtest: database downloads use live SQLite with custom data directory; SSH command failures do not report success
+ok 38 - database downloads use live SQLite with custom data directory; SSH command failures do not report success
+  ---
+  duration_ms: 182.721732
+  type: 'test'
+  ...
+1..38
+# tests 42
+# suites 0
+# pass 42
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2597.496862
+
+> @homenas/frontend@1.0.2 test <checkout>/apps/frontend
+> node --test tests/*.test.mjs
+
+TAP version 13
+# (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+#   - `__dirname` (vite.config.ts:10:39). Use `import.meta.dirname` instead
+# Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+# Subtest: TOTP challenge survives HTTP 401 and login submits the second factor
+ok 1 - TOTP challenge survives HTTP 401 and login submits the second factor
+  ---
+  duration_ms: 732.368078
+  type: 'test'
+  ...
+# Subtest: invalid login reports backend message without a spurious TOTP prompt
+ok 2 - invalid login reports backend message without a spurious TOTP prompt
+  ---
+  duration_ms: 294.05438
+  type: 'test'
+  ...
+# Subtest: changing sessions clears private cache; old 401 cannot invalidate new login
+ok 3 - changing sessions clears private cache; old 401 cannot invalidate new login
+  ---
+  duration_ms: 251.800093
+  type: 'test'
+  ...
+# Subtest: API accepts native Headers and sends session and CSRF headers
+ok 4 - API accepts native Headers and sends session and CSRF headers
+  ---
+  duration_ms: 249.4531
+  type: 'test'
+  ...
+# Subtest: editing existing static IP saves payload and advances storage step
+ok 5 - editing existing static IP saves payload and advances storage step
+  ---
+  duration_ms: 594.856251
+  type: 'test'
+  ...
+# Subtest: failed setup completion remains on wizard and displays error; retry succeeds
+ok 6 - failed setup completion remains on wizard and displays error; retry succeeds
+  ---
+  duration_ms: 734.836622
+  type: 'test'
+  ...
+# Subtest: upload invalid JSON rejects instead of leaving its promise pending
+ok 7 - upload invalid JSON rejects instead of leaving its promise pending
+  ---
+  duration_ms: 262.632689
+  type: 'test'
+  ...
+# Subtest: cron previews contain future runs only and omit unsupported expressions
+ok 8 - cron previews contain future runs only and omit unsupported expressions
+  ---
+  duration_ms: 279.922295
+  type: 'test'
+  ...
+# Subtest: disk browsing sends selected partition, not just parent disk
+ok 9 - disk browsing sends selected partition, not just parent disk
+  ---
+  duration_ms: 276.04831
+  type: 'test'
+  ...
+# Subtest: compose completion refreshes stack status and rejected action displays error
+ok 10 - compose completion refreshes stack status and rejected action displays error
+  ---
+  duration_ms: 2904.109099
+  type: 'test'
+  ...
+# Subtest: changing selected disks resets destructive setup confirmation
+ok 11 - changing selected disks resets destructive setup confirmation
+  ---
+  duration_ms: 827.111424
+  type: 'test'
+  ...
+# Subtest: setup API rejects malformed status instead of rendering as incomplete
+ok 12 - setup API rejects malformed status instead of rendering as incomplete
+  ---
+  duration_ms: 228.101396
+  type: 'test'
+  ...
+# Subtest: setup does not offer formatting mounted or system disks
+ok 13 - setup does not offer formatting mounted or system disks
+  ---
+  duration_ms: 633.409161
+  type: 'test'
+  ...
+# Subtest: delayed 401 from downloads/list/upload cannot log out a newer session
+ok 14 - delayed 401 from downloads/list/upload cannot log out a newer session
+  ---
+  duration_ms: 270.125011
+  type: 'test'
+  ...
+# Subtest: 401 from the current download session logs out consistently
+ok 15 - 401 from the current download session logs out consistently
+  ---
+  duration_ms: 255.088189
+  type: 'test'
+  ...
+# Subtest: retired features are absent from routes/menu while local/cloud backup remain
+ok 16 - retired features are absent from routes/menu while local/cloud backup remain
+  ---
+  duration_ms: 431.453359
+  type: 'test'
+  ...
+# Subtest: network rates render current RX/TX immediately and follow interface changes/removal
+ok 17 - network rates render current RX/TX immediately and follow interface changes/removal
+  ---
+  duration_ms: 542.300551
+  type: 'test'
+  ...
+# Subtest: dashboard network rates display byte units and low-rate precision
+ok 18 - dashboard network rates display byte units and low-rate precision
+  ---
+  duration_ms: 481.3308
+  type: 'test'
+  ...
+# Subtest: dashboard RX/TX histories record constant sample ticks and reset when interface changes
+ok 19 - dashboard RX/TX histories record constant sample ticks and reset when interface changes
+  ---
+  duration_ms: 560.447118
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11181.588302

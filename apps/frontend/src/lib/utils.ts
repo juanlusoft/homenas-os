@@ -22,3 +22,12 @@ export function formatUptime(seconds: number): string {
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
 }
+
+
+// Network APIs report bytes/second. Use the same decimal units in both views,
+// with precision for low rates instead of producing an invalid negative unit.
+export function formatTransferRate(bytesPerSecond: number): string {
+  const rate = Number.isFinite(bytesPerSecond) ? Math.max(0, bytesPerSecond) : 0
+  if (rate < 1) return `${Number(rate.toFixed(1))} B/s`
+  return `${formatBytes(rate, 1)}/s`
+}

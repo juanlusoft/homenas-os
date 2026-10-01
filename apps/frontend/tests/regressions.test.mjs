@@ -365,6 +365,7 @@ test('retired features are absent from routes/menu while local/cloud backup rema
   assert.equal(await page.locator('aside a[href="/active-directory"]').count(), 0)
   assert.equal(await page.locator('aside a[href="/active-backup"]').count(), 0)
   assert.equal(await page.locator('aside a[href="/cloud-backup"]').count(), 1)
+  assert.equal(await page.locator('aside a[href="/syncthing"]').count(), 0)
   const paths = await page.evaluate(async () => {
     const { router } = await import('/src/router.tsx')
     return router.routes.flatMap(route => [route.path, ...(route.children || []).map(child => child.path)])
@@ -373,4 +374,86 @@ test('retired features are absent from routes/menu while local/cloud backup rema
   assert.equal(paths.includes('active-backup'), false)
   assert.equal(paths.includes('backup'), true)
   assert.equal(paths.includes('cloud-backup'), true)
+  assert.equal(paths.includes('syncthing'), true)
+})
+
+test('network rates render current RX/TX immediately and follow interface changes/removal', async t => {
+  let interfaces = [
+    { name: 'eth0', rxBytesPerSec: 1500000, txBytesPerSec: 2500000 },
+    { name: 'eth1', rxBytesPerSec: 3000, txBytesPerSec: 4000 },
+  ]
+  const page = await pageFor(t, {
+    '/setup/status': json({ complete: true }),
+    '/network/stats': route => json({ interfaces })(route),
+  })
+  await page.evaluate(async input => { const { useAuthStore } = await import('/src/stores/authStore.ts'); useAuthStore.getState().login(input) }, auth())
+  await page.goto(`${origin}network`)
+  await page.getByRole('heading', { name: 'Bandwidth', exact: true }).waitFor()
+  const chart = page.locator('div').filter({ has: page.getByRole('heading', { name: 'Bandwidth', exact: true }) }).filter({ has: page.locator('canvas') }).last()
+  await chart.getByText('1.5 MB/s', { exact: true }).waitFor()
+  await chart.getByText('2.5 MB/s', { exact: true }).waitFor()
+  interfaces[0] = { name: 'eth0', rxBytesPerSec: 5750000, txBytesPerSec: 850000 }
+  await page.evaluate(async () => { const { queryClient } = await import('/src/lib/queryClient.ts'); await queryClient.invalidateQueries({ queryKey: ['network', 'stats'] }) })
+  await chart.getByText('5.8 MB/s', { exact: true }).waitFor()
+  await chart.getByText('850 KB/s', { exact: true }).waitFor()
+  await page.getByLabel('Interfaz de ancho de banda').selectOption('eth1')
+  await chart.getByText('3 KB/s', { exact: true }).waitFor()
+  await chart.getByText('4 KB/s', { exact: true }).waitFor()
+  interfaces = [{ name: 'eth0', rxBytesPerSec: 0.5, txBytesPerSec: 0 }]
+  await page.evaluate(async () => { const { queryClient } = await import('/src/lib/queryClient.ts'); await queryClient.invalidateQueries({ queryKey: ['network', 'stats'] }) })
+  await chart.getByText('0.5 B/s', { exact: true }).waitFor()
+  await chart.getByText('0 B/s', { exact: true }).waitFor()
+  await chart.getByText('eth0', { exact: true }).waitFor()
+})
+
+test('dashboard network rates display byte units and low-rate precision', async t => {
+  const metrics = {
+    cpu: { usagePercent: 0, tempCelsius: null, cores: 1 },
+    memory: { totalBytes: 1000000, usedBytes: 0, freeBytes: 1000000, usagePercent: 0 },
+    network: { interface: 'eth-test', rxBytesPerSec: 1500000, txBytesPerSec: 0.5, rxTotal: 0, txTotal: 0 },
+    uptime: 0, loadAvg: [0, 0, 0], fans: [], temps: [], power: null,
+  }
+  const page = await pageFor(t, {
+    '/setup/status': json({ complete: true }),
+    '/system/metrics': json(metrics),
+  })
+  await page.evaluate(async input => { const { useAuthStore } = await import('/src/stores/authStore.ts'); useAuthStore.getState().login(input) }, auth())
+  await page.goto(origin)
+  await page.getByText('eth-test', { exact: true }).waitFor()
+  await page.getByText('1.5 MB/s', { exact: true }).waitFor()
+  await page.getByText('0.5 B/s', { exact: true }).waitFor()
+})
+
+test('dashboard RX/TX histories record constant sample ticks and reset when interface changes', async t => {
+  let iface = 'eth-first'
+  const page = await pageFor(t, {
+    '/setup/status': json({ complete: true }),
+    '/system/metrics': route => json({
+      cpu: { usagePercent: 0, tempCelsius: null, cores: 1 },
+      memory: { totalBytes: 1000000, usedBytes: 0, freeBytes: 1000000, usagePercent: 0 },
+      network: { interface: iface, rxBytesPerSec: 1000000, txBytesPerSec: 2000000, rxTotal: 0, txTotal: 0 },
+      uptime: 0, loadAvg: [0, 0, 0], fans: [], temps: [], power: null,
+    })(route),
+  })
+  await page.evaluate(async input => { const { useAuthStore } = await import('/src/stores/authStore.ts'); useAuthStore.getState().login(input) }, auth())
+  await page.goto(origin)
+  await page.getByText('eth-first', { exact: true }).waitFor()
+  const refetch = () => page.evaluate(async () => { const { queryClient } = await import('/src/lib/queryClient.ts'); await queryClient.invalidateQueries({ queryKey: ['system', 'metrics'] }) })
+  for (let i = 0; i < 2; i++) await refetch()
+  const rx = page.locator('path[stroke="#10b981"]')
+  const tx = page.locator('path[stroke="#3b82f6"]')
+  await rx.waitFor({ state: 'attached' })
+  await tx.waitFor({ state: 'attached' })
+  assert.ok(((await rx.getAttribute('d')).match(/L/g) || []).length >= 2)
+  assert.ok(((await tx.getAttribute('d')).match(/L/g) || []).length >= 2)
+  iface = 'eth-second'
+  await refetch()
+  await page.getByText('eth-second', { exact: true }).waitFor()
+  assert.equal(await rx.count(), 0)
+  assert.equal(await tx.count(), 0)
+  await refetch()
+  await rx.waitFor({ state: 'attached' })
+  await tx.waitFor({ state: 'attached' })
+  assert.equal(((await rx.getAttribute('d')).match(/L/g) || []).length, 1)
+  assert.equal(((await tx.getAttribute('d')).match(/L/g) || []).length, 1)
 })

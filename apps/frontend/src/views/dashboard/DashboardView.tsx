@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Cpu,
   MemoryStick,
@@ -20,7 +20,7 @@ import { useSystemMetrics } from '../../hooks/useSystem'
 import { usePublicIp, useDdnsStatus, useNetworkInterfaces } from '../../hooks/useNetwork'
 import { useDisks, useMergerFSStatus } from '../../hooks/useStorage'
 import { useContainers } from '../../hooks/useDocker'
-import { formatBytes, formatUptime } from '../../lib/utils'
+import { formatBytes, formatUptime, formatTransferRate } from '../../lib/utils'
 import type { SystemMetrics } from '@homenas/shared'
 import { useT } from '../../i18n/useT'
 
@@ -67,6 +67,22 @@ function useHistory<T>(value: T | undefined, maxLen = HISTORY): T[] {
     setBuf((prev) => [...prev.slice(-(maxLen - 1)), value])
   }, [value, maxLen])
   return buf
+}
+
+// Unlike CPU/memory value history, throughput records every successful sample,
+// including unchanged rates. The NetworkCard is keyed by interface below.
+function useNetworkHistory(rx: number, tx: number, sampleTick: number) {
+  const lastTick = useRef<number | null>(null)
+  const [history, setHistory] = useState<{ rx: number[]; tx: number[] }>({ rx: [], tx: [] })
+  useEffect(() => {
+    if (lastTick.current === sampleTick) return
+    lastTick.current = sampleTick
+    setHistory(previous => ({
+      rx: [...previous.rx.slice(-(HISTORY - 1)), rx],
+      tx: [...previous.tx.slice(-(HISTORY - 1)), tx],
+    }))
+  }, [rx, tx, sampleTick])
+  return history
 }
 
 // ─── Shared UI primitives ─────────────────────────────────────────────────────
@@ -240,14 +256,13 @@ function MemoryCard({ data }: { data: SystemMetrics }) {
 
 // ─── Network card ─────────────────────────────────────────────────────────────
 
-function NetworkCard({ data }: { data: SystemMetrics }) {
+function NetworkCard({ data, sampleTick }: { data: SystemMetrics; sampleTick: number }) {
   const { network } = data
   const { data: publicIpData } = usePublicIp()
   const { data: ddnsData } = useDdnsStatus()
   const { data: interfaces } = useNetworkInterfaces()
 
-  const rxHistory = useHistory(network.rxBytesPerSec)
-  const txHistory = useHistory(network.txBytesPerSec)
+  const { rx: rxHistory, tx: txHistory } = useNetworkHistory(network.rxBytesPerSec, network.txBytesPerSec, sampleTick)
 
   const lanIp = interfaces?.find(i => i.isUp && i.ipv4)?.ipv4 ?? null
   const ddnsActive = ddnsData?.enabled ? 1 : 0
@@ -269,7 +284,7 @@ function NetworkCard({ data }: { data: SystemMetrics }) {
           <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
             <ArrowDown className="w-3 h-3" /><span className="text-xs">RX/s</span>
           </div>
-          <span className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatBytes(network.rxBytesPerSec)}/s</span>
+          <span className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatTransferRate(network.rxBytesPerSec)}</span>
         </div>
         <div className="-mx-1"><Sparkline points={rxHistory} color="#10b981" fillColor="#10b98118" height={24} /></div>
       </div>
@@ -279,7 +294,7 @@ function NetworkCard({ data }: { data: SystemMetrics }) {
           <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
             <ArrowUp className="w-3 h-3" /><span className="text-xs">TX/s</span>
           </div>
-          <span className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">{formatBytes(network.txBytesPerSec)}/s</span>
+          <span className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">{formatTransferRate(network.txBytesPerSec)}</span>
         </div>
         <div className="-mx-1"><Sparkline points={txHistory} color="#3b82f6" fillColor="#3b82f618" height={24} /></div>
       </div>
@@ -605,7 +620,7 @@ function SkeletonCard() {
 
 export function DashboardView() {
   const t = useT()
-  const { data, isLoading, isError, error } = useSystemMetrics()
+  const { data, dataUpdatedAt, isLoading, isError, error } = useSystemMetrics()
 
   return (
     <div className="space-y-4">
@@ -628,7 +643,7 @@ export function DashboardView() {
           <>
             <CpuCard data={data} />
             <MemoryCard data={data} />
-            <NetworkCard data={data} />
+            <NetworkCard key={data.network.interface} data={data} sampleTick={dataUpdatedAt} />
             <UptimeCard data={data} />
             <FansCard data={data} />
             <PowerCard data={data} />

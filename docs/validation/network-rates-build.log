@@ -1,0 +1,69 @@
+
+> homenas-os-v3@1.0.3 build <checkout>
+> pnpm -r build
+
+Scope: 3 of 4 workspace projects
+packages/shared build$ tsc
+packages/shared build: Done
+apps/backend build$ tsc
+apps/frontend build$ tsc && vite build
+apps/backend build: Done
+apps/frontend build: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+apps/frontend build:   - `__dirname` (vite.config.ts:10:39). Use `import.meta.dirname` instead
+apps/frontend build: Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+apps/frontend build: vite v8.3.1 building client environment for production...
+apps/frontend build: transforming...
+apps/frontend build: ✓ 1774 modules transformed.
+apps/frontend build: rendering chunks...
+apps/frontend build: computing gzip size...
+apps/frontend build: dist/index.html                              0.52 kB │ gzip:   0.32 kB
+apps/frontend build: dist/assets/index-DEJZEIoc.css              74.48 kB │ gzip:  11.63 kB
+apps/frontend build: dist/assets/check-mZyDNZFV.js                0.11 kB │ gzip:   0.13 kB
+apps/frontend build: dist/assets/chevron-down-B9D2XLOp.js         0.11 kB │ gzip:   0.13 kB
+apps/frontend build: dist/assets/play-BSoL_IrO.js                 0.12 kB │ gzip:   0.13 kB
+apps/frontend build: dist/assets/square-C0QQPXw-.js               0.13 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/plus-Bo412N-N.js                 0.14 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/x-CtWFnnYt.js                    0.14 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/clock-DzZ44x0B.js                0.17 kB │ gzip:   0.16 kB
+apps/frontend build: dist/assets/circle-check-big-C0jGYHKn.js     0.18 kB │ gzip:   0.17 kB
+apps/frontend build: dist/assets/circle-x-KhYBDmxh.js             0.19 kB │ gzip:   0.17 kB
+apps/frontend build: dist/assets/database-BFx71TY6.js             0.23 kB │ gzip:   0.19 kB
+apps/frontend build: dist/assets/circle-alert-Ylj7Jcyg.js         0.23 kB │ gzip:   0.18 kB
+apps/frontend build: dist/assets/download-B1y1tKmu.js             0.25 kB │ gzip:   0.21 kB
+apps/frontend build: dist/assets/triangle-alert-BK9YX-m3.js       0.25 kB │ gzip:   0.20 kB
+apps/frontend build: dist/assets/pencil-Bmp8U_wu.js               0.26 kB │ gzip:   0.21 kB
+apps/frontend build: dist/assets/wifi-DTE0zY7N.js                 0.26 kB │ gzip:   0.19 kB
+apps/frontend build: dist/assets/shield-check-BdruBI-j.js         0.30 kB │ gzip:   0.24 kB
+apps/frontend build: dist/assets/file-text-J5EV9wQg.js            0.32 kB │ gzip:   0.20 kB
+apps/frontend build: dist/assets/server-CZCTDQex.js               0.32 kB │ gzip:   0.20 kB
+apps/frontend build: dist/assets/trash-2-BMI4Ye8_.js              0.34 kB │ gzip:   0.24 kB
+apps/frontend build: dist/assets/folder-open-BotJavwJ.js          0.46 kB │ gzip:   0.31 kB
+apps/frontend build: dist/assets/useSystem-DNR7adyh.js            0.80 kB │ gzip:   0.41 kB
+apps/frontend build: dist/assets/shield-vLnn26Xr.js               0.85 kB │ gzip:   0.42 kB
+apps/frontend build: dist/assets/useScheduler-BpoB4SwD.js         1.31 kB │ gzip:   0.44 kB
+apps/frontend build: dist/assets/useDocker-C0ntu20u.js            1.57 kB │ gzip:   0.65 kB
+apps/frontend build: dist/assets/useStorage-JJir-VnM.js           3.32 kB │ gzip:   0.89 kB
+apps/frontend build: dist/assets/useNetwork-DflYPDR4.js           4.80 kB │ gzip:   1.00 kB
+apps/frontend build: dist/assets/LoginView-BCT0lpkE.js            5.79 kB │ gzip:   1.87 kB
+apps/frontend build: dist/assets/src-DRSgDbh3.js                 10.79 kB │ gzip:   3.33 kB
+apps/frontend build: dist/assets/client-DxPf6roi.js              12.20 kB │ gzip:   4.82 kB
+apps/frontend build: dist/assets/NetworkDrivesView-BRfZ83DY.js   13.00 kB │ gzip:   3.57 kB
+apps/frontend build: dist/assets/SchedulerView-C1lKZjqf.js       15.56 kB │ gzip:   3.70 kB
+apps/frontend build: dist/assets/HomeStoreView-BCs2XwC-.js       19.40 kB │ gzip:   4.51 kB
+apps/frontend build: dist/assets/SyncthingView-Dp3TWWAk.js       20.39 kB │ gzip:   4.08 kB
+apps/frontend build: dist/assets/DashboardView-BPrfACVK.js       20.85 kB │ gzip:   4.82 kB
+apps/frontend build: dist/assets/container-form-Boo8goIY.js      22.91 kB │ gzip:   4.95 kB
+apps/frontend build: dist/assets/DockerView-C9V8Bria.js          24.80 kB │ gzip:   6.01 kB
+apps/frontend build: dist/assets/SetupWizard-B4qkH2nm.js         25.00 kB │ gzip:   5.70 kB
+apps/frontend build: dist/assets/UsersView-DflZEDUI.js           25.34 kB │ gzip:   5.31 kB
+apps/frontend build: dist/assets/BackupView-BMjOygRQ.js          26.99 kB │ gzip:   5.43 kB
+apps/frontend build: dist/assets/index.esm-BRBk98Q4.js           27.93 kB │ gzip:  10.22 kB
+apps/frontend build: dist/assets/FilesView-C5WUj-Ap.js           28.22 kB │ gzip:   7.64 kB
+apps/frontend build: dist/assets/CloudBackupView-CWsfrrFJ.js     32.01 kB │ gzip:   6.67 kB
+apps/frontend build: dist/assets/SystemView-D3Hmc-qs.js          38.73 kB │ gzip:   8.73 kB
+apps/frontend build: dist/assets/StorageView-CWDflqri.js         52.86 kB │ gzip:   9.79 kB
+apps/frontend build: dist/assets/types-CHTUHh1Q.js               58.08 kB │ gzip:  13.49 kB
+apps/frontend build: dist/assets/NetworkView-CJdwy4nf.js         61.85 kB │ gzip:  10.94 kB
+apps/frontend build: dist/assets/index-xF_WxNTW.js              392.26 kB │ gzip: 123.56 kB
+apps/frontend build: ✓ built in 209ms
+apps/frontend build: Done

@@ -40,7 +40,6 @@ const NAV_ROUTES = [
   { key: 'docker'          as const, icon: Container,        to: '/docker' },
   { key: 'homestore'       as const, icon: ShoppingBag,      to: '/homestore' },
   { key: 'network'         as const, icon: Network,          to: '/network' },
-  { key: 'syncthing'       as const, icon: RefreshCw,        to: '/syncthing' },
   { key: 'cloudBackup'     as const, icon: Cloud,            to: '/cloud-backup' },
   { key: 'users'           as const, icon: Users,            to: '/users' },
   { key: 'backup'          as const, icon: Archive,          to: '/backup' },

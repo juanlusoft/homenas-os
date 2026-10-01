@@ -52,8 +52,14 @@ interface IpAddrEntry {
 }
 
 interface IpLinkStats {
-  rx_bytes: number
-  tx_bytes: number
+  rx?: { bytes?: number }
+  tx?: { bytes?: number }
+  rx_bytes?: number
+  tx_bytes?: number
+}
+
+export function parseIpLinkCounters(stats: IpLinkStats | undefined): { rxBytes: number; txBytes: number } {
+  return { rxBytes: stats?.rx?.bytes ?? stats?.rx_bytes ?? 0, txBytes: stats?.tx?.bytes ?? stats?.tx_bytes ?? 0 }
 }
 
 interface IpLinkEntry {
@@ -93,7 +99,7 @@ export async function listInterfaces(): Promise<NetworkInterface[]> {
   }
 
   // Filter out virtual/Docker interfaces — only show physical ones
-  const VIRTUAL_IFACE = /^(docker\d*|veth|br-|virbr|lo$|bond\d|dummy|tun\d|tap\d)/
+  const VIRTUAL_IFACE = /^(docker\d*|veth|br-|virbr|lo$|dummy|tun\d|tap\d)/
   const physicalIfaces = addrData.filter((iface) => !VIRTUAL_IFACE.test(iface.ifname))
 
   const interfaces: NetworkInterface[] = []
@@ -102,7 +108,7 @@ export async function listInterfaces(): Promise<NetworkInterface[]> {
     const ipv4 = iface.addr_info.find((a) => a.family === 'inet')?.local ?? null
     const ipv6 = iface.addr_info.find((a) => a.family === 'inet6' && a.scope !== 'link')?.local ?? null
 
-    const stats = statsMap.get(iface.ifname)
+    const stats = parseIpLinkCounters(statsMap.get(iface.ifname))
     const isUp = iface.flags?.includes('UP') ?? false
 
     // Try ethtool for speed (graceful fallback)
@@ -120,8 +126,8 @@ export async function listInterfaces(): Promise<NetworkInterface[]> {
       mac: iface.address ?? null,
       isUp,
       speed,
-      rxBytes: stats?.rx_bytes ?? 0,
-      txBytes: stats?.tx_bytes ?? 0,
+      rxBytes: stats.rxBytes,
+      txBytes: stats.txBytes,
     })
   }
 
@@ -1050,62 +1056,74 @@ export async function deleteNfsExport(path: string): Promise<void> {
 
 // ─── Network bandwidth stats ──────────────────────────────────────────────────
 
-interface IfaceSnapshot {
-  timestamp: number
+export interface NetworkTrafficSample {
+  name: string
   rxBytes: number
   txBytes: number
-}
-
-// In-memory previous snapshots keyed by interface name
-const bandwidthSnapshots = new Map<string, IfaceSnapshot>()
-
-interface IfaceBandwidth {
-  name: string
   rxBytesPerSec: number
   txBytesPerSec: number
 }
 
-export async function getNetworkBandwidthStats(): Promise<{ interfaces: IfaceBandwidth[] }> {
-  let content: string
-  try {
-    content = await readFile('/proc/net/dev', 'utf-8')
-  } catch {
-    return { interfaces: [] }
+export function parseNetworkCounters(content: string): { name: string; rxBytes: number; txBytes: number }[] {
+  const interfaces: { name: string; rxBytes: number; txBytes: number }[] = []
+  for (const line of content.split('\n')) {
+    const match = line.match(/^\s*([^\s:]+)\s*:\s*(.*)$/)
+    if (!match) continue
+    const name = match[1]!
+    if (/^(docker\d*|veth|br-|virbr|lo$|dummy|tun\d|tap\d)/.test(name)) continue
+    const cols = match[2]!.trim().split(/\s+/)
+    if (!/^\d+$/.test(cols[0] ?? '') || !/^\d+$/.test(cols[8] ?? '')) continue
+    const rxBytes = Number(cols[0]), txBytes = Number(cols[8])
+    if (!Number.isFinite(rxBytes) || !Number.isFinite(txBytes)) continue
+    interfaces.push({ name, rxBytes, txBytes })
   }
+  return interfaces
+}
 
-  const now = Date.now()
-  const result: IfaceBandwidth[] = []
-
-  // /proc/net/dev format (skip first 2 header lines):
-  // iface: rx_bytes rx_packets rx_errs ... tx_bytes ...
-  const lines = content.split('\n').slice(2)
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    const colonIdx = trimmed.indexOf(':')
-    if (colonIdx === -1) continue
-    const name = trimmed.slice(0, colonIdx).trim()
-    if (/^(docker\d*|veth|br-|virbr|lo$|bond\d|dummy|tun\d|tap\d)/.test(name)) continue
-    const cols = trimmed.slice(colonIdx + 1).trim().split(/\s+/)
-    const rxBytes = parseInt(cols[0] ?? '0', 10)
-    const txBytes = parseInt(cols[8] ?? '0', 10)
-    if (isNaN(rxBytes) || isNaN(txBytes)) continue
-
-    const prev = bandwidthSnapshots.get(name)
-    let rxBytesPerSec = 0
-    let txBytesPerSec = 0
-
-    if (prev) {
-      const elapsed = (now - prev.timestamp) / 1000
-      if (elapsed > 0) {
-        rxBytesPerSec = Math.max(0, (rxBytes - prev.rxBytes) / elapsed)
-        txBytesPerSec = Math.max(0, (txBytes - prev.txBytes) / elapsed)
+/** Share one sampling window across clients; near-simultaneous requests must not reset each other's rates. */
+export function createNetworkTrafficSampler(dependencies: {
+  readCounters?: () => Promise<string>
+  now?: () => number
+  intervalMs?: number
+} = {}) {
+  const readCounters = dependencies.readCounters ?? (() => readFile('/proc/net/dev', 'utf-8'))
+  const now = dependencies.now ?? (() => performance.now()) // monotonic elapsed time
+  const intervalMs = dependencies.intervalMs ?? 1000
+  let sampledAt = -Infinity
+  let cached: NetworkTrafficSample[] = []
+  let previous = new Map<string, { rxBytes: number; txBytes: number }>()
+  let pending: Promise<NetworkTrafficSample[]> | null = null
+  return async function sample(): Promise<NetworkTrafficSample[]> {
+    if (pending) return pending
+    if (now() - sampledAt < intervalMs) return cached
+    pending = (async () => {
+      let content: string
+      try { content = await readCounters() } catch {
+        previous.clear(); sampledAt = now(); cached = []; return cached
       }
-    }
-
-    bandwidthSnapshots.set(name, { timestamp: now, rxBytes, txBytes })
-    result.push({ name, rxBytesPerSec, txBytesPerSec })
+      const timestamp = now()
+      const elapsed = (timestamp - sampledAt) / 1000
+      const counters = parseNetworkCounters(content)
+      cached = counters.map(current => {
+        const before = previous.get(current.name)
+        const usable = before && Number.isFinite(elapsed) && elapsed > 0
+        return {
+          ...current,
+          rxBytesPerSec: usable ? Math.max(0, (current.rxBytes - before.rxBytes) / elapsed) : 0,
+          txBytesPerSec: usable ? Math.max(0, (current.txBytes - before.txBytes) / elapsed) : 0,
+        }
+      })
+      previous = new Map(counters.map(current => [current.name, current]))
+      sampledAt = timestamp
+      return cached
+    })().finally(() => { pending = null })
+    return pending
   }
+}
 
-  return { interfaces: result }
+export const getNetworkTrafficSample = createNetworkTrafficSampler()
+
+export async function getNetworkBandwidthStats(sample = getNetworkTrafficSample): Promise<{ interfaces: { name: string; rxBytesPerSec: number; txBytesPerSec: number }[] }> {
+  const samples = await sample()
+  return { interfaces: samples.map(({ name, rxBytesPerSec, txBytesPerSec }) => ({ name, rxBytesPerSec, txBytesPerSec })) }
 }
