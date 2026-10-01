@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { networkApi } from '../api/network'
-import type { AddWireguardPeerInput, WireguardInitInput, CreateSambaShareInput, UpdateSambaShareInput } from '@homenas/shared'
+import type { AddWireguardPeerInput, WireguardInitInput, CreateSambaShareInput, UpdateSambaShareInput, CreateNfsExportInput, UpdateNfsExportInput } from '@homenas/shared'
 import type { IpConfigInput } from '../api/network'
 
 export function useNetworkInterfaces() {
@@ -147,6 +147,36 @@ export function useNfsStatus() {
     queryKey: ['network', 'nfs', 'status'],
     queryFn: () => networkApi.getNfsStatus(),
     refetchInterval: 15_000,
+  })
+}
+
+function invalidateNfs(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['network', 'nfs', 'exports'] })
+  queryClient.invalidateQueries({ queryKey: ['network', 'nfs', 'status'] })
+}
+
+export function useCreateNfsExport() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CreateNfsExportInput) => networkApi.createNfsExport(body),
+    onSuccess: () => invalidateNfs(queryClient),
+  })
+}
+
+export function useUpdateNfsExport() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ path, fields }: { path: string; fields: UpdateNfsExportInput }) =>
+      networkApi.updateNfsExport(path, fields),
+    onSuccess: () => invalidateNfs(queryClient),
+  })
+}
+
+export function useDeleteNfsExport() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (path: string) => networkApi.deleteNfsExport(path),
+    onSuccess: () => invalidateNfs(queryClient),
   })
 }
 
