@@ -1,0 +1,7 @@
+2fdc69a
+active
+/mnt/pool fuse.mergerfs
+/mnt/pool-write fuse.mergerfs
+/mnt/pool-archive fuse.mergerfs
+active
+active
