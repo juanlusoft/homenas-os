@@ -5,8 +5,8 @@
 Scope: 3 of 4 workspace projects
 packages/shared build$ tsc
 packages/shared build: Done
-apps/backend build$ tsc
 apps/frontend build$ tsc && vite build
+apps/backend build$ tsc
 apps/backend build: Done
 apps/frontend build: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
 apps/frontend build:   - `__dirname` (vite.config.ts:10:39). Use `import.meta.dirname` instead
@@ -65,5 +65,5 @@ apps/frontend build: dist/assets/StorageView-mfBjvK19.js         52.86 kB │ gz
 apps/frontend build: dist/assets/NetworkView-CzVKxUrE.js         57.26 kB │ gzip:   9.60 kB
 apps/frontend build: dist/assets/types-CHTUHh1Q.js               58.08 kB │ gzip:  13.49 kB
 apps/frontend build: dist/assets/index-L1umVMT7.js              392.18 kB │ gzip: 123.52 kB
-apps/frontend build: ✓ built in 187ms
+apps/frontend build: ✓ built in 176ms
 apps/frontend build: Done

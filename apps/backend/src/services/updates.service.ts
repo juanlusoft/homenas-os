@@ -7,6 +7,13 @@ import { findProjectRoot } from '../lib/project-root.js'
 // Repo root is two levels up from apps/backend (WorkingDirectory in systemd)
 const REPO_ROOT = findProjectRoot(import.meta.url)
 
+// Keep this pinned to package.json packageManager, independently of the host's global pnpm.
+export const APP_UPDATE_PNPM_PACKAGE = 'pnpm@9.15.9'
+
+export function getAppUpdatePnpmCommand(args: string[]): [string, string[]] {
+  return ['npm', ['exec', '--yes', `--package=${APP_UPDATE_PNPM_PACKAGE}`, '--', 'pnpm', ...args]]
+}
+
 export function getAppUpdateMergeArgs(remoteHead: string): string[] {
   // Ignored runtime/custom files still belong to the installation, not upstream.
   return ['merge', '--ff-only', '--no-overwrite-ignore', remoteHead]
@@ -162,10 +169,15 @@ async function runAppUpdate(): Promise<void> {
   }
 
   // Repo is owned by homenas (install.sh sets chown -R homenas:homenas).
-  // git/pnpm run as homenas directly — no sudo needed.
+  // git/npm run as homenas directly — no sudo needed. npm exec selects the
+  // repository's pinned pnpm; invoking global pnpm can recursively bootstrap itself.
   // Only systemctl restart requires sudo (escalation allowed since NoNewPrivileges is not set).
   const run = (cmd: string, args: string[], extra?: object) =>
     execa(cmd, args, { cwd: REPO_ROOT, shell: false, reject: false, all: true, ...extra })
+  const runPinnedPnpm = (args: string[], extra?: object) => {
+    const [command, commandArgs] = getAppUpdatePnpmCommand(args)
+    return run(command, commandArgs, extra)
+  }
 
   try {
     append('=== Starting app update ===')
@@ -204,8 +216,8 @@ async function runAppUpdate(): Promise<void> {
     })
 
     // Install dependencies — CI=true skips TTY confirmation for node_modules removal
-    append('> pnpm install --frozen-lockfile')
-    const installResult = await run('pnpm', ['install', '--frozen-lockfile', '--config.confirmModulesPurge=false'], {
+    append('> npm exec --yes --package=pnpm@9.15.9 -- pnpm install --frozen-lockfile')
+    const installResult = await runPinnedPnpm(['install', '--frozen-lockfile', '--config.confirmModulesPurge=false'], {
       env: { ...process.env, CI: 'true' },
     })
     append(installResult.all ?? '')
@@ -220,8 +232,8 @@ async function runAppUpdate(): Promise<void> {
     })
 
     // Build all packages
-    append('> pnpm -r build')
-    const buildResult = await run('pnpm', ['-r', 'build'])
+    append('> npm exec --yes --package=pnpm@9.15.9 -- pnpm -r build')
+    const buildResult = await runPinnedPnpm(['-r', 'build'])
     append(buildResult.all ?? '')
     if (buildResult.exitCode !== 0) {
       throw new Error(`pnpm build failed: ${buildResult.stderr}`)
