@@ -366,6 +366,7 @@ test('retired features are absent from routes/menu while local/cloud backup rema
   assert.equal(await page.locator('aside a[href="/active-backup"]').count(), 0)
   assert.equal(await page.locator('aside a[href="/cloud-backup"]').count(), 1)
   assert.equal(await page.locator('aside a[href="/syncthing"]').count(), 0)
+  assert.equal(await page.locator('aside a[href="/scheduler"]').count(), 0)
   const paths = await page.evaluate(async () => {
     const { router } = await import('/src/router.tsx')
     return router.routes.flatMap(route => [route.path, ...(route.children || []).map(child => child.path)])
@@ -375,6 +376,7 @@ test('retired features are absent from routes/menu while local/cloud backup rema
   assert.equal(paths.includes('backup'), true)
   assert.equal(paths.includes('cloud-backup'), true)
   assert.equal(paths.includes('syncthing'), true)
+  assert.equal(paths.includes('scheduler'), true)
 })
 
 test('network rates render current RX/TX immediately and follow interface changes/removal', async t => {

@@ -25,3 +25,7 @@ Nueva petición TX/RX y ocultarSyncthingmenú: rama fix/network-rates desde69917
 TX/RX integrado: backendselectorroute+operstate,samplermonotónico1scompartido,countersstats64; frontendgráficaconectada/livehistories/ticks/reset+tasasprecisas ySyncthingNAVoculto conservandomódulo. Local67tests/build/lint/audit0/HTTPSPASS,revisorbackend42/front19PASSsinhallazgos. Pendiente publicar/desplegarNAS+leerTX/RXreales.
 
 Cierre TX/RX/Syncthing:8349ad3 publicadoNAS mainlimpio ybuild+42tests allíPASS; browserreal dashboardeth0/RXTXpositivosAPI+DOM+gráfica/counterspositivosPASS, SyncthingNAVausente. Local67tests/lint/build/audit0/HTTPS yindreview42/19PASS. Configdatoshashesconservados; sólo restartapp,nooperacionesred/datos. HarnessRXambiguocorregidoscopegráfica,repeticiónPASS. LímiteIPv6/policyrouting/hotplugdocumentado. Evidencia NETWORK-RATES-REPAIR+validation/network-rates-*.log.
+
+Petición posterior: ocultar Programador delmenú. NASconsultareadonly scheduled_tasks total0/habilitadas0; timerscache/SnapRAIDactivosindependientes. SóloSidebar enlace/importCalendar retirados; ruta/API/servicio preservados. Regresiónmenúausente/rutapresente ajustada. Pendiente build/pruebasfront/indreview/push/NAS.
+
+OcultarProgramador validaciónlocal: buildglobal/frontend19/lintPASS; revisiónindependientefocalmenú/ruta+typecheck/diffPASS,sinhallazgos. Ningunarchivo backend/rutasReact/instaladores/timers tocado. Publicar/desplegar frontend yverificarmenúrealNAS.

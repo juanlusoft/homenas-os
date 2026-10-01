@@ -7,7 +7,6 @@ import {
   Network,
   Users,
   Archive,
-  Calendar,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -43,7 +42,6 @@ const NAV_ROUTES = [
   { key: 'cloudBackup'     as const, icon: Cloud,            to: '/cloud-backup' },
   { key: 'users'           as const, icon: Users,            to: '/users' },
   { key: 'backup'          as const, icon: Archive,          to: '/backup' },
-  { key: 'scheduler'       as const, icon: Calendar,         to: '/scheduler' },
   { key: 'system'          as const, icon: Settings,         to: '/system' },
 ]
 
