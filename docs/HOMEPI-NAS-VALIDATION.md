@@ -29,7 +29,7 @@ El [script aplicado](validation/homepinas-upgrade-command.sh) es evidencia de es
 |---|---|
 | Referencia antes de actualizar | Login navegador,8API y4vistas PASS; status tomaba incorrectamente `/mnt/pool-archive`. |
 | Compilación y SQLite | [build ARM](validation/homepinas-build.log), [build final](validation/homepinas-build-final.log); instalación frozen y carga SQLite nativa PASS. |
-| Regresiones en NAS | [backend39](validation/homepinas-backend-tests.log):39PASS,0fallos/omitidos; comandos destructivos sustituidos por fixtures incluso en NAS real. |
+| Regresiones en NAS | [backend39](validation/homepinas-published-tests.log):39PASS,0fallos/omitidos; comandos destructivos sustituidos por fixtures incluso en NAS real. |
 | Go real en ARM64 | [integración](validation/homepinas-agent-integration.log): TCP→Fastify→SQLite, archivos vacíos/multichunk, hardlinks, recuperación de base ausente y errores/manifest preservado PASS, todo temporal. |
 | Interfaz y API instaladas | [browser final](validation/homepinas-browser-final.log): login y8API200,4vistas sin errores JS; principal `/mnt/pool`, seis discos y una rama cache lógica, incluso ausente su subdirectorio. |
 | Archivos por API sobre pool real | [flujo completo](validation/homepinas-browser-after.log): hashes SHA256 de tres fixtures antes/después; descarga UTF-8/vacío/archivo grande, subida multipart de1MB/vacío, rename/copy/mkdir/move, verificación de contenido y borrado del directorio temporal PASS. No se leyó contenido de archivos del usuario. |
