@@ -1,0 +1,9 @@
+ M .gitignore
+ M README.md
+ M apps/agent/cmd/install.go
+ M apps/agent/cmd/install_windows.go
+ M apps/agent/go.mod
+active
+/etc/fstab: OK
+/etc/samba/smb.conf: OK
+/etc/snapraid.conf: OK

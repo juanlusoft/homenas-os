@@ -3,10 +3,8 @@ import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import bcryptjs from 'bcryptjs'
 import { execa } from 'execa'
-import { readFile, writeFile, mkdtemp } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { execWithInput, sudoWrap } from '../../lib/exec.js'
+import { readFile } from 'node:fs/promises'
+import { exec, execWithInput, sudoWrap, writeFileAsRoot } from '../../lib/exec.js'
 import { logError } from '../../lib/log-store.js'
 import { getSetting, setSetting } from '../../lib/settings.js'
 import { createUsersRepo } from '../../repositories/users.repo.js'
@@ -45,35 +43,26 @@ async function setupSambaUser(username: string, password: string): Promise<void>
 // ─── Fix storage pool permissions + ensure default SMB share exists ──────────
 
 async function fixPoolPermissions(): Promise<void> {
-  const SMB_CONF = '/etc/samba/smb.conf'
-  try {
-    const mounts = await readFile('/proc/mounts', 'utf-8')
-    for (const line of mounts.split('\n')) {
-      const parts = line.trim().split(/\s+/)
-      if (parts[2] === 'fuse.mergerfs' && parts[1]) {
-        const mountPoint = parts[1].replace(/\\040/g, ' ')
-        await execa(...sudoWrap('chown', ['root:sambashare', mountPoint]), { reject: false })
-        await execa(...sudoWrap('chmod', ['2775', mountPoint]), { reject: false })
-
-        // Ensure a [storage] share exists in smb.conf pointing at this pool
-        try {
-          const conf = await readFile(SMB_CONF, 'utf-8').catch(() => '')
-          if (!conf.includes('[storage]')) {
-            const shareSection = `\n[storage]\n   path = ${mountPoint}\n   comment = HomeNas Storage\n   browseable = yes\n   read only = no\n   valid users = @sambashare\n   create mask = 0664\n   directory mask = 0775\n`
-            // Unique temp file (concurrent requests would otherwise stomp /tmp/smb.conf.tmp)
-            const tmpDir = await mkdtemp(join(tmpdir(), 'homenas-smb-'))
-            const tmpPath = join(tmpDir, 'smb.conf.tmp')
-            await writeFile(tmpPath, conf + shareSection)
-            await execa(...sudoWrap('mv', [tmpPath, SMB_CONF]), { reject: false })
-            await execa(...sudoWrap('systemctl', ['reload-or-restart', 'smbd']), { reject: false })
-          }
-        } catch {
-          // smb.conf write failed — non-fatal
-        }
+  const mounts = await readFile('/proc/mounts', 'utf-8')
+  for (const line of mounts.split('\n')) {
+    const parts = line.trim().split(/\s+/)
+    if ((parts[2] === 'fuse.mergerfs' || parts[1] === '/mnt/storage') && parts[1]) {
+      const mountPoint = parts[1].replace(/\\040/g, ' ')
+      for (const [command, args] of [
+        ['chown', ['homenas:sambashare', mountPoint]],
+        ['chmod', ['2775', mountPoint]],
+      ] as [string, string[]][]) {
+        const result = await exec(command, args)
+        if (result.exitCode !== 0) throw new Error(`Pool permissions failed: ${result.stderr}`)
+      }
+      const conf = await readFile('/etc/samba/smb.conf', 'utf-8')
+      if (!/^\[storage\]\s*$/m.test(conf)) {
+        const section = `\n[storage]\n   path = ${mountPoint}\n   comment = HomeNas Storage\n   browseable = yes\n   read only = no\n   valid users = @sambashare\n   create mask = 0664\n   directory mask = 0775\n`
+        await writeFileAsRoot('/etc/samba/smb.conf', conf + section)
+        const restarted = await exec('systemctl', ['reload-or-restart', 'smbd'])
+        if (restarted.exitCode !== 0) throw new Error(`Cannot load storage share: ${restarted.stderr}`)
       }
     }
-  } catch {
-    // /proc/mounts not available or pool not mounted yet — skip
   }
 }
 
@@ -83,6 +72,8 @@ const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
 const strongSetupPassword = z.string()
   .min(8, 'La contraseña debe tener al menos 8 caracteres')
   .max(128)
+  .refine((p) => new TextEncoder().encode(p).length <= 72, { message: 'Password must not exceed 72 UTF-8 bytes (bcrypt limit)' })
+  .refine((p) => !/[\r\n\0]/.test(p), { message: 'Password must not contain newline or null characters' })
   .refine((p) => /[A-Z]/.test(p), { message: 'Debe incluir al menos una letra mayúscula' })
   .refine((p) => /[0-9]/.test(p), { message: 'Debe incluir al menos un número' })
 
@@ -143,7 +134,7 @@ export async function setupRoutes(fastify: FastifyInstance) {
     }
     // Permanently locked once setup was ever completed — blocks autologin even if
     // setup_complete is manually cleared (e.g. via the reset wizard command).
-    if (getSetting(fastify.db, 'setup_ever_completed') === '1') {
+    if (getSetting(fastify.db, 'setup_ever_completed') === '1' || getSetting(fastify.db, 'setup_account_configured') === '1') {
       return reply.status(403).send({ error: 'Forbidden', message: 'Setup already completed on this device' })
     }
 
@@ -189,9 +180,24 @@ export async function setupRoutes(fastify: FastifyInstance) {
       return reply.status(409).send({ error: 'Conflict', message: 'El nombre de usuario ya está en uso' })
     }
 
-    usersRepo.updateUsername(request.user.id, result.data.username)
     const newHash = await bcryptjs.hash(result.data.newPassword, BCRYPT_ROUNDS)
-    usersRepo.updatePassword(request.user.id, newHash)
+    const committed = fastify.db.transaction(() => {
+      // Hashing yields the event loop: another bootstrap request may revoke
+      // this session or complete setup while bcrypt is running. Revalidate
+      // inside the synchronous transaction before committing credentials.
+      const session = createSessionsRepo(fastify.db).findById(request.headers['x-session-id'] as string)
+      const now = Math.floor(Date.now() / 1000)
+      if (!session || session.userId !== request.user.id || session.expiresAt <= now || session.idleExpiresAt <= now ||
+          getSetting(fastify.db, 'setup_complete') === '1') return false
+      if ('username' in result.data) usersRepo.updateUsername(request.user.id, result.data.username)
+      usersRepo.updatePassword(request.user.id, newHash)
+      setSetting(fastify.db, 'setup_account_configured', '1')
+      // Keep the wizard's current session; revoke every other bootstrap session.
+      fastify.db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?')
+        .run(request.user.id, request.headers['x-session-id'])
+      return true
+    })()
+    if (!committed) return reply.status(409).send({ error: 'Conflict', message: 'Setup session changed; sign in again' })
 
     // Create Samba user in background — non-fatal if Samba not installed
     setupSambaUser(result.data.username, result.data.newPassword)
@@ -214,7 +220,21 @@ export async function setupRoutes(fastify: FastifyInstance) {
     }
     const usersRepo = createUsersRepo(fastify.db)
     const newHash = await bcryptjs.hash(result.data.newPassword, BCRYPT_ROUNDS)
-    usersRepo.updatePassword(request.user.id, newHash)
+    const committed = fastify.db.transaction(() => {
+      // Hashing yields the event loop: another bootstrap request may revoke
+      // this session or complete setup while bcrypt is running. Revalidate
+      // inside the synchronous transaction before committing credentials.
+      const session = createSessionsRepo(fastify.db).findById(request.headers['x-session-id'] as string)
+      const now = Math.floor(Date.now() / 1000)
+      if (!session || session.userId !== request.user.id || session.expiresAt <= now || session.idleExpiresAt <= now ||
+          getSetting(fastify.db, 'setup_complete') === '1') return false
+      usersRepo.updatePassword(request.user.id, newHash)
+      setSetting(fastify.db, 'setup_account_configured', '1')
+      fastify.db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?')
+        .run(request.user.id, request.headers['x-session-id'])
+      return true
+    })()
+    if (!committed) return reply.status(409).send({ error: 'Conflict', message: 'Setup session changed; sign in again' })
     return reply.send({ ok: true })
   })
 
@@ -272,6 +292,7 @@ export async function setupRoutes(fastify: FastifyInstance) {
 
     try {
       await configurePool(parsed.data)
+      await fixPoolPermissions()
       return reply.send({ ok: true })
     } catch (err) {
       return reply.status(500).send({ error: 'Storage Error', message: (err as Error).message })
@@ -282,6 +303,11 @@ export async function setupRoutes(fastify: FastifyInstance) {
   fastify.post('/complete', {
     preHandler: [requireAuth, requireAdmin],
   }, async (request, reply) => {
+    if (getSetting(fastify.db, 'setup_account_configured') !== '1' && getSetting(fastify.db, 'setup_ever_completed') !== '1') {
+      return reply.status(409).send({ error: 'Conflict', message: 'Configure the administrator account before completing setup' })
+    }
+    fastify.db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?')
+      .run(request.user.id, request.headers['x-session-id'])
     setSetting(fastify.db, 'setup_complete', '1')
     setSetting(fastify.db, 'setup_ever_completed', '1') // permanent — survives setup resets
     fastify.db.prepare(`INSERT INTO audit_log (user_id, username, action, ip) VALUES (?, ?, 'setup_complete', ?)`)

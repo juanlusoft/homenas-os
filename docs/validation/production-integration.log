@@ -1,0 +1,5 @@
+
+> homenas-os-v3@1.0.3 test:production <WORKSPACE>
+> pnpm --filter @homenas/backend exec tsx tests/production-integration.ts
+
+PASS compiled HTTPS server + production React static/fallback + real login/TOTP/session + API404 + security headers + compiled agent ZIP/database downloads; temp DB/cert/logs, host monitoring blocked

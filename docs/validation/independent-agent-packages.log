@@ -1,0 +1,20 @@
+{"level":30,"time":1790852225045,"pid":1200162,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-package-UPsJyh/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790852225080,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790852225083,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":200},"responseTime":3.0541500000000497,"msg":"request completed"}
+{"level":30,"time":1790852225083,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-2","req":{"method":"POST","url":"/api/active-backup/devices","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790852225085,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-2","res":{"statusCode":201},"responseTime":2.1304360000000315,"msg":"request completed"}
+{"level":30,"time":1790852225085,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-3","req":{"method":"GET","url":"/api/active-backup/devices/1/agent-package?platform=windows&arch=amd64","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+PASS windows/amd64: full ZIP 3148036 bytes
+{"level":30,"time":1790852225313,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-3","res":{"statusCode":200},"responseTime":227.89009600000009,"msg":"request completed"}
+{"level":30,"time":1790852225314,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-4","req":{"method":"GET","url":"/api/active-backup/devices/1/agent-package?platform=linux&arch=amd64","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790852225515,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-4","res":{"statusCode":200},"responseTime":200.91919800000005,"msg":"request completed"}
+PASS linux/amd64: full ZIP 2902915 bytes
+{"level":30,"time":1790852225516,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-5","req":{"method":"GET","url":"/api/active-backup/devices/1/agent-package?platform=linux&arch=arm64","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790852225707,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-5","res":{"statusCode":200},"responseTime":191.2110049999999,"msg":"request completed"}
+PASS linux/arm64: full ZIP 2631155 bytes
+{"level":30,"time":1790852225708,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-6","req":{"method":"GET","url":"/api/active-backup/devices/1/agent-package?platform=mac&arch=amd64","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790852225918,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-6","res":{"statusCode":200},"responseTime":210.00422400000002,"msg":"request completed"}
+PASS mac/amd64: full ZIP 2921666 bytes
+{"level":30,"time":1790852225918,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-7","req":{"method":"GET","url":"/api/active-backup/devices/1/agent-package?platform=mac&arch=arm64","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+PASS mac/arm64: full ZIP 2700047 bytes
+{"level":30,"time":1790852226072,"pid":1200162,"hostname":"TEST_WORKSTATION","reqId":"req-7","res":{"statusCode":200},"responseTime":153.20951100000002,"msg":"request completed"}

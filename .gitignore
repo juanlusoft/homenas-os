@@ -2,8 +2,23 @@ node_modules/
 dist/
 .env
 .env.local
+.env.*
 *.db
 *.db-shm
 *.db-wal
 .DS_Store
 apps/agent/build/
+
+.homenas-tools/
+logs/
+
+# Runtime state and service-user home; never publish credentials or NAS data.
+/certs/
+/data/
+/homestore/
+/.cache/
+/.local/
+/.npm/
+/.gitconfig
+/apps/backend/data/
+initial-admin-password.txt

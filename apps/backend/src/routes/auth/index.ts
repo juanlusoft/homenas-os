@@ -31,7 +31,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
 
     // Block login until setup wizard is complete
-    if (getSetting(fastify.db, 'setup_complete') !== '1') {
+    if (getSetting(fastify.db, 'setup_complete') !== '1' && getSetting(fastify.db, 'setup_account_configured') !== '1') {
       return reply.status(403).send({ error: 'Forbidden', message: 'Setup not completed' })
     }
 
@@ -58,20 +58,31 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
 
     const usersRepo = createUsersRepo(fastify.db)
-    const user = usersRepo.findByUsername(username)
+    const originalUser = usersRepo.findByUsername(username)
 
     // Always run bcrypt even when user not found — prevents username enumeration via timing
-    const hashToCompare = user?.passwordHash ?? DUMMY_HASH
+    const hashToCompare = originalUser?.passwordHash ?? DUMMY_HASH
     const passwordValid = await bcryptjs.compare(password, hashToCompare)
+    // Other requests may reach the lockout threshold while bcrypt yields.
+    const currentFailCount = (fastify.db.prepare(
+      'SELECT COUNT(*) as n FROM login_attempts WHERE username = ? AND success = 0 AND created_at > ?'
+    ).get(username, Math.floor(Date.now() / 1000) - LOCKOUT_WINDOW) as { n: number }).n
+    if (currentFailCount >= MAX_ATTEMPTS) {
+      return reply.status(429).send({ error: 'Too Many Requests', message: 'Account temporarily locked. Try again in 15 minutes.' })
+    }
+    // Password hashing yields; a reset, deletion or TOTP change may have occurred.
+    // Authenticate against the current record, never issue a session from a
+    // stale password hash or stale second-factor settings.
+    const user = originalUser ? usersRepo.findById(originalUser.id) : undefined
 
     // Record attempt
-    fastify.db.prepare(
+    const attempt = fastify.db.prepare(
       `INSERT INTO login_attempts (username, ip, success) VALUES (?, ?, ?)`
-    ).run(username, ip, passwordValid && user ? 1 : 0)
+    ).run(username, ip, 0)
 
-    if (!user || !passwordValid) {
+    if (!user || !passwordValid || user.passwordHash !== hashToCompare || user.username !== username) {
       // Alert when account is about to be locked (attempt that would reach threshold)
-      const newFailCount = failCount + 1
+      const newFailCount = currentFailCount + 1
       if (newFailCount >= MAX_ATTEMPTS) {
         void sendAlert(fastify.db, 'error',
           'Cuenta bloqueada por intentos fallidos',
@@ -95,6 +106,11 @@ export async function authRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid TOTP code' })
       }
     }
+
+    // Only mark success after both password and second factor have passed.
+    fastify.db.prepare(
+      'UPDATE login_attempts SET success = 1 WHERE id = ?'
+    ).run(attempt.lastInsertRowid)
 
     // Log successful login to audit log
     fastify.db.prepare(

@@ -1,0 +1,119 @@
+
+> @homenas/frontend@1.0.2 test <WORKSPACE>/apps/frontend
+> node --test tests/*.test.mjs
+
+TAP version 13
+# (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+#   - `__dirname` (vite.config.ts:10:39). Use `import.meta.dirname` instead
+# Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+# Subtest: TOTP challenge survives HTTP 401 and login submits the second factor
+ok 1 - TOTP challenge survives HTTP 401 and login submits the second factor
+  ---
+  duration_ms: 743.032822
+  type: 'test'
+  ...
+# Subtest: invalid login reports backend message without a spurious TOTP prompt
+ok 2 - invalid login reports backend message without a spurious TOTP prompt
+  ---
+  duration_ms: 358.249922
+  type: 'test'
+  ...
+# Subtest: changing sessions clears private cache; old 401 cannot invalidate new login
+ok 3 - changing sessions clears private cache; old 401 cannot invalidate new login
+  ---
+  duration_ms: 248.811241
+  type: 'test'
+  ...
+# Subtest: API accepts native Headers and sends session and CSRF headers
+ok 4 - API accepts native Headers and sends session and CSRF headers
+  ---
+  duration_ms: 232.380797
+  type: 'test'
+  ...
+# Subtest: editing existing static IP saves payload and advances storage step
+ok 5 - editing existing static IP saves payload and advances storage step
+  ---
+  duration_ms: 613.89323
+  type: 'test'
+  ...
+# Subtest: failed setup completion remains on wizard and displays error; retry succeeds
+ok 6 - failed setup completion remains on wizard and displays error; retry succeeds
+  ---
+  duration_ms: 764.47882
+  type: 'test'
+  ...
+# Subtest: upload invalid JSON rejects instead of leaving its promise pending
+ok 7 - upload invalid JSON rejects instead of leaving its promise pending
+  ---
+  duration_ms: 221.690838
+  type: 'test'
+  ...
+# Subtest: cron previews contain future runs only and omit unsupported expressions
+ok 8 - cron previews contain future runs only and omit unsupported expressions
+  ---
+  duration_ms: 291.408965
+  type: 'test'
+  ...
+# Subtest: disk browsing sends selected partition, not just parent disk
+ok 9 - disk browsing sends selected partition, not just parent disk
+  ---
+  duration_ms: 243.178532
+  type: 'test'
+  ...
+# Subtest: compose completion refreshes stack status and rejected action displays error
+ok 10 - compose completion refreshes stack status and rejected action displays error
+  ---
+  duration_ms: 2918.847653
+  type: 'test'
+  ...
+# Subtest: changing selected disks resets destructive setup confirmation
+ok 11 - changing selected disks resets destructive setup confirmation
+  ---
+  duration_ms: 788.497717
+  type: 'test'
+  ...
+# Subtest: setup API rejects malformed status instead of rendering as incomplete
+ok 12 - setup API rejects malformed status instead of rendering as incomplete
+  ---
+  duration_ms: 238.749297
+  type: 'test'
+  ...
+# Subtest: setup does not offer formatting mounted or system disks
+ok 13 - setup does not offer formatting mounted or system disks
+  ---
+  duration_ms: 656.249036
+  type: 'test'
+  ...
+# Subtest: delayed 401 from downloads/list/upload cannot log out a newer session
+ok 14 - delayed 401 from downloads/list/upload cannot log out a newer session
+  ---
+  duration_ms: 266.14402
+  type: 'test'
+  ...
+# Subtest: 401 from the current download session logs out consistently
+ok 15 - 401 from the current download session logs out consistently
+  ---
+  duration_ms: 261.790673
+  type: 'test'
+  ...
+# Subtest: agent package requests preserve default API and select Linux/macOS architectures explicitly
+ok 16 - agent package requests preserve default API and select Linux/macOS architectures explicitly
+  ---
+  duration_ms: 239.088226
+  type: 'test'
+  ...
+# Subtest: agent install modal offers each supported processor and sends its selection
+ok 17 - agent install modal offers each supported processor and sends its selection
+  ---
+  duration_ms: 855.378322
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10298.511472

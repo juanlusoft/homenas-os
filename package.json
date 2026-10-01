@@ -6,7 +6,13 @@
     "dev": "pnpm --parallel -r dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm typecheck && git diff --check && bash -n install.sh install-x86.sh uninstall.sh",
+    "test": "pnpm test:installers && pnpm --filter @homenas/backend test && pnpm --filter @homenas/frontend test",
+    "test:installers": "node --test tests/installers.test.mjs",
+    "test:integration": "pnpm --filter @homenas/backend exec tsx tests/agent-integration.ts",
+    "test:go": "cd apps/agent && go test -race ./...",
+    "build:agent": "node scripts/build-agent.mjs",
+    "test:production": "pnpm --filter @homenas/backend exec tsx tests/production-integration.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
@@ -15,6 +21,15 @@
     "onlyBuiltDependencies": [
       "better-sqlite3",
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "brace-expansion@>=2.0.0 <2.1.7": "2.1.7",
+      "esbuild@>=0.27.3 <0.28.1": "0.28.1"
+    }
+  },
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0",
+    "pnpm": ">=9.15.9 <10"
   }
 }

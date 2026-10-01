@@ -81,6 +81,7 @@ export const DiskPartitionSchema = z.object({
 export type DiskPartition = z.infer<typeof DiskPartitionSchema>
 
 export const MountDiskInputSchema = z.object({
+  partition: z.string().regex(/^\/dev\/[a-z0-9]+$/).optional(),
   browserId: z.string().regex(/^[a-z0-9_-]{1,32}$/),
 })
 export type MountDiskInput = z.infer<typeof MountDiskInputSchema>

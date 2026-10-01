@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import { exec } from '../lib/exec.js'
+import { readFileSync } from 'node:fs'
+import { exec, writeFileAsRoot } from '../lib/exec.js'
 
 export interface NetworkInfo {
   interfaces: { name: string; ip: string | null; isDhcp: boolean }[]
@@ -117,10 +117,11 @@ export async function getNetworkInfo(): Promise<NetworkInfo> {
 
 export async function configureNetwork(input: SetupNetworkInput): Promise<void> {
   validateIface(input.interface)
+  if (!['static', 'dhcp'].includes(input.mode)) throw new Error('Invalid network mode')
 
   if (input.mode === 'static') {
     if (!input.ip) throw new Error('IP is required for static mode')
-    if (!input.prefix || input.prefix < 1 || input.prefix > 32) throw new Error('Prefix must be 1-32')
+    if (!Number.isInteger(input.prefix) || !input.prefix || input.prefix < 1 || input.prefix > 32) throw new Error('Prefix must be 1-32')
     if (!input.gateway) throw new Error('Gateway is required for static mode')
     validateIPv4(input.ip, 'ip')
     validateIPv4(input.gateway, 'gateway')
@@ -153,7 +154,8 @@ async function configureWithNmcli(input: SetupNetworkInput): Promise<void> {
   // If no connection found, create one
   if (!connName) {
     connName = iface
-    await exec('nmcli', ['con', 'add', 'type', 'ethernet', 'ifname', iface, 'con-name', iface])
+    const created = await exec('nmcli', ['con', 'add', 'type', 'ethernet', 'ifname', iface, 'con-name', iface])
+    if (created.exitCode !== 0) throw new Error(`nmcli create failed: ${created.stderr}`)
   }
 
   const args = mode === 'dhcp'
@@ -168,7 +170,8 @@ async function configureWithNmcli(input: SetupNetworkInput): Promise<void> {
   const modResult = await exec('nmcli', args)
   if (modResult.exitCode !== 0) throw new Error(`nmcli modify failed: ${modResult.stderr}`)
 
-  await exec('nmcli', ['con', 'up', connName])
+  const activated = await exec('nmcli', ['con', 'up', connName])
+  if (activated.exitCode !== 0) throw new Error(`nmcli activate failed: ${activated.stderr}`)
 }
 
 // ── dhcpcd backend ────────────────────────────────────────────────────────────
@@ -182,7 +185,8 @@ async function configureWithDhcpcd(input: SetupNetworkInput): Promise<void> {
 
   // Remove previous static block for this interface
   // Matches: "interface IFACE\nstatic ...\nstatic ...\n" until next empty line or EOF
-  const blockRe = new RegExp(`\\ninterface ${iface}\\n(?:(?:static|nohook|noarp|inform) [^\\n]*\\n)*`, 'g')
+  const escapedIface = iface.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const blockRe = new RegExp(`(?:^|\\n)interface ${escapedIface}\\n(?:(?:static|nohook|noarp|inform) [^\\n]*\\n)*`, 'g')
   content = content.replace(blockRe, '\n').trimEnd()
 
   if (mode === 'static') {
@@ -192,6 +196,7 @@ async function configureWithDhcpcd(input: SetupNetworkInput): Promise<void> {
     content += `static domain_name_servers=${dns ?? '8.8.8.8 8.8.4.4'}\n`
   }
 
-  writeFileSync(confPath, content + '\n', 'utf8')
-  await exec('systemctl', ['restart', 'dhcpcd'])
+  await writeFileAsRoot(confPath, content + '\n')
+  const restarted = await exec('systemctl', ['restart', 'dhcpcd'])
+  if (restarted.exitCode !== 0) throw new Error(`dhcpcd restart failed: ${restarted.stderr}`)
 }

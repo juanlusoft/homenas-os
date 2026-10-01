@@ -2,25 +2,36 @@ import { useAuthStore } from '../stores/authStore'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
-// Pulls a useful, short error message out of a non-2xx response.
-// - If the body looks like our standard JSON error envelope ({ message } /
-//   { error }), use that.
-// - Otherwise fall back to the raw text but truncate it so we don't render a
-//   full HTML error page in a toast/alert.
-async function extractErrorMessage(res: Response): Promise<string> {
-  const raw = await res.text()
-  if (!raw) return `HTTP ${res.status}`
-  try {
-    const parsed = JSON.parse(raw) as { message?: unknown; error?: unknown }
-    const msg = typeof parsed.message === 'string' ? parsed.message
-              : typeof parsed.error   === 'string' ? parsed.error
-              : null
-    if (msg) return msg
-  } catch {
-    // not JSON — fall through to truncated text
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number, public readonly body: unknown = null) {
+    super(message)
+    this.name = 'ApiError'
   }
-  const trimmed = raw.trim()
-  return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed
+
+  get requireTotp(): boolean {
+    return typeof this.body === 'object' && this.body !== null &&
+      'requireTotp' in this.body && this.body.requireTotp === true
+  }
+}
+
+// Preserve machine-readable flags (e.g. the login TOTP challenge) as well as
+// the backend's message. HTML proxy errors are kept short for the UI.
+async function responseError(res: Response): Promise<ApiError> {
+  const raw = await res.text()
+  let body: unknown = null
+  try { body = JSON.parse(raw) } catch { /* text response */ }
+  const envelope = body && typeof body === 'object' ? body as Record<string, unknown> : {}
+  const message = typeof envelope.message === 'string' ? envelope.message
+    : typeof envelope.error === 'string' ? envelope.error
+    : raw.trim().slice(0, 200) || `HTTP ${res.status}`
+  return new ApiError(message, res.status, body)
+}
+
+// A delayed failure from an old session must not log out a newly signed-in user.
+export function invalidateSession(sessionId: string | null) {
+  if (sessionId && useAuthStore.getState().sessionId === sessionId) {
+    useAuthStore.getState().logout()
+  }
 }
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -28,21 +39,16 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   const method = (options?.method ?? 'GET').toUpperCase()
   const isMutating = !SAFE_METHODS.has(method)
 
-  const res = await fetch(`/api${path}`, {
-    ...options,
-    headers: {
-      // Only set Content-Type if there's a body — Fastify rejects empty JSON bodies
-      ...(options?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(sessionId ? { 'X-Session-Id': sessionId } : {}),
-      ...(isMutating && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-      ...options?.headers,
-    }
-  })
-  if (res.status === 401) {
-    useAuthStore.getState().logout()
-    throw new Error('UNAUTHORIZED')
+  const headers = new Headers(options?.headers)
+  // Fastify rejects empty JSON bodies; FormData needs its browser-generated boundary.
+  if (options?.body != null && typeof options.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
   }
-  if (!res.ok) throw new Error(await extractErrorMessage(res))
+  if (sessionId) headers.set('X-Session-Id', sessionId)
+  if (isMutating && csrfToken) headers.set('X-CSRF-Token', csrfToken)
+  const res = await fetch(`/api${path}`, { ...options, headers })
+  if (res.status === 401 && path !== '/auth/login') invalidateSession(sessionId)
+  if (!res.ok) throw await responseError(res)
   return res.json()
 }
 
@@ -56,8 +62,6 @@ export async function silentFetch(path: string): Promise<Response> {
   const res = await fetch(`/api${path}`, {
     headers: sessionId ? { 'X-Session-Id': sessionId } : {}
   })
-  if (res.status === 401) {
-    useAuthStore.getState().logout()
-  }
+  if (res.status === 401) invalidateSession(sessionId)
   return res
 }

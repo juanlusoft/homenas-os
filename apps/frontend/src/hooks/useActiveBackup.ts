@@ -30,7 +30,7 @@ export function useAbProgress(deviceId: number | null) {
     queryKey: ['active-backup', 'progress', deviceId],
     queryFn: () => activeBackupApi.getProgress(deviceId!),
     enabled: deviceId !== null,
-    refetchInterval: (query) => query.state.data?.running ? 2_000 : false,
+    refetchInterval: (query) => query.state.data?.running ? 2_000 : 10_000,
   })
 }
 

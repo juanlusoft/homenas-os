@@ -1,7 +1,9 @@
 import fp from 'fastify-plugin'
+import { shutdownBackupSchedules } from '../services/backup-scheduler.service.js'
+import { stopDdnsUpdater } from '../services/ddns.service.js'
 import Database from 'better-sqlite3'
 import bcryptjs from 'bcryptjs'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, chmodSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
@@ -277,11 +279,13 @@ function runMigrations(db: Database.Database): void {
 // ─── Plugin ───────────────────────────────────────────────────────────────────
 
 async function dbPlugin(fastify: FastifyInstance) {
-  const dbDir = join(process.cwd(), 'data')
-  mkdirSync(dbDir, { recursive: true })
+  const dbDir = process.env.HOMENAS_DATA_DIR ?? join(process.cwd(), 'data')
+  mkdirSync(dbDir, { recursive: true, mode: 0o700 })
+  chmodSync(dbDir, 0o700)
 
   const dbPath = join(dbDir, 'homenas.db')
   const db = new Database(dbPath)
+  chmodSync(dbPath, 0o600)
 
   // Enable WAL mode for better concurrency
   db.pragma('journal_mode = WAL')
@@ -308,7 +312,7 @@ async function dbPlugin(fastify: FastifyInstance) {
       `INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)`
     ).run('admin', passwordHash, 'admin')
 
-    const credPath = '/opt/homenas-v3/data/initial-admin-password.txt'
+    const credPath = join(dbDir, 'initial-admin-password.txt')
     try {
       const { writeFileSync, mkdirSync, chmodSync } = await import('node:fs')
       const { dirname } = await import('node:path')
@@ -320,14 +324,7 @@ async function dbPlugin(fastify: FastifyInstance) {
         credPath,
       )
     } catch (err) {
-      // If we can't write the file (read-only fs, perms…), we still have to
-      // give the user some way to log in. Falls back to logging the password
-      // (the original behaviour) but logs a loud warning.
-      fastify.log.warn({ err }, 'Could not write initial password file, falling back to log output (PASSWORD WILL BE PERSISTED IN LOGS)')
-      fastify.log.info(
-        { initialPassword },
-        '*** FIRST RUN: default admin created. Use this password in the setup wizard, then change it immediately. ***',
-      )
+      fastify.log.error({ err }, 'Could not write initial password file; credentials are never logged. Retry after fixing data directory permissions.')
     }
   }
 
@@ -337,6 +334,10 @@ async function dbPlugin(fastify: FastifyInstance) {
   fastify.decorate('db', db)
 
   fastify.addHook('onClose', async () => {
+    // The database owns teardown: Fastify close hooks run in reverse registration
+    // order, so application hooks registered before plugin initialization are too late.
+    await shutdownBackupSchedules(db)
+    await stopDdnsUpdater(db)
     db.close()
   })
 }

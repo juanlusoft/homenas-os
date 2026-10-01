@@ -32,13 +32,13 @@ async function authPlugin(fastify: FastifyInstance) {
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000)
-    if (session.expiresAt < nowSeconds) {
+    if (session.expiresAt <= nowSeconds) {
       sessionsRepo.delete(sessionId)
       return reply.status(401).send({ error: 'Unauthorized', message: 'Session expired' })
     }
 
     // Idle timeout: reject if inactive for more than 8 hours (idleExpiresAt=0 means legacy session — skip check once, initialize it below)
-    if (session.idleExpiresAt > 0 && session.idleExpiresAt < nowSeconds) {
+    if (session.idleExpiresAt > 0 && session.idleExpiresAt <= nowSeconds) {
       sessionsRepo.delete(sessionId)
       return reply.status(401).send({ error: 'Unauthorized', message: 'Session expired due to inactivity' })
     }

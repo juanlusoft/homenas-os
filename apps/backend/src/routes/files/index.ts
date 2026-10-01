@@ -1,7 +1,8 @@
 import { createReadStream, createWriteStream } from 'node:fs'
-import { stat, mkdir, rm, copyFile, unlink, open } from 'node:fs/promises'
+import { stat, mkdir, mkdtemp, rm, copyFile, unlink, open } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { pipeline } from 'node:stream/promises'
-import { join, basename, extname } from 'node:path'
+import { join, basename, extname, normalize } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import multipartPlugin, { type Multipart } from '@fastify/multipart'
 import {
@@ -16,6 +17,7 @@ import {
   getFileLocations,
   validateWritableRealPath,
   validateRealPath,
+  READONLY_ROOTS,
 } from '../../services/files.service.js'
 import { logError, logInfo } from '../../lib/log-store.js'
 
@@ -63,7 +65,7 @@ const BLOCKED_MAGIC: Array<{ sig: number[]; label: string }> = [
 
 const MAGIC_HEAD_BYTES = 16
 
-async function checkFileSafety(filePath: string, filename: string): Promise<void> {
+export async function checkFileSafety(filePath: string, filename: string): Promise<void> {
   const ext = extname(filename).toLowerCase()
   if (BLOCKED_EXTENSIONS.has(ext)) {
     throw new Error(`File type not allowed: ${ext}`)
@@ -85,7 +87,12 @@ async function checkFileSafety(filePath: string, filename: string): Promise<void
   }
   for (const { sig, label } of BLOCKED_MAGIC) {
     if (sig.length > lower.length) continue
-    if (sig.every((byte, i) => lower[i] === byte)) {
+    const signature = Buffer.from(sig)
+    // Fold both sides for textual signatures; binary signatures compare original bytes.
+    const textSignature = sig[0] === 0x3c
+    const head = textSignature ? lower : buf
+    const expected = textSignature ? Buffer.from(signature.toString('ascii').toLowerCase()) : signature
+    if ([...expected].every((byte, i) => head[i] === byte)) {
       throw new Error(`Blocked file type detected: ${label}`)
     }
   }
@@ -93,6 +100,16 @@ async function checkFileSafety(filePath: string, filename: string): Promise<void
 
 export async function filesRoutes(fastify: FastifyInstance) {
   const { requireAuth } = fastify
+  const requireFileAccess: typeof requireAuth = async (request, reply) => {
+    if (request.user.role === 'admin') return
+    const values = [...Object.values((request.query ?? {}) as object), ...Object.values((request.body ?? {}) as object)]
+    const paths = await Promise.all(values.filter((value): value is string => typeof value === 'string' && value.startsWith('/')).map(async value => {
+      try { return await validateRealPath(value) } catch { return normalize(value) }
+    }))
+    if (paths.some(value => READONLY_ROOTS.some(root => value === root.replace(/\/$/, '') || value.startsWith(root)))) {
+      return reply.status(403).send({ error: 'Forbidden', message: 'Admin role required for application files' })
+    }
+  }
 
   // Use @fastify/multipart for streaming uploads — avoids buffering entire files in memory.
   // 50 GB file size limit; no field size restriction beyond Node defaults.
@@ -102,7 +119,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // GET /api/files/locations — returns the list of user-facing storage locations
   fastify.get('/locations', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (_request, reply) => {
     try {
       const locations = await getFileLocations()
@@ -115,7 +132,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // GET /api/files/list?path=
   fastify.get('/list', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const { path } = request.query as { path?: string }
     if (!path) {
@@ -133,7 +150,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // POST /api/files/mkdir — body: { path }
   fastify.post('/mkdir', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const body = request.body as { path?: unknown }
     if (typeof body?.path !== 'string' || !body.path) {
@@ -151,7 +168,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // DELETE /api/files/item — body: { path }
   fastify.delete('/item', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const body = request.body as { path?: unknown }
     if (typeof body?.path !== 'string' || !body.path) {
@@ -169,7 +186,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // POST /api/files/rename — body: { oldPath, newPath }
   fastify.post('/rename', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const body = request.body as { oldPath?: unknown; newPath?: unknown }
     if (typeof body?.oldPath !== 'string' || typeof body?.newPath !== 'string') {
@@ -187,7 +204,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // POST /api/files/move — body: { source, destination }
   fastify.post('/move', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const body = request.body as { source?: unknown; destination?: unknown }
     if (typeof body?.source !== 'string' || typeof body?.destination !== 'string') {
@@ -205,7 +222,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // POST /api/files/copy — body: { source, destination }
   fastify.post('/copy', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const body = request.body as { source?: unknown; destination?: unknown }
     if (typeof body?.source !== 'string' || typeof body?.destination !== 'string') {
@@ -223,7 +240,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // GET /api/files/download?path= — stream file
   fastify.get('/download', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const { path } = request.query as { path?: string }
     if (!path) {
@@ -269,10 +286,9 @@ export async function filesRoutes(fastify: FastifyInstance) {
   // POST /api/files/upload — multipart upload (streamed — no full-file buffering)
   // body: multipart/form-data with field "path" (destination directory) + one or more file parts
   fastify.post('/upload', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
-    const tmpDir = `/tmp/homenas-upload-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    await mkdir(tmpDir, { recursive: true })
+    const tmpDir = await mkdtemp(join(tmpdir(), 'homenas-upload-'))
 
     const fields: Record<string, string> = {}
     const stagedFiles: { filename: string; savedPath: string }[] = []
@@ -284,7 +300,8 @@ export async function filesRoutes(fastify: FastifyInstance) {
           fields[part.fieldname] = String(part.value)
         } else {
           const safeFilename = basename(part.filename).replace(/[^a-zA-Z0-9._\- ]/g, '_') || 'upload'
-          const savedPath = join(tmpDir, safeFilename)
+          if (safeFilename === '.' || safeFilename === '..') throw new Error('Invalid upload filename')
+          const savedPath = join(tmpDir, `part-${stagedFiles.length}`)
           await pipeline(part.file, createWriteStream(savedPath))
           await checkFileSafety(savedPath, safeFilename)
           stagedFiles.push({ filename: safeFilename, savedPath })
@@ -345,7 +362,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // GET /api/files/search?path=&q=
   fastify.get('/search', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const { path, q } = request.query as { path?: string; q?: string }
     if (!path || !q) {
@@ -363,7 +380,7 @@ export async function filesRoutes(fastify: FastifyInstance) {
 
   // GET /api/files/info?path=
   fastify.get('/info', {
-    preHandler: [requireAuth],
+    preHandler: [requireAuth, requireFileAccess],
   }, async (request, reply) => {
     const { path } = request.query as { path?: string }
     if (!path) {

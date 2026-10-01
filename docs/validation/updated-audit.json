@@ -1,0 +1,378 @@
+{
+  "actions": [
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1123896,
+          "path": "apps__backend>archiver>archiver-utils>glob>minimatch>brace-expansion",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1130589,
+          "path": "apps__backend>archiver>archiver-utils>glob>minimatch>brace-expansion",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1130736,
+          "path": "apps__backend>archiver>archiver-utils>glob>minimatch>brace-expansion",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1240101,
+          "path": "apps__backend>archiver>archiver-utils>glob>minimatch>brace-expansion",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1240105,
+          "path": "apps__backend>archiver>archiver-utils>glob>minimatch>brace-expansion",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1240109,
+          "path": "apps__backend>archiver>archiver-utils>glob>minimatch>brace-expansion",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": "brace-expansion",
+      "target": "2.1.7",
+      "depth": 6
+    },
+    {
+      "action": "review",
+      "module": "esbuild",
+      "resolves": [
+        {
+          "id": 1120680,
+          "path": "apps__backend>tsx>esbuild",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    }
+  ],
+  "advisories": {
+    "1120680": {
+      "findings": [
+        {
+          "version": "0.27.7",
+          "paths": [
+            "apps/backend > tsx@4.21.0 > esbuild@0.27.7",
+            "apps/frontend > @tailwindcss/vite@4.3.0 > vite@8.3.1 > esbuild@0.27.7",
+            "apps/frontend > @tailwindcss/vite@4.3.0 > vite@8.3.1 > tsx@4.21.0 > esbuild@0.27.7",
+            "apps/frontend > @vitejs/plugin-react@6.0.1 > vite@8.3.1 > esbuild@0.27.7",
+            "apps/frontend > @vitejs/plugin-react@6.0.1 > vite@8.3.1 > tsx@4.21.0 > esbuild@0.27.7",
+            "apps/frontend > vite@8.3.1 > esbuild@0.27.7",
+            "apps/frontend > vite@8.3.1 > tsx@4.21.0 > esbuild@0.27.7"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/evanw/esbuild/security/advisories/GHSA-g7r4-m6w7-qqqr\n- https://github.com/evanw/esbuild/releases/tag/v0.28.1\n- https://github.com/advisories/GHSA-g7r4-m6w7-qqqr",
+      "created": "2026-06-12T20:08:53.000Z",
+      "id": 1120680,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nThe development server contains a path traversal vulnerability on Windows when serving files from `servedir`.\n\nDue to the use of `path.Clean()` (which only normalizes forward-slash `/` separators) instead of a Windows-aware path normalization function, it is possible to craft requests using backslashes (`\\`) that bypass the intended directory containment logic. An attacker can escape the configured `servedir` root and access arbitrary files on the filesystem.\nThis issue affects Windows environments only.\n\n### Details\n\nThe request path is sanitized using:\n```go\n// https://github.com/evanw/esbuild/blob/v0.27.3/pkg/api/serve_other.go#L165\nqueryPath := path.Clean(req.URL.Path)[1:]\n```\n\n\nHowever:\n- `path.Clean()` is POSIX-style and only understands `/` (docs: `https://pkg.go.dev/path#Clean`)\n- On Windows, `\\` is a valid path separator\n- `path.Clean()` does not treat `\\` as a separator\n\nLater, the server constructs the absolute path:\n```go\n// https://github.com/evanw/esbuild/blob/v0.27.3/pkg/api/serve_other.go#L221\nabsPath := h.fs.Join(h.servedir, queryPath)\n```\n\nIf `queryPath` contains sequences such as:\n```\n..\\..\\..\\..\\..\\..\\..\\Windows\\system.ini\n```\n\n`path.Clean()` will not normalize them, but the Windows filesystem will interpret `\\` as directory separators when resolving `absPath`.\nBecause the implementation does not verify that the final resolved path remains within `servedir`, it allows directory traversal outside the intended root directory.\n### Vulnerable Code\n\n```go\n// https://github.com/evanw/esbuild/blob/v0.27.3/pkg/api/serve_other.go#L165\n\tqueryPath := path.Clean(req.URL.Path)[1:]\n\t....\n\t// Check for a file in the \"servedir\" directory\n\tif h.servedir != \"\" && kind != fs.FileEntry {\n\t\tabsPath := h.fs.Join(h.servedir, queryPath)\n\t\tif absDir := h.fs.Dir(absPath); absDir != absPath {\n\t\t\tif entries, err, _ := h.fs.ReadDirectory(absDir); err == nil {\n\t\t\t\tif entry, _ := entries.Get(h.fs.Base(absPath)); entry != nil && entry.Kind(h.fs) == fs.FileEntry {\n\t....\t\t\t\t\n```\n\n\n### Steps to reproduce\n\n```\nnpm install --save-exact --save-dev esbuild\n\necho \"console.log(1)\" > app.js\n\n.\\node_modules\\.bin\\esbuild --version\n0.27.3\n\n.\\node_modules\\.bin\\esbuild app.js --bundle --outdir=www --servedir=www --watch\n\ncurl -i --path-as-is \"http://localhost:8000/..\\..\\..\\..\\..\\..\\..\\Windows\\system.ini\"\n<content of Windows\\system.ini>\n```\n\n\n### Impact\n\n- Arbitrary file read on Windows\n- Exposure of sensitive files",
+      "reported_by": null,
+      "title": "esbuild allows arbitrary file read when running the development server on Windows",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "low",
+      "module_name": "esbuild",
+      "vulnerable_versions": ">=0.27.3 <0.28.1",
+      "github_advisory_id": "GHSA-g7r4-m6w7-qqqr",
+      "recommendation": "Upgrade to version 0.28.1 or later",
+      "patched_versions": ">=0.28.1",
+      "updated": "2026-06-12T20:08:54.000Z",
+      "cvss": {
+        "score": 2.5,
+        "vectorString": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:N/I:L/A:N"
+      },
+      "cwe": [
+        "CWE-22"
+      ],
+      "url": "https://github.com/advisories/GHSA-g7r4-m6w7-qqqr"
+    },
+    "1123896": {
+      "findings": [
+        {
+          "version": "2.1.0",
+          "paths": [
+            "apps/backend > archiver@7.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > zip-stream@6.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-3jxr-9vmj-r5cp\n- https://nvd.nist.gov/vuln/detail/CVE-2026-13149\n- https://github.com/juliangruber/brace-expansion/pull/122\n- https://github.com/juliangruber/brace-expansion/pull/123\n- https://github.com/juliangruber/brace-expansion/commit/835d6be91201122d9adffb0c0c8c094189ace265\n- https://github.com/juliangruber/brace-expansion/commit/c7e33ec13ac1a684c116720843ce24e208611754\n- https://github.com/juliangruber/brace-expansion/commit/d74e63030c012e3b7ae81657b8d665619cd51b95\n- https://github.com/juliangruber/brace-expansion/releases/tag/v1.1.16\n- https://github.com/juliangruber/brace-expansion/releases/tag/v2.1.2\n- https://github.com/juliangruber/brace-expansion/releases/tag/v5.0.7\n- https://www.npmjs.com/package/brace-expansion\n- https://github.com/advisories/GHSA-3jxr-9vmj-r5cp",
+      "created": "2026-07-20T20:51:09.000Z",
+      "id": 1123896,
+      "npm_advisory_id": null,
+      "overview": "### Summary\nbrace-expansion's expand() exhibits exponential-time - O(2ⁿ) - behavior in the number of consecutive non-expanding {} groups. A short, all-ASCII input (~90 bytes/30 groups) blocks the calling thread for minutes; a slightly longer input hangs it effectively indefinitely. Because the dominant consumers run on Node's single-threaded event loop, one small input can fully stall a worker/process.\n\nIn `expand_`, `post` is computed unconditionally at the top of the function, before the early-return branches that don't use it:\n```js\nconst post = m.post.length ? expand_(m.post, max, false) : [''];   // always recurses\n  ...\nif (!isSequence && !isOptions) {\n  if (m.post.match(/,(?!,).*\\}/)) {\n    str = m.pre + '{' + m.body + escClose + m.post;\n    return expand_(str, max, true); // restart — `post` discarded\n  }\n  return [str];\n}\n```\n\nFor input like a{},{},…, the first {} is non-expanding, so control reaches the {a},b} rewrite branch - but `expand_` has already recursed into post over the entire remaining tail, only to throw the result away.\nEach level therefore spawns two recursive expansions over essentially the same remaining work: `T(n) = 2·T(n−1) ⇒ O(2ⁿ)`.\n\nThe max option does not mitigate this: max only bounds the output-building loops; neither the post recursion nor the rewrite recursion consults it.\n  \nMeasured on 5.0.6:\n\n| groups (n) | input bytes | time |\n|---|---|---|\n| 20 | 60 | 130 ms |\n| 24 | 72 | 1.9 s |\n| 26 | 78 | 7.8 s |\n| 30 (PoC) | 90 | ~2 min |\n\n### Proof of concept\n```js\nconst { expand } = require('brace-expansion');\n// 30 non-expanding groups, ~90 bytes — blocks for minutes:\nexpand('a{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}');\n```\n\n### Impact\n\nAny application that passes attacker-influenced strings to brace-expansion.expand() - directly or transitively via minimatch/glob brace patterns - can be driven into a multi-minute-to-indefinite CPU hang by a tiny request, denying service on that thread/process.\n\n### Remediation\n\nUpgrade to a patched release. The fix:\n1. Defers computing post until after the early-return branches (and computes it locally in the $-suffix branch), so post is only expanded when a brace set actually expands and the value is used. This alone removes the exponential.\n1. Converts the {a},b} rewrite from recursion to an in-function loop, so a long run of rewrites cannot grow the call stack.\n\nVerified: the PoC drops from ~2 min to 0.55 ms, 5,000 groups complete in ~344 ms, and output is identical to 5.0.6 across a behavioral-equivalence suite (sequences, padding, $-prefix, a{},b}c, {},a}b, x{{a,b}}y, etc.). Post-fix complexity is ~O(n²) on this input class - acceptable for the security fix; a linear rewrite can be a non-urgent follow-up.\n\nIf immediate upgrade isn't possible, avoid passing untrusted input to expand() / glob brace patterns, or run such expansion under a timeout/worker.",
+      "reported_by": null,
+      "title": "brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-13149"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "brace-expansion",
+      "vulnerable_versions": ">=2.0.0 <2.1.2",
+      "github_advisory_id": "GHSA-3jxr-9vmj-r5cp",
+      "recommendation": "Upgrade to version 2.1.2 or later",
+      "patched_versions": ">=2.1.2",
+      "updated": "2026-07-20T20:51:11.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-407"
+      ],
+      "url": "https://github.com/advisories/GHSA-3jxr-9vmj-r5cp"
+    },
+    "1130589": {
+      "findings": [
+        {
+          "version": "2.1.0",
+          "paths": [
+            "apps/backend > archiver@7.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > zip-stream@6.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-mh99-v99m-4gvg\n- https://nvd.nist.gov/vuln/detail/CVE-2026-14257\n- https://github.com/juliangruber/brace-expansion/commit/a1bd33999ea75262c4749fff3bbb0d1372bd07b5\n- https://github.com/juliangruber/brace-expansion\n- https://www.npmjs.com/package/brace-expansion\n- https://github.com/juliangruber/brace-expansion/pull/129\n- https://github.com/juliangruber/brace-expansion/pull/130\n- https://github.com/juliangruber/brace-expansion/pull/136\n- https://github.com/juliangruber/brace-expansion/commit/139d015104e71433ad52a41d19467c48ecbb2c7d\n- https://github.com/juliangruber/brace-expansion/commit/cb4b9e47cc2ec777c14b2b4492fb431a56f6a031\n- https://github.com/juliangruber/brace-expansion/commit/d13ff455a58b0d56704f0111e3c2a0b16ceb06eb\n- https://github.com/advisories/GHSA-mh99-v99m-4gvg",
+      "created": "2026-07-24T21:53:14.000Z",
+      "id": 1130589,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\n`expand()` bounds the *number* of results it produces (the `max` option,\n`100_000` by default) but not their *length*. By chaining many brace groups,\nan attacker keeps the result count under `max` while making every result grow\nwith the number of groups. Building `max` long results — plus the intermediate\narrays combined at each brace group — exhausts memory and crashes the Node\nprocess with an **uncatchable** out-of-memory error. `try/catch` around\n`expand()` does not help: the fatal error terminates the process.\n\nA ~7.5 KB input (`'{a,b}'.repeat(1500)`) is enough to crash a default Node\nprocess.\n\n### Details\n\nFor `N` chained brace groups such as `'{a,b}'.repeat(N)`:\n\n- the result count is `2^N`, immediately capped at `max` (`100_000`), so the\n  `max` protection appears to hold, but\n- each result is `N` characters long, so the total output size is\n  `max × N` characters, which grows without bound in `N`.\n\n`expand_` combines each brace set with the fully-expanded tail:\n\n```js\nconst post = m.post.length ? expand_(m.post, max, false) : ['']\n...\nfor (let j = 0; j < N.length; j++) {\n  for (let k = 0; k < post.length && expansions.length < max; k++) {\n    const expansion = pre + N[j] + post[k]   // grows one group longer per level\n    ...\n    expansions.push(expansion)\n  }\n}\n```\n\nThe loop guard `expansions.length < max` limits how many strings are built, but\nnothing limits how long they get. Each recursion level materializes another\narray of up to `max` strings, one character longer than the level below, and —\nbecause V8 represents `pre + N[j] + post[k]` as a cons-string (rope) that\nreferences `post[k]` — those intermediate strings stay reachable through the\nwhole chain. Memory therefore scales with `max × N`.\n\nMeasured on `5.0.7` (`'{a,b}'.repeat(N)`, default `max`):\n\n| groups (N) | input bytes | result count | peak RSS |\n|---|---|---|---|\n| 20 | 100 | 100,000 | ~80 MB |\n| 50 | 250 | 100,000 | ~214 MB |\n| 100 | 500 | 100,000 | ~409 MB |\n| 300 | 1,500 | 100,000 | ~1,148 MB |\n| 1500 | 7,500 | — | **OOM crash** |\n\n### Proof of concept\n\n```js\nconst { expand } = require('brace-expansion')\n\n// ~7.5 KB input — crashes the process with a fatal, uncatchable OOM:\n//   FATAL ERROR: ... JavaScript heap out of memory\ntry {\n  expand('{a,b}'.repeat(1500))\n} catch (e) {\n  // never reached — the process is already dead\n}\n```\n\n### Impact\n\nAny application that passes attacker-influenced strings to\n`brace-expansion.expand()` — directly, or transitively via `minimatch` / `glob`\nbrace patterns — can be crashed by a small request. Because the failure is a\nfatal V8 out-of-memory error rather than a thrown exception, it cannot be caught\nand it takes down the whole worker/process, denying service.\n\n### Remediation\n\nUpgrade to a patched release. The fix bounds the total number of characters a\nsingle `expand()` call may accumulate (`EXPANSION_MAX_LENGTH`, default\n`4_000_000`, configurable via a new `maxLength` option), applied inside the\noutput-building loops so intermediate arrays are bounded too. Once the limit is\nreached, output is truncated — consistent with how `max` already truncates —\ninstead of growing without bound. The limit sits well above any realistic\nexpansion (100,000 results hitting `max` measure ~1M characters), so legitimate\ninput is unaffected.\n\nAfter the fix, `'{a,b}'.repeat(1500)` returns a bounded, truncated result in\n~0.7 s using ~340 MB and never crashes, including under a constrained 512 MB\nheap.\n\nThe fix bounds memory but the algorithm still rebuilds intermediate arrays at\neach level (roughly `O(N × maxLength)` work on this input class). A streaming\nrewrite that produces output in `O(total output size)` can be a non-urgent\nfollow-up.\n\nIf immediate upgrade isn't possible, avoid passing untrusted input to\n`expand()` / glob brace patterns, or pass a small explicit `max` **and**\n`maxLength`.",
+      "reported_by": null,
+      "title": "brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-14257"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "brace-expansion",
+      "vulnerable_versions": ">=2.0.0 <2.1.3",
+      "github_advisory_id": "GHSA-mh99-v99m-4gvg",
+      "recommendation": "Upgrade to version 2.1.3 or later",
+      "patched_versions": ">=2.1.3",
+      "updated": "2026-07-31T19:37:57.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-770"
+      ],
+      "url": "https://github.com/advisories/GHSA-mh99-v99m-4gvg"
+    },
+    "1130736": {
+      "findings": [
+        {
+          "version": "2.1.0",
+          "paths": [
+            "apps/backend > archiver@7.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > zip-stream@6.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-rgw5-rvv9-x895\n- https://github.com/juliangruber/brace-expansion/commit/139d015104e71433ad52a41d19467c48ecbb2c7d\n- https://github.com/juliangruber/brace-expansion/commit/1e30c930238d7162802d88a94189182def178dac\n- https://github.com/juliangruber/brace-expansion/commit/688a99eeaab02627c2b89ba8ba4821fecfa659cf\n- https://github.com/juliangruber/brace-expansion/commit/cb4b9e47cc2ec777c14b2b4492fb431a56f6a031\n- https://nvd.nist.gov/vuln/detail/CVE-2026-69152\n- https://github.com/advisories/GHSA-rgw5-rvv9-x895",
+      "created": "2026-08-03T16:35:32.000Z",
+      "id": 1130736,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nThe `maxLength` mitigation added in `5.0.8` for GHSA-mh99-v99m-4gvg / CVE-2026-14257 is incomplete. It bounds the accumulator where results are *combined*, but not the intermediate arrays that feed it. A ~25 KB input still crashes the Node process with an **uncatchable** out-of-memory error, so `try/catch` around `expand()` does not help.\n\nA second, related path in the same function lets a ~400 KB input block the event loop for over two minutes without ever exceeding the memory bound.\n\n### Details\n\n`maxLength` was enforced in `combine()`, the single place output grows. Two arrays are built *before* `combine()` runs, and neither was bounded.\n\n**1. Comma alternatives accumulate without a running total (memory exhaustion)**\n\nEach alternative in `{a,b,c,...}` is expanded by its own recursive `expand_()` call, so each receives a full, independent `maxLength` allowance. The results were then concatenated into a single `values` array with no cumulative limit:\n\n```js\nvalues = []\nfor (let j = 0; j < n.length; j++) {\n  values.push.apply(values, expand_(n[j], max, maxLength, false))\n}\n\nacc = combine(acc, pre, values, max, maxLength, ...)\n```\n\nWith `A` alternatives, `values` can reach `A * maxLength` characters before `combine()` gets a chance to truncate it. At the default `maxLength` of 4,000,000 and 400 alternatives, that is well past any default heap.\n\n**2. Padded sequences ignore `maxLength` while generating (CPU exhaustion)**\n\n`expandSequence()` was bounded by `max` (the result *count*) but never consulted `maxLength`. A padded sequence's element width follows the input, so `{0...01..100000}` with a wide pad generates `max` elements, each as wide as the input, only for `combine()` to discard all but a handful.\n\nMemory stays flat here, because V8 represents the padded strings as cons-strings, which is likely why this path was not caught alongside the original issue. The cost is time: work proportional to `max * width`.\n\n| pad width | input bytes | results kept | time (5.0.8) | time (patched) |\n|---|---|---|---|---|\n| 20,000 | 20 KB | 199 | ~7.3 s | ~20 ms |\n| 100,000 | 100 KB | 39 | ~32 s | ~20 ms |\n| 400,000 | 400 KB | 9 | ~124 s | ~18 ms |\n\nOutput is byte-identical before and after the fix; only the wasted work is removed.\n\n### Proof of concept\n\nMemory exhaustion, against `5.0.8`:\n\n```js\nimport { expand } from 'brace-expansion'\n\nconst part = '{' + '0'.repeat(50) + '1..100000}'\nconst input = '{' + Array(400).fill(part).join(',') + '}'  // ~25 KB\n\ntry {\n  expand(input)\n} catch (e) {\n  // never reached - the process is already dead\n}\n```\n\n```\nFATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory\nAborted\n```\n\nEvent-loop stall, against `5.0.8`:\n\n```js\nimport { expand } from 'brace-expansion'\n\n// ~400 KB input, returns 9 results after roughly two minutes of blocking CPU\nexpand('{' + '0'.repeat(400_000) + '1..100000}')\n```\n\n### Impact\n\nDenial of service. Any application that passes attacker-controlled input to `expand()`, directly or transitively through a glob or pattern-matching library, can be remotely crashed or stalled. The out-of-memory variant terminates the process and cannot be handled with `try/catch`.\n\nApplications already on `5.0.8` are affected: the `5.0.8` mitigation does not cover these paths.\n\n### Patches\n\nBoth intermediate arrays are now bounded as they are built, using the same `max` and `maxLength` limits already applied in `combine()`:\n\n- `values` tracks a running result count and character length while alternatives are appended, and stops once either bound is reached.\n- `expandSequence()` accepts `maxLength` and stops generating once the sequence's own characters reach it.\n\nAs with the existing limits, output is truncated rather than allowed to grow without bound, which matches how `max` already behaves. The defaults sit well above any realistic expansion, so legitimate input is unaffected.\n\n### Workarounds\n\nIf upgrading is not immediately possible, avoid passing untrusted input to `expand()` or to glob brace patterns, or pass an explicitly small `max` **and** `maxLength`.\n\nNote that a small `maxLength` alone was not sufficient on affected versions: it was applied per alternative rather than cumulatively, which is the root of the first issue above.\n\n### Credits\n\nThe memory-exhaustion bypass was reported by Alessio Della Libera, CEO & Co-founder at [Numyra](https://numyra.ai/).\n\nThe sequence-generation issue was found while verifying that report.",
+      "reported_by": null,
+      "title": "brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-69152"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "brace-expansion",
+      "vulnerable_versions": ">=2.0.0 <2.1.4",
+      "github_advisory_id": "GHSA-rgw5-rvv9-x895",
+      "recommendation": "Upgrade to version 2.1.4 or later",
+      "patched_versions": ">=2.1.4",
+      "updated": "2026-08-03T20:17:20.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-770"
+      ],
+      "url": "https://github.com/advisories/GHSA-rgw5-rvv9-x895"
+    },
+    "1240101": {
+      "findings": [
+        {
+          "version": "2.1.0",
+          "paths": [
+            "apps/backend > archiver@7.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > zip-stream@6.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-q2hr-2g5m-vwhr\n- https://nvd.nist.gov/vuln/detail/CVE-2026-102277\n- https://github.com/juliangruber/brace-expansion/commit/33a5ef17b8d800bbfa8c52b14c39043b6aac1a96\n- https://github.com/juliangruber/brace-expansion/commit/bdff773f98e5988616b7039cc9b508df5d640b22\n- https://github.com/juliangruber/brace-expansion/commit/c55e67d8d8b1c56a2474afff15c2891166b2d364\n- https://github.com/juliangruber/brace-expansion/commit/ffdfa3e3806bed17c0874b8f1439b084de354a7e\n- https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "created": "2026-09-29T23:45:39.000Z",
+      "id": 1240101,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nExpanding `{a},b}`-shaped input takes time quadratic in the number of literal `}` characters, blocking the event loop.\n\nBash preserves a quirk where a brace group followed by a comma set still expands (`{a},b}`). The parser implements this by rewriting the string and restarting the scan. Each pass absorbs exactly one `}` and re-scans from the beginning, so `n` trailing braces cost `n` full passes.\n\n### Reproduction\n\n```js\nconst build = n => '{a}' + '}'.repeat(n) + ',z}'\n\nfor (const n of [8000, 16000, 32000, 64000, 128000]) {\n  const t = Date.now()\n  expand(build(n))\n  console.log(n, Date.now() - t + 'ms')\n}\n```\n\n| n | input | time | results |\n|---|---|---|---|\n| 8,000 | 8 KB | 110 ms | 2 |\n| 16,000 | 16 KB | 446 ms | 2 |\n| 32,000 | 32 KB | 1.7 s | 2 |\n| 64,000 | 64 KB | 6.9 s | 2 |\n| 128,000 | 128 KB | **27.7 s** | 2 |\n\n`ms/n^2` is flat at ~1.7 and each doubling of `n` costs exactly 4.0x - quadratic. 128 KB of input blocks the event loop for nearly half a minute to produce two results.\n\n### Mechanism\n\nInstrumenting the rewrite branch confirms it runs exactly `n + 1` times, once per literal `}`, each re-scanning the whole string.\n\nThere is a second multiplier. The rewrite replaces the group's closing `}` with the internal `escClose` sentinel, which is `'\\0CLOSE' + Math.random() + '\\0'` - about 25 characters. The working string therefore *grows* by ~25 characters on every pass:\n\n| n | input length | final string length |\n|---|---|---|\n| 1,000 | 1,006 | 26,006 |\n| 8,000 | 8,006 | 208,006 |\n\nSo the input is inflated roughly 26x, and that factor multiplies both the quadratic constant and peak memory. This makes it partly a memory-pressure issue as well as a CPU one.\n\n### Why `max` and `maxLength` do not help\n\nThe cost is in parsing, before the result set exists. The payload yields 2 results regardless of size, so neither bound is ever reached.\n\n### Impact\n\nAn application passing an untrusted pattern to `expand()`, directly or through `minimatch` / `glob`, can have its event loop blocked for tens of seconds by a payload well under minimatch's 65,536-character cap. For a single-threaded Node server that is a full stall, not just a slow request.\n\nDegraded availability rather than a crash - the process recovers once the expansion completes.\n\n### Affected versions\n\nVerified affected on 1.1.18, 2.1.4, 3.0.6 and 5.0.9, all within a few percent of each other (~460-490 ms at n=16,000).\n\n### Patch\n\nThe rewrite loop gets an iteration bound. Past the cap the remaining string is treated as non-expanding and returned literally, consistent with the existing `max` / `maxLength` caps, which truncate rather than throw.\n\nNote this bounds the number of passes, not the cost of each: worst-case work remains proportional to `cap x input length`. The cap is set low enough that the residual is bounded in practice, and far above what any realistic `{a},b}` input needs.\n\n### Severity note\n\nScored 5.3 Medium (`A:L`) for consistency with GHSA-3jxr-9vmj-r5cp, the other algorithmic-complexity advisory on this package (CWE-407), which uses the same vector. The stack-exhaustion advisories on this package score `A:H` because they crash the process outright; this one stalls it.",
+      "reported_by": null,
+      "title": "brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-102277"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "brace-expansion",
+      "vulnerable_versions": ">=2.0.0 <2.1.7",
+      "github_advisory_id": "GHSA-q2hr-2g5m-vwhr",
+      "recommendation": "Upgrade to version 2.1.7 or later",
+      "patched_versions": ">=2.1.7",
+      "updated": "2026-09-29T23:45:39.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-407"
+      ],
+      "url": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"
+    },
+    "1240105": {
+      "findings": [
+        {
+          "version": "2.1.0",
+          "paths": [
+            "apps/backend > archiver@7.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > zip-stream@6.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-qhr7-859c-m2p7\n- https://nvd.nist.gov/vuln/detail/CVE-2026-102278\n- https://github.com/juliangruber/brace-expansion/commit/1efee7c397c191da6287a78ec19512476a966a7b\n- https://github.com/juliangruber/brace-expansion/commit/935d78f32f335b2ff76578e5c5e877d31ae9888c\n- https://github.com/juliangruber/brace-expansion/commit/de84f144e9816f30e25fc8179e2e1249ab6df0db\n- https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "created": "2026-09-29T23:45:17.000Z",
+      "id": 1240105,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\n`expand_()` recurses once per level of brace *nesting*. Deeply nested input exhausts the native stack and crashes the process.\n\nThis is distinct from CVE-2026-14257 / GHSA-mh99-v99m-4gvg, which made the *tail* iterative (recursion on `m.post`, driven by how many groups are chained). Nesting depth drives a different recursion that the tail fix never touched, so the documented constant-stack-depth guarantee only ever covered chained input, not nested input.\n\nIt is also distinct from GHSA-6j4f-fj2g-mc7p, which fixed recursion in `parseCommaParts()`. Both payloads below still crash with that fix applied.\n\n### Two recursion sites\n\n**Comma members.** Each alternative of a brace set is expanded by a recursive call, so nesting a set inside every alternative recurses once per level:\n\n```js\nexpand('{a,'.repeat(4000) + 'z' + '}'.repeat(4000))\n// RangeError: Maximum call stack size exceeded\n```\n\nCrashes at depth 3,907 - about **15.6 KB** of input.\n\n**Single set.** A brace set whose body parses to a single part is expanded by a recursive call before being re-wrapped (`x{{a,b}}y` -> `x{a}y x{b}y`), which recurses once per nesting level:\n\n```js\nexpand('{'.repeat(3200) + 'a,b' + '}'.repeat(3200))\n// RangeError: Maximum call stack size exceeded\n```\n\nCrashes at depth 3,125 - about **6.25 KB** of input. This is the cheapest stack-exhaustion payload known against this package: roughly a quarter the input of GHSA-6j4f-fj2g-mc7p (29 KB), and about a tenth of minimatch's `MAX_PATTERN_LENGTH` (65,536).\n\n### Why `max` and `maxLength` do not help\n\nBoth crashes happen while recursing into sub-expansions, before the result set grows. The payloads produce almost no output - the single-set case yields 2 results - so neither bound is ever the limiter. `expand(payload, { max: 1, maxLength: 1 })` still overflows.\n\n### Impact\n\nAny application passing an untrusted string to `expand()`, directly or through `minimatch` / `glob` as a user-supplied glob pattern, can be crashed. In Node a `RangeError` the application does not catch terminates the process, so a server globbing user input is exposed to remote unauthenticated denial of service.\n\nAvailability only. No code execution, no data exposure.\n\n### Affected versions\n\nVerified affected on 1.1.18, 2.1.4, 3.0.6 and 5.0.9, at near-identical depths on every line (single set: 3,125 on all four; comma members: 3,907-4,102). Not a regression from any recent fix - the gap predates them.\n\n### Patch\n\nA `maxDepth` bound (default `EXPANSION_MAX_DEPTH`) is threaded through `expand_()`. Past the cap a group is treated as non-expanding and returned literally, which is how the parser already handles a group that cannot expand. This matches the existing `max` / `maxLength` caps, which truncate rather than throw, so `expand()` continues never to throw on any input.\n\nThe default sits far above any realistic nesting depth and well below the crash threshold.",
+      "reported_by": null,
+      "title": "brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-102278"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "brace-expansion",
+      "vulnerable_versions": ">=2.0.0 <2.1.6",
+      "github_advisory_id": "GHSA-qhr7-859c-m2p7",
+      "recommendation": "Upgrade to version 2.1.6 or later",
+      "patched_versions": ">=2.1.6",
+      "updated": "2026-09-29T23:45:19.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-674"
+      ],
+      "url": "https://github.com/advisories/GHSA-qhr7-859c-m2p7"
+    },
+    "1240109": {
+      "findings": [
+        {
+          "version": "2.1.0",
+          "paths": [
+            "apps/backend > archiver@7.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.0",
+            "apps/backend > archiver@7.0.1 > zip-stream@6.0.1 > archiver-utils@5.0.2 > glob@10.5.0 > minimatch@9.0.9 > brace-expansion@2.1.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/juliangruber/brace-expansion/security/advisories/GHSA-6j4f-fj2g-mc7p\n- https://nvd.nist.gov/vuln/detail/CVE-2026-102276\n- https://github.com/juliangruber/brace-expansion/commit/0bcbfc0a5928c3073d48f42999d1ce4fc1c42fbc\n- https://github.com/juliangruber/brace-expansion/commit/316359e6019c39b3254c8ba8e25dc586a480652c\n- https://github.com/juliangruber/brace-expansion/commit/5171e681c0922b7ae8bfaf9a331e309107be6edc\n- https://github.com/juliangruber/brace-expansion/commit/6735c94873ca570bcdd6a0690033bdd3126379d3\n- https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "created": "2026-09-29T23:44:58.000Z",
+      "id": 1240109,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\n`parseCommaParts()` can exhaust the native stack and crash the process. There are two distinct ways to trigger it, both reachable from a single untrusted pattern string.\n\nThis is the parsing-side counterpart to CVE-2026-14257 / GHSA-mh99-v99m-4gvg. That fix made `expand_()` iterative and documented a constant-stack-depth guarantee, but `parseCommaParts()` was left recursive, so the guarantee only held for one of the two parsing paths.\n\n### Vector 1 - unbounded recursion on `post`\n\n`parseCommaParts()` recursed on the remainder of the string once per brace group:\n\n```js\nconst postParts = parseCommaParts(post)   // unbounded\n```\n\nA brace group containing many comma-separated groups drives one recursion level per group:\n\n```js\nexpand('{' + '{a},'.repeat(7000) + 'b}')\n// RangeError: Maximum call stack size exceeded\n```\n\nAbout 7,300 repetitions - roughly 29 KB of input - is enough on Node 24; roughly 6,300 (25 KB) on Node 18. The threshold is identical on every affected release line.\n\n### Vector 2 - `push.apply` with an unbounded array\n\nEven with the recursion removed, `parseCommaParts()` spread whole arrays into an argument list:\n\n```js\np.push.apply(p, postParts)\nparts.push.apply(parts, p)\n```\n\n`Function.prototype.apply` places one argument per element on the stack, so a single large array overflows it. This needs **no recursion depth at all** - the following reaches a recursion depth of exactly 1:\n\n```js\nexpand('{{x},' + 'a,'.repeat(125000) + 'b}')\n// RangeError: Maximum call stack size exceeded\n```\n\nThreshold is about 124,300 repetitions (~249 KB). This vector was not part of the original report; it was found while verifying the fix. A patch that only de-recurses but keeps `push.apply` leaves a working denial of service behind.\n\n### Why `max` and `maxLength` do not help\n\nBoth crashes happen during **parsing**, before any expansion. The payloads produce one result per group, so output size grows linearly with input and is never the limiter. `expand(payload, { max: 1, maxLength: 1 })` still overflows.\n\n### Impact\n\nAny application that passes an untrusted string to `expand()` - directly, or through `minimatch` / `glob` where it is a user-supplied glob pattern - can be crashed. In Node, a `RangeError` that the application does not catch terminates the process, so a server that globs user input is exposed to remote unauthenticated denial of service.\n\n`minimatch`'s own `MAX_PATTERN_LENGTH` cap (65,536) does not help against vector 1: the overflow threshold sits well below it. Confirmed on minimatch 10.2.6 - a 64,003-byte pattern passes the length check and overflows both `minimatch.braceExpand()` and `new minimatch.Minimatch()`.\n\nThis is an availability-only issue. No code execution and no data exposure.\n\n### Not a regression\n\n5.0.8 and 5.0.9 overflow at the same repetition count, so the gap predates the recent advisories; those fixes simply did not reach it. Verified affected on 1.1.18, 2.1.4, 3.0.6, 5.0.8 and 5.0.9, all at an identical threshold.\n\n### Patch\n\n`parseCommaParts()` is rewritten as a loop that carries the partial part across chunks, and every array append uses an element-by-element loop rather than `push.apply`. The redundant `if (!str) return ['']` guard is dropped - the loop returns `['']` for the empty string on its own.\n\nEquivalence of the old and new implementations was checked by differential testing: exhaustive over every string of `{`, `}`, `,`, `a` up to length 7 plus 300,000 random inputs - 322,000 cases, zero mismatches.\n\n### Severity note\n\nScored 7.5 High under CVSS 3.1 for consistency with the other availability advisories on this package (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895), which use the same vector. The reporter self-assessed 6.9 Medium under CVSS 4.0 (`CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:L/SC:N/SI:N/SA:N`).\n\n### Credit\n\nReported by baeseungwon1010, with a working proof of concept and a proposed patch. Vector 2 was identified during maintainer verification.",
+      "reported_by": null,
+      "title": "brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-102276"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "brace-expansion",
+      "vulnerable_versions": ">=2.0.0 <2.1.5",
+      "github_advisory_id": "GHSA-6j4f-fj2g-mc7p",
+      "recommendation": "Upgrade to version 2.1.5 or later",
+      "patched_versions": ">=2.1.5",
+      "updated": "2026-09-29T23:44:59.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-674"
+      ],
+      "url": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 1,
+      "high": 5,
+      "critical": 0
+    },
+    "dependencies": 375,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 375
+  }
+}

@@ -111,11 +111,11 @@ function AgentInstructionsModal({ device, onClose }: { device: AbDevice; onClose
   const [downloading, setDownloading] = useState<string | null>(null)
   const [dlError, setDlError] = useState<string | null>(null)
 
-  const handleDownload = async (platform: 'windows' | 'linux' | 'mac') => {
-    setDownloading(platform)
+  const handleDownload = async (platform: 'windows' | 'linux' | 'mac', arch: 'amd64' | 'arm64') => {
+    setDownloading(`${platform}-${arch}`)
     setDlError(null)
     try {
-      await activeBackupApi.downloadAgentPackage(device.id, platform, device.name)
+      await activeBackupApi.downloadAgentPackage(device.id, platform, device.name, arch)
     } catch (e) {
       setDlError(e instanceof Error ? e.message : 'Error al descargar')
     } finally {
@@ -131,7 +131,7 @@ function AgentInstructionsModal({ device, onClose }: { device: AbDevice; onClose
             <Server className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             <div>
               <h2 className="text-base font-semibold text-gray-900 dark:text-white">Instalar agente en {device.name}</h2>
-              <p className="text-xs text-gray-500 dark:text-white/40 mt-0.5">Descarga el paquete para el sistema operativo del equipo a proteger</p>
+              <p className="text-xs text-gray-500 dark:text-white/40 mt-0.5">Descarga el paquete para el sistema operativo y procesador del equipo a proteger</p>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/80 transition-colors text-xl leading-none">&times;</button>
@@ -141,13 +141,15 @@ function AgentInstructionsModal({ device, onClose }: { device: AbDevice; onClose
           {/* Download buttons */}
           <div className="space-y-2">
             {([
-              { platform: 'windows' as const, label: 'Windows', icon: '🪟', hint: 'Ejecuta instalar.cmd como Administrador' },
-              { platform: 'linux'   as const, label: 'Linux',   icon: '🐧', hint: 'Ejecuta sudo bash instalar.sh' },
-              { platform: 'mac'     as const, label: 'macOS',   icon: '', hint: 'Ejecuta sudo bash instalar.sh' },
-            ]).map(({ platform, label, icon, hint }) => (
+              { platform: 'windows' as const, arch: 'amd64' as const, label: 'Windows x86-64', icon: '🪟', hint: 'Ejecuta instalar.cmd como Administrador' },
+              { platform: 'linux' as const, arch: 'amd64' as const, label: 'Linux x86-64', icon: '🐧', hint: 'Ejecuta sudo bash instalar.sh' },
+              { platform: 'linux' as const, arch: 'arm64' as const, label: 'Linux ARM64', icon: '🐧', hint: 'Ejecuta sudo bash instalar.sh' },
+              { platform: 'mac' as const, arch: 'amd64' as const, label: 'macOS Intel', icon: '', hint: 'Ejecuta sudo bash instalar.sh' },
+              { platform: 'mac' as const, arch: 'arm64' as const, label: 'macOS Apple Silicon', icon: '', hint: 'Ejecuta sudo bash instalar.sh' },
+            ]).map(({ platform, arch, label, icon, hint }) => (
               <button
-                key={platform}
-                onClick={() => handleDownload(platform)}
+                key={`${platform}-${arch}`}
+                onClick={() => handleDownload(platform, arch)}
                 disabled={!!downloading}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 transition-colors text-white"
               >
@@ -156,7 +158,7 @@ function AgentInstructionsModal({ device, onClose }: { device: AbDevice; onClose
                   <p className="text-sm font-semibold">Descargar agente {label}</p>
                   <p className="text-xs text-indigo-200">{hint}</p>
                 </div>
-                {downloading === platform
+                {downloading === `${platform}-${arch}`
                   ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                   : <Download className="w-4 h-4 shrink-0" />
                 }

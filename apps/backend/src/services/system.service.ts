@@ -37,24 +37,25 @@ async function readFileSafe(path: string): Promise<string | null> {
 }
 
 // Parse /proc/stat first CPU line: cpu  user nice system idle iowait irq softirq steal guest guest_nice
-function parseProcStat(content: string): { idle: number; total: number } | null {
+export function parseProcStat(content: string): { idle: number; total: number } | null {
   const line = content.split('\n').find(l => l.startsWith('cpu '))
   if (!line) return null
   const parts = line.trim().split(/\s+/).slice(1).map(Number)
   const idle = parts[3] + (parts[4] ?? 0) // idle + iowait
-  const total = parts.reduce((sum, v) => sum + v, 0)
+  // guest and guest_nice are already included in user/nice by the kernel.
+  const total = parts.slice(0, 8).reduce((sum, v) => sum + v, 0)
   return { idle, total }
 }
 
 // Parse /proc/net/dev for a given interface
-function parseNetDev(content: string, iface: string): { rxBytes: number; txBytes: number } | null {
+export function parseNetDev(content: string, iface: string): { rxBytes: number; txBytes: number } | null {
   const lines = content.split('\n')
   const line = lines.find(l => l.trim().startsWith(iface + ':'))
   if (!line) return null
-  const cols = line.trim().split(/\s+/)
+  const cols = line.slice(line.indexOf(':') + 1).trim().split(/\s+/)
   // Format: iface: rx_bytes rx_packets rx_errs rx_drop rx_fifo rx_frame rx_compressed rx_multicast tx_bytes ...
-  const rxBytes = parseInt(cols[1], 10)
-  const txBytes = parseInt(cols[9], 10)
+  const rxBytes = parseInt(cols[0], 10)
+  const txBytes = parseInt(cols[8], 10)
   if (isNaN(rxBytes) || isNaN(txBytes)) return null
   return { rxBytes, txBytes }
 }
@@ -192,7 +193,8 @@ function parseCoreStats(content: string): CoreSnapshot[] {
     if (!line.match(/^cpu\d+\s/)) continue
     const parts = line.trim().split(/\s+/).slice(1).map(Number)
     const idle = parts[3] + (parts[4] ?? 0)
-    const total = parts.reduce((sum, v) => sum + v, 0)
+    // guest and guest_nice are already included in user/nice by the kernel.
+  const total = parts.slice(0, 8).reduce((sum, v) => sum + v, 0)
     cores.push({ idle, total })
   }
   return cores

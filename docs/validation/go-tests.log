@@ -1,0 +1,6 @@
+?   	homenas.io/agent	[no test files]
+ok  	homenas.io/agent/cmd	(cached)
+ok  	homenas.io/agent/internal/agent	(cached)
+ok  	homenas.io/agent/internal/config	(cached)
+?   	homenas.io/agent/internal/svc	[no test files]
+?   	homenas.io/agent/internal/vss	[no test files]

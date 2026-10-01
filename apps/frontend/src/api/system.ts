@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, invalidateSession } from './client'
 import { useAuthStore } from '../stores/authStore'
 import type { SystemMetrics, SystemInfo } from '@homenas/shared'
 
@@ -38,7 +38,7 @@ export const systemApi = {
       const res = await fetch('/api/system/db-backup', {
         headers: sessionId ? { 'X-Session-Id': sessionId } : {},
       })
-      if (res.status === 401) { useAuthStore.getState().logout(); throw new Error('UNAUTHORIZED') }
+      if (res.status === 401) { invalidateSession(sessionId); throw new Error('UNAUTHORIZED') }
       if (!res.ok) throw new Error(await res.text())
       const blob = await res.blob()
       const filename = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ?? 'homenas.db'
@@ -47,7 +47,7 @@ export const systemApi = {
       a.href = url
       a.download = filename
       a.click()
-      URL.revokeObjectURL(url)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
     },
   },
 

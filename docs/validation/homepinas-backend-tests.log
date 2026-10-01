@@ -1,0 +1,131 @@
+npm warn Unknown user config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> @homenas/backend@1.0.2 test /opt/homenas-v3/apps/backend
+> tsx --test tests/*.test.ts
+
+{"level":30,"time":1790853805905,"pid":15368,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backup-cron-fXcb2Q/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790853806244,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806256,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-1","res":{"statusCode":200},"responseTime":11.530138000000079,"msg":"request completed"}
+{"level":30,"time":1790853806258,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-2","req":{"method":"POST","url":"/api/backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806271,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-2","res":{"statusCode":201},"responseTime":13.291494000000057,"msg":"request completed"}
+{"level":30,"time":1790853806272,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-3","req":{"method":"DELETE","url":"/api/backup/jobs/5","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806274,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-3","res":{"statusCode":200},"responseTime":2.321728000000803,"msg":"request completed"}
+{"level":30,"time":1790853806275,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-4","req":{"method":"POST","url":"/api/cloud-backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806283,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-4","res":{"statusCode":201},"responseTime":8.134390000000167,"msg":"request completed"}
+{"level":30,"time":1790853806284,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-5","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/2","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806289,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-5","res":{"statusCode":200},"responseTime":4.959214999999858,"msg":"request completed"}
+{"level":30,"time":1790853806289,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-6","req":{"method":"PUT","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806299,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-6","res":{"statusCode":200},"responseTime":9.14746600000035,"msg":"request completed"}
+{"level":30,"time":1790853806299,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-7","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806302,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-7","res":{"statusCode":200},"responseTime":2.486746999999923,"msg":"request completed"}
+{"level":30,"time":1790853806302,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-8","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806305,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-8","res":{"statusCode":200},"responseTime":2.4076719999993657,"msg":"request completed"}
+{"level":30,"time":1790853806306,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-9","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806308,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-9","res":{"statusCode":200},"responseTime":2.1208379999998215,"msg":"request completed"}
+{"level":30,"time":1790853806309,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-a","req":{"method":"DELETE","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806311,"pid":15368,"hostname":"TEST_NAS_HOST","reqId":"req-a","res":{"statusCode":200},"responseTime":1.5292069999995874,"msg":"request completed"}
+✔ backup cron initializes persisted jobs, preserves runners/contracts, refreshes API edits and stops cleanly (837.724647ms)
+✔ actual node-cron clock dispatches an enabled persisted backup without running system commands (715.829732ms)
+{"level":30,"time":1790853805913,"pid":15369,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-4GfNrt/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790853806173,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806192,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-1","res":{"statusCode":200},"responseTime":18.051578999999947,"msg":"request completed"}
+{"level":30,"time":1790853806193,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806201,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-2","res":{"statusCode":200},"responseTime":7.82238899999993,"msg":"request completed"}
+{"level":30,"time":1790853806202,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-3","req":{"method":"POST","url":"/api/setup/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806204,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-3","res":{"statusCode":409},"responseTime":1.8688739999997779,"msg":"request completed"}
+{"level":30,"time":1790853806205,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806791,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-4","res":{"statusCode":200},"responseTime":585.3519640000004,"msg":"request completed"}
+{"level":30,"time":1790853806791,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-5","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806793,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-5","res":{"statusCode":403},"responseTime":1.1882619999996678,"msg":"request completed"}
+{"level":30,"time":1790853806793,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-6","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806795,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-6","res":{"statusCode":401},"responseTime":1.3052249999991545,"msg":"request completed"}
+{"level":30,"time":1790853806796,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-7","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853806797,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-7","res":{"statusCode":200},"responseTime":1.3323739999996178,"msg":"request completed"}
+{"level":30,"time":1790853806798,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-8","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853807376,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-8","res":{"statusCode":200},"responseTime":577.5763530000004,"msg":"request completed"}
+{"level":30,"time":1790853807380,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-9","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853808313,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-9","res":{"statusCode":401},"responseTime":932.4230349999998,"msg":"request completed"}
+{"level":30,"time":1790853808314,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-a","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853808931,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-a","res":{"statusCode":401},"responseTime":617.565928,"msg":"request completed"}
+{"level":30,"time":1790853808933,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-b","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853809818,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-b","res":{"statusCode":401},"responseTime":885.1045170000007,"msg":"request completed"}
+{"level":30,"time":1790853809818,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-c","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853810743,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-c","res":{"statusCode":401},"responseTime":924.3520909999988,"msg":"request completed"}
+{"level":30,"time":1790853810743,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-d","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853811494,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-d","res":{"statusCode":401},"responseTime":750.44009,"msg":"request completed"}
+{"level":30,"time":1790853811495,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-e","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853811497,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-e","res":{"statusCode":429},"responseTime":2.009486000000834,"msg":"request completed"}
+{"level":30,"time":1790853811497,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-f","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853811498,"pid":15369,"hostname":"TEST_NAS_HOST","reqId":"req-f","res":{"statusCode":401},"responseTime":0.9211689999992814,"msg":"request completed"}
+✔ bootstrap credential changes revoke other sessions; authenticated wizard can resume; 2FA failures lock account (5951.405642ms)
+{"level":30,"time":1790853811772,"pid":15369,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-nTviPi/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+✔ scheduler rejects untrusted binaries, combined rsync interpreter flags and unsafe toggle (544.065811ms)
+✔ path guards accept dotted names, reject symlink escapes/missing leaves and pool roots (6.944609ms)
+✔ upload safety checks binary signatures and case-insensitive text signatures (7.541018ms)
+✔ Compose validates relative binds, device access, inherited definitions and volume driver bypasses (34.390044ms)
+{"level":30,"time":1790853812308,"pid":15369,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-Q1ebFY/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+✔ DDNS retries failed providers at unchanged IP and updates newly configured domains (428.639522ms)
+✔ Cloudflare selects the correct CPU binary and passwords respect bcrypt byte limits (3.822898ms)
+✔ independent review: expired interrupted backup can be retried (10.817581ms)
+✔ independent review: queued push backup exposes running state and can be cancelled (6.3037ms)
+✔ independent review: polling never approves an unapproved agent (3.661268ms)
+{"level":30,"time":1790853807282,"pid":15484,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-bootstrap-WEdLJL/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790853807696,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853807717,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","res":{"statusCode":200},"responseTime":20.864900999999918,"msg":"request completed"}
+{"level":30,"time":1790853807718,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853807720,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-2","res":{"statusCode":200},"responseTime":2.0012079999996786,"msg":"request completed"}
+{"level":30,"time":1790853807721,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-3","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853807722,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853808956,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-3","res":{"statusCode":200},"responseTime":1234.3273539999996,"msg":"request completed"}
+{"level":30,"time":1790853808961,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-4","res":{"statusCode":409},"responseTime":1238.523197,"msg":"request completed"}
+{"level":30,"time":1790853808962,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-5","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853809676,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-5","res":{"statusCode":200},"responseTime":713.6513380000006,"msg":"request completed"}
+✔ independent review: a concurrently revoked bootstrap session cannot overwrite administrator password (2797.10344ms)
+{"level":30,"time":1790853810002,"pid":15484,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-YlflXP/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790853810205,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853810207,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","res":{"statusCode":401},"responseTime":2.3073020000001634,"msg":"request completed"}
+▶ independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+  ✔ password (512.473218ms)
+{"level":30,"time":1790853810461,"pid":15484,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-tu5ac7/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790853810615,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853810622,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","res":{"statusCode":401},"responseTime":6.597905000000537,"msg":"request completed"}
+  ✔ totp (419.137ms)
+{"level":30,"time":1790853810874,"pid":15484,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-3kYnc7/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790853811035,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853811038,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","res":{"statusCode":401},"responseTime":3.1185999999997875,"msg":"request completed"}
+  ✔ delete (411.859298ms)
+{"level":30,"time":1790853811310,"pid":15484,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-XDpsrd/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+{"level":30,"time":1790853811445,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+{"level":30,"time":1790853811452,"pid":15484,"hostname":"TEST_NAS_HOST","reqId":"req-1","res":{"statusCode":429},"responseTime":6.428069999999934,"msg":"request completed"}
+  ✔ lockout (409.755756ms)
+✔ independent review: login cannot issue sessions from stale password, TOTP or deleted-user state (1765.447449ms)
+{"level":30,"time":1790853811529,"pid":15742,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-cron-close-PYymLf/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+✔ independent review: server hook cancels backups before SQLite closes (1058.541479ms)
+{"level":30,"time":1790853812201,"pid":15742,"hostname":"TEST_NAS_HOST","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-ddns-close-GPxSR9/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+✔ independent review: closing waits for in-flight DDNS before SQLite closes (492.39819ms)
+✔ independent review: update and agent package resolve actual tsc production layout (10.893877ms)
+✔ independent storage review: branch policies and cache subpaths never measure root (1448.480762ms)
+✔ real multipart consumes file and validates full backup, including empty files and hardlink dedup (237.605297ms)
+✔ format entrypoints refuse root before destructive commands; add/create mount only mocked disks and persist UUID (5370.863889ms)
+✔ missing logical cache branch measures only its existing mounted NAS ancestor (58.028654ms)
+✔ format guard resolves NVMe root without truncating namespace (3.427749ms)
+✔ format guard refuses unknown topology, duplicates, mounted children and LVM (1.144336ms)
+✔ format guard protects every physical ancestor of LVM/RAID root (0.497131ms)
+✔ format lock excludes concurrent entrypoints and releases after failures (1.207132ms)
+✔ backup rejects attached and bundled shell execution flags (1.174002ms)
+✔ metrics avoid counting virtual guest CPU twice and parse attached RX counter (6.875794ms)
+✔ disk persistence replaces only matching mountpoints and preserves unrelated entries (0.89228ms)
+✔ cloud remote config rejects INI directive injection and executable password commands (1.586671ms)
+✔ project-root discovery supports source and compiled backend nesting (8.323038ms)
+✔ flat lsblk topology is refused and disconnected disks are never formatted (0.940373ms)
+✔ multi-view pools select storage alias instead of first archive; ambiguity fails closed (0.563687ms)
+✔ primary pool resolver follows a real storage symlink with temporary mounts (73.522116ms)
+✔ database downloads use live SQLite with custom data directory; SSH command failures do not report success (623.863923ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18750.427799

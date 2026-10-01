@@ -1,3 +1,4 @@
+import { assertContainedHostPath } from '../lib/path-security.js'
 import { exec } from '../lib/exec.js'
 import { ensureDockerAvailable } from './docker.service.js'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
@@ -495,6 +496,7 @@ function assertSafeHostPath(hostPath: string): void {
   if (BLOCKED_VOLUME_PATHS.has(hostPath)) {
     throw new Error(`Volume hostPath blocked: ${hostPath}`)
   }
+  assertContainedHostPath(hostPath, ALLOWED_VOLUME_PREFIXES)
   const ok = ALLOWED_VOLUME_PREFIXES.some((p) => hostPath === p.replace(/\/$/, '') || hostPath.startsWith(p))
   if (!ok) {
     throw new Error(
@@ -787,6 +789,8 @@ export async function uninstallApp(id: string, removeData: boolean): Promise<voi
       // root. Better to skip than wipe /etc by accident.
       try {
         assertSafeHostPath(v.hostPath)
+        // Only app-owned storage is disposable; user bind mounts may contain an entire NAS pool.
+        assertContainedHostPath(v.hostPath, [`/opt/homestore/${id}/`])
       } catch {
         continue
       }

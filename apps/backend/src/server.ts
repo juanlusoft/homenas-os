@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { buildApp } from './app.js'
+import { createBackupScheduler } from './services/backup-scheduler.service.js'
 import { createSchedulerService } from './services/scheduler.service.js'
 import { initCacheDrainScheduler } from './services/storage.service.js'
 import { initAutoUpdatePoller } from './services/updates.service.js'
@@ -32,9 +33,11 @@ process.on('SIGINT',  () => { void shutdown('SIGINT') })
 const port = parseInt(process.env.PORT ?? '3000', 10)
 
 try {
-  await app.listen({ port, host: '0.0.0.0' })
+  await app.listen({ port, host: process.env.HOST ?? '0.0.0.0' })
   scheduler = createSchedulerService(app.db)
   scheduler.initialize()
+  const backupScheduler = createBackupScheduler(app.db)
+  backupScheduler.initialize()
   initCacheDrainScheduler(app.db)
   initAutoUpdatePoller(app.db)
   app.log.info(`HomeNas OS v3 backend running on port ${port}${httpsOptions ? ' (HTTPS)' : ''} — scheduler initialized`)

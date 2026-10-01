@@ -140,7 +140,7 @@ export async function storageRoutes(fastify: FastifyInstance) {
     const { device, writeMode } = result.data
 
     try {
-      startBadblocks(device, writeMode)
+      await startBadblocks(device, writeMode)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       return reply.status(400).send({ error: 'Bad Request', message })
@@ -187,7 +187,9 @@ export async function storageRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'Bad Request', message: result.error.message })
     }
     try {
-      const mountResult = await mountPartitionReadOnly(device, result.data.browserId)
+      const partition = result.data.partition
+      if (partition && !(await getDiskPartitions(device)).some(p => p.partition === partition)) throw new Error('Partition does not belong to this disk')
+      const mountResult = await mountPartitionReadOnly(partition ?? device, result.data.browserId)
       return reply.send(mountResult)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'

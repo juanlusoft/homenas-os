@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import {
   Server, CheckCircle, Loader2,
   Lock, Wifi, HardDrive, AlertTriangle, User,
@@ -158,7 +157,7 @@ function StepAccount({ onNext }: { onNext: () => void }) {
 // ── Step 3: Network ───────────────────────────────────────────────────────────
 
 function StepNetwork({ onNext }: { onNext: () => void }) {
-  const { data, isLoading } = useSetupNetwork()
+  const { data, isLoading, error: loadError, refetch } = useSetupNetwork()
   const configureNetwork = useConfigureNetwork()
 
   const interfaces = data?.interfaces ?? []
@@ -190,6 +189,7 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
     }
     setMode(activeIfaceData.isDhcp ? 'dhcp' : 'static')
     setUserEdited(false)
+    setSaved(false)
   }, [activeIfaceData])
 
   // If the interface already has an IP and the user hasn't changed anything, allow skipping save
@@ -205,6 +205,7 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
       }
       await configureNetwork.mutateAsync(payload)
       setSaved(true)
+      onNext()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al configurar red')
     }
@@ -217,6 +218,14 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
         <p className="text-sm text-gray-500 dark:text-white/40">Detectando interfaces de red...</p>
       </div>
     )
+  }
+
+  if (loadError) {
+    return <div role="alert" className="space-y-3 text-center">
+      <p className="text-sm text-red-600 dark:text-red-400">Error al detectar interfaces: {loadError.message}</p>
+      <button onClick={() => void refetch()} className="text-sm text-indigo-600 dark:text-indigo-400">Reintentar</button>
+      <button onClick={onNext} className="ml-3 text-sm text-gray-600 dark:text-white/60">Saltar</button>
+    </div>
   }
 
   return (
@@ -247,11 +256,11 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
       )}
 
       {/* Current IP display */}
-      {primary?.ip && (
+      {activeIfaceData?.ip && (
         <div className="p-3 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-between">
           <span className="text-xs text-gray-500 dark:text-white/50">IP actual ({activeIface || primary.name})</span>
           <span className="text-sm font-mono text-gray-900 dark:text-white">{
-            interfaces.find(i => i.name === activeIface)?.ip ?? primary.ip
+            activeIfaceData?.ip
           }</span>
         </div>
       )}
@@ -259,7 +268,7 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
       {/* Mode selector */}
       <div className="grid grid-cols-2 gap-2">
         {(['dhcp', 'static'] as const).map(m => (
-          <button key={m} onClick={() => { setMode(m); setUserEdited(true) }}
+          <button key={m} onClick={() => { setMode(m); setUserEdited(true); setSaved(false) }}
             className={[
               'py-3 rounded-xl border text-sm font-semibold transition-all',
               mode === m ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/50 hover:text-gray-700 dark:text-white/70',
@@ -275,23 +284,23 @@ function StepNetwork({ onNext }: { onNext: () => void }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-500 dark:text-white/50 mb-1.5">Dirección IP</label>
-              <input type="text" value={ip} onChange={e => setIp(e.target.value)} placeholder="192.168.1.10"
+              <input type="text" value={ip} onChange={e => { setIp(e.target.value); setUserEdited(true); setSaved(false) }} placeholder="192.168.1.10"
                 className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-white/30 focus:outline-none focus:border-indigo-500 font-mono" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-white/50 mb-1.5">Prefijo</label>
-              <input type="number" value={prefix} onChange={e => setPrefix(e.target.value)} min="1" max="32" placeholder="24"
+              <input type="number" value={prefix} onChange={e => { setPrefix(e.target.value); setUserEdited(true); setSaved(false) }} min="1" max="32" placeholder="24"
                 className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-white/30 focus:outline-none focus:border-indigo-500 font-mono" />
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-white/50 mb-1.5">Puerta de enlace</label>
-            <input type="text" value={gateway} onChange={e => setGateway(e.target.value)} placeholder="192.168.1.1"
+            <input type="text" value={gateway} onChange={e => { setGateway(e.target.value); setUserEdited(true); setSaved(false) }} placeholder="192.168.1.1"
               className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-white/30 focus:outline-none focus:border-indigo-500 font-mono" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-white/50 mb-1.5">DNS primario</label>
-            <input type="text" value={dns} onChange={e => setDns(e.target.value)} placeholder="8.8.8.8"
+            <input type="text" value={dns} onChange={e => { setDns(e.target.value); setUserEdited(true); setSaved(false) }} placeholder="8.8.8.8"
               className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-white/30 focus:outline-none focus:border-indigo-500 font-mono" />
           </div>
         </div>
@@ -348,7 +357,7 @@ const DISK_TYPE_TAG: Record<string, { label: string; className: string }> = {
 
 function StepStorage({ onNext }: { onNext: () => void }) {
   const configurePool = useConfigurePool()
-  const { data: disksData, isLoading } = useQuery<Disk[]>({
+  const { data: disksData, isLoading, error: loadError, refetch } = useQuery<Disk[]>({
     queryKey: ['storage', 'disks'],
     queryFn: () => apiFetch<Disk[]>('/storage/disks'),
     staleTime: 30_000,
@@ -362,18 +371,21 @@ function StepStorage({ onNext }: { onNext: () => void }) {
   const [done, setDone] = useState(false)
 
   const disks = disksData ?? []
-  const selectedDisks = disks.filter(d => roles[d.device] && roles[d.device] !== 'none')
+  const selectedDisks = disks.filter(d => d.mountPoint === null && roles[d.device] && roles[d.device] !== 'none')
   const dataCount   = selectedDisks.filter(d => roles[d.device] === 'data').length
   const parityCount = selectedDisks.filter(d => roles[d.device] === 'parity').length
 
   const canConfigure = (() => {
     if (dataCount === 0) return false
+    if (poolType === 'single' && (dataCount !== 1 || selectedDisks.length !== 1)) return false
+    if (poolType !== 'snapraid' && parityCount > 0) return false
     if (poolType === 'snapraid' && parityCount === 0) return false
     return confirmed
   })()
 
   const handleConfigure = async () => {
     setError(null)
+    if (!canConfigure || configurePool.isPending) return
     try {
       await configurePool.mutateAsync({
         disks: selectedDisks.map(d => ({ device: d.device, role: roles[d.device] as 'data' | 'parity' | 'cache' })),
@@ -393,6 +405,14 @@ function StepStorage({ onNext }: { onNext: () => void }) {
         <p className="text-sm text-gray-500 dark:text-white/40">Detectando discos...</p>
       </div>
     )
+  }
+
+  if (loadError) {
+    return <div role="alert" className="space-y-3 text-center">
+      <p className="text-sm text-red-600 dark:text-red-400">Error al detectar discos: {loadError.message}</p>
+      <button onClick={() => void refetch()} className="text-sm text-indigo-600 dark:text-indigo-400">Reintentar</button>
+      <button onClick={onNext} className="ml-3 text-sm text-gray-600 dark:text-white/60">Configurar después</button>
+    </div>
   }
 
   if (done) {
@@ -432,12 +452,12 @@ function StepStorage({ onNext }: { onNext: () => void }) {
           <p className="text-xs font-medium text-gray-500 dark:text-white/40 uppercase tracking-wider">Discos disponibles</p>
           {disks.map(disk => {
             const role = roles[disk.device] ?? 'none'
-            const isSystemDisk = disk.mountPoint === '/'
+            const isUnavailableDisk = disk.mountPoint !== null
             const tag = DISK_TYPE_TAG[disk.diskType] ?? DISK_TYPE_TAG.other
             return (
               <div key={disk.device} className={[
                 'p-3 rounded-xl border',
-                isSystemDisk ? 'border-black/5 dark:border-white/5 bg-white/3 opacity-50' : 'border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5',
+                isUnavailableDisk ? 'border-black/5 dark:border-white/5 bg-white/3 opacity-50' : 'border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5',
               ].join(' ')}>
                 <div className="flex items-center gap-3">
                   <HardDrive className="w-4 h-4 text-gray-400 dark:text-white/30 shrink-0" />
@@ -447,7 +467,7 @@ function StepStorage({ onNext }: { onNext: () => void }) {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-sm font-mono text-gray-900 dark:text-white">{disk.device}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${tag.className}`}>{tag.label}</span>
-                      {isSystemDisk && <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 font-medium">Sistema</span>}
+                      {isUnavailableDisk && <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 font-medium">{disk.mountPoint === '/' ? 'Sistema' : 'Montado'}</span>}
                     </div>
                   </div>
 
@@ -466,8 +486,8 @@ function StepStorage({ onNext }: { onNext: () => void }) {
                   </div>
 
                   {/* Role selector */}
-                  {!isSystemDisk && (
-                    <select value={role} onChange={e => setRoles(r => ({ ...r, [disk.device]: e.target.value as DiskRole }))}
+                  {!isUnavailableDisk && (
+                    <select value={role} onChange={e => { setRoles(r => ({ ...r, [disk.device]: e.target.value as DiskRole })); setConfirmed(false) }}
                       className="bg-gray-100 dark:bg-gray-800 border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 shrink-0">
                       <option value="none">No usar</option>
                       <option value="data">Datos</option>
@@ -491,7 +511,7 @@ function StepStorage({ onNext }: { onNext: () => void }) {
             { value: 'mergerfs', label: 'MergerFS',     desc: 'Combina varios discos en un único directorio sin redundancia' },
             { value: 'snapraid', label: 'SnapRAID',     desc: 'MergerFS + paridad SnapRAID para recuperación ante fallos' },
           ] as { value: PoolType; label: string; desc: string }[]).map(opt => (
-            <button key={opt.value} onClick={() => setPoolType(opt.value)}
+            <button key={opt.value} onClick={() => { setPoolType(opt.value); setConfirmed(false) }}
               className={[
                 'w-full text-left p-3 rounded-xl border transition-all',
                 poolType === opt.value ? 'border-indigo-500 bg-indigo-500/10' : 'border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:border-white/20',
@@ -509,7 +529,7 @@ function StepStorage({ onNext }: { onNext: () => void }) {
           <p className="text-xs font-medium text-gray-500 dark:text-white/40 uppercase tracking-wider mb-2">Sistema de ficheros</p>
           <div className="grid grid-cols-2 gap-2">
             {(['ext4', 'xfs'] as FsType[]).map(f => (
-              <button key={f} onClick={() => setFsType(f)}
+              <button key={f} onClick={() => { setFsType(f); setConfirmed(false) }}
                 className={[
                   'py-2.5 rounded-xl border text-sm font-semibold font-mono transition-all',
                   fsType === f ? 'border-indigo-500 bg-indigo-500/10 text-white' : 'border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/50 hover:text-gray-700 dark:text-white/70',
@@ -525,6 +545,9 @@ function StepStorage({ onNext }: { onNext: () => void }) {
       {poolType === 'snapraid' && parityCount === 0 && dataCount > 0 && (
         <p className="text-xs text-yellow-600 dark:text-yellow-400 text-center">SnapRAID requiere al menos un disco de paridad</p>
       )}
+
+      {poolType === 'single' && selectedDisks.length > 1 && <p role="alert" className="text-xs text-yellow-600 dark:text-yellow-400 text-center">Disco único requiere seleccionar solamente un disco de datos</p>}
+      {poolType !== 'snapraid' && parityCount > 0 && <p role="alert" className="text-xs text-yellow-600 dark:text-yellow-400 text-center">Los discos de paridad requieren un pool SnapRAID</p>}
 
       {/* Confirmation */}
       {selectedDisks.length > 0 && (
@@ -583,9 +606,8 @@ function StepDone({ onFinish, isLoading }: { onFinish: () => void; isLoading: bo
 
 export function SetupWizard() {
   const [step, setStep] = useState<Step>(1)
-  const [autoLogging, setAutoLogging] = useState(false)
+  const [finishError, setFinishError] = useState<string | null>(null)
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const completeSetup = useCompleteSetup()
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const loginStore      = useAuthStore((s) => s.login)
@@ -593,13 +615,12 @@ export function SetupWizard() {
   // Auto-login with admin/homenas1 so the user never sees the login screen.
   // Uses an AbortController so an unmount mid-request cancels in-flight work,
   // and a `cancelled` flag so we never call setState/navigate after unmount.
-  // `setAutoLogging(false)` runs in `finally` so the spinner doesn't get stuck
-  // when the request errors out.
+  // Authentication itself controls the spinner: login triggers effect cleanup
+  // before finally runs, so a second loading state could otherwise stay stuck.
   useEffect(() => {
     if (isAuthenticated) return
     const ctrl = new AbortController()
     let cancelled = false
-    setAutoLogging(true)
     setupApi.autologin({ signal: ctrl.signal })
       .then((result) => { if (!cancelled) loginStore(result) })
       .catch((err) => {
@@ -611,18 +632,19 @@ export function SetupWizard() {
         }
         navigate('/login', { replace: true })
       })
-      .finally(() => { if (!cancelled) setAutoLogging(false) })
     return () => { cancelled = true; ctrl.abort() }
   }, [isAuthenticated, loginStore, navigate])
 
-  if (autoLogging || !isAuthenticated) return <PageSpinner />
+  if (!isAuthenticated) return <PageSpinner />
 
   const handleFinish = async () => {
-    try { await completeSetup.mutateAsync() } catch { /* non-fatal */ }
-    // Force cache update synchronously before navigating so SetupGuard
-    // doesn't read stale complete:false and redirect back to /setup
-    queryClient.setQueryData(['setup', 'status'], { complete: true })
-    navigate('/')
+    setFinishError(null)
+    try {
+      await completeSetup.mutateAsync()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setFinishError(err instanceof Error ? err.message : 'Error al finalizar la configuración')
+    }
   }
 
   const LABELS = ['Bienvenido', 'Cuenta', 'Red', 'Almacenamiento', 'Listo']
@@ -639,6 +661,7 @@ export function SetupWizard() {
           {step === 3 && <StepNetwork onNext={() => setStep(4)} />}
           {step === 4 && <StepStorage onNext={() => setStep(5)} />}
           {step === 5 && <StepDone onFinish={handleFinish} isLoading={completeSetup.isPending} />}
+          {finishError && <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400 text-center">{finishError}</p>}
         </div>
       </div>
     </div>

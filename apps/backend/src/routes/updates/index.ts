@@ -66,7 +66,7 @@ export async function updatesRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Bad Request', message: 'packages must be an array of strings' })
       }
       for (const pkg of body.packages) {
-        if (typeof pkg !== 'string' || !/^[a-zA-Z0-9._+\-]+$/.test(pkg)) {
+        if (typeof pkg !== 'string' || !/^[a-z0-9][a-z0-9.+-]*(?::[a-z0-9]+)?$/.test(pkg)) {
           return reply.status(400).send({ error: 'Bad Request', message: `Invalid package name: ${pkg}` })
         }
         packages.push(pkg)

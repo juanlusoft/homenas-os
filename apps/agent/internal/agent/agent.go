@@ -2,7 +2,9 @@ package agent
 
 import (
 	"context"
+	"github.com/robfig/cron/v3"
 	"log"
+	"sync"
 	"time"
 
 	"homenas.io/agent/internal/config"
@@ -10,15 +12,16 @@ import (
 
 // Agent is the main long-running agent process.
 type Agent struct {
-	cfg    *config.Config
-	client *NASClient
+	cfg      *config.Config
+	client   *NASClient
+	backupMu sync.Mutex
 }
 
 // New creates an Agent from the given config.
 func New(cfg *config.Config) *Agent {
 	return &Agent{
 		cfg:    cfg,
-		client: NewNASClient(cfg.NasURL, cfg.Token),
+		client: NewNASClientWithTrust(cfg.NasURL, cfg.Token, cfg.TLSFingerprint, cfg.InsecureTLS),
 	}
 }
 
@@ -32,12 +35,21 @@ func (a *Agent) Run(ctx context.Context) {
 	heartbeatTick := time.NewTicker(30 * time.Second)
 	defer heartbeatTick.Stop()
 
-	// Schedule-based backup (if configured)
-	var backupTick <-chan time.Time
+	// Parse the actual configured cron expression rather than silently treating
+	// every expression as "once every 24 hours".
+	schedule := cron.New(cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger)))
 	if a.cfg.ScheduleCron != "" {
-		// Simple daily fallback — for cron parsing use robfig/cron in a full impl
-		backupTick = time.NewTicker(24 * time.Hour).C
+		if _, err := schedule.AddFunc(a.cfg.ScheduleCron, func() {
+			if err := a.TriggerBackup(ctx); err != nil {
+				log.Printf("[agent] backup error: %v", err)
+			}
+		}); err != nil {
+			log.Printf("[agent] invalid backup schedule: %v", err)
+		} else {
+			schedule.Start()
+		}
 	}
+	defer func() { <-schedule.Stop().Done() }()
 
 	for {
 		select {
@@ -48,22 +60,26 @@ func (a *Agent) Run(ctx context.Context) {
 		case <-heartbeatTick.C:
 			a.heartbeat(ctx)
 
-		case <-backupTick:
-			log.Println("[agent] scheduled backup triggered")
-			if err := RunBackup(ctx, a.cfg, a.client); err != nil {
-				log.Printf("[agent] backup error: %v", err)
-			}
 		}
 	}
 }
 
 // TriggerBackup runs a backup immediately (called from service control or CLI).
 func (a *Agent) TriggerBackup(ctx context.Context) error {
+	a.backupMu.Lock()
+	defer a.backupMu.Unlock()
 	return RunBackup(ctx, a.cfg, a.client)
 }
 
 func (a *Agent) heartbeat(ctx context.Context) {
-	if err := a.client.Heartbeat(ctx); err != nil {
+	task, err := a.client.Poll(ctx)
+	if err != nil {
 		log.Printf("[agent] heartbeat error: %v", err)
+		return
+	}
+	if task.Status == "backup" {
+		if err := a.TriggerBackup(ctx); err != nil {
+			log.Printf("[agent] requested backup error: %v", err)
+		}
 	}
 }

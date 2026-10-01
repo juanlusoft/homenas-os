@@ -1,6 +1,7 @@
-import { createReadStream, statSync, existsSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { X509Certificate, createHash } from 'node:crypto'
+import { createReadStream, statSync, existsSync, readFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { findProjectRoot } from '../../lib/project-root.js'
 import { PassThrough } from 'node:stream'
 import archiver from 'archiver'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
@@ -328,17 +329,20 @@ export async function activeBackupRoutes(fastify: FastifyInstance) {
 
       const parts = request.parts()
       const fields: Record<string, string> = {}
-      let dataStream: AsyncIterable<Buffer> | null = null
+      let data: Buffer | null = null
 
       for await (const part of parts) {
         if (part.type === 'field') {
           fields[part.fieldname] = part.value as string
         } else if (part.type === 'file' && part.fieldname === 'data') {
-          dataStream = part.file
+          if (data) throw new Error('Duplicate data field')
+          data = await part.toBuffer()
+        } else if (part.type === 'file') {
+          for await (const _chunk of part.file) { /* consume unsupported fields */ }
         }
       }
 
-      if (!dataStream) return reply.status(400).send({ error: 'Bad Request', message: 'Missing data field' })
+      if (!data) return reply.status(400).send({ error: 'Bad Request', message: 'Missing data field' })
 
       const { session_id, path: filePath, hash, mtime, size, chunk_index, total_chunks } = fields
       if (!session_id || !filePath || !hash || !mtime || !size || chunk_index === undefined || !total_chunks) {
@@ -348,7 +352,7 @@ export async function activeBackupRoutes(fastify: FastifyInstance) {
       const service = createActiveBackupService(fastify.db)
       try {
         const { Readable } = await import('node:stream')
-        const readable = Readable.from(dataStream as AsyncIterable<Buffer>)
+        const readable = Readable.from([data])
         const result = await service.receiveFileChunk(session_id, token, {
           path: filePath,
           hash,
@@ -377,7 +381,10 @@ export async function activeBackupRoutes(fastify: FastifyInstance) {
 
     // Manifest is sent alongside the end request
     const body = request.body as { manifest?: unknown[] }
-    const manifest = Array.isArray(body.manifest) ? body.manifest : []
+    const { ManifestEntrySchema } = await import('@homenas/shared')
+    const manifestParsed = ManifestEntrySchema.array().safeParse(parsed.data.status === 'error' && body.manifest == null ? [] : body.manifest)
+    if (!manifestParsed.success) return reply.status(400).send({ error: 'Bad Request', message: 'Invalid manifest' })
+    const manifest = manifestParsed.data
 
     const service = createActiveBackupService(fastify.db)
     try {
@@ -440,25 +447,29 @@ export async function activeBackupRoutes(fastify: FastifyInstance) {
 
   fastify.get<{
     Params: { id: string }
-    Querystring: { platform?: string }
+    Querystring: { platform?: string; arch?: string }
   }>('/devices/:id/agent-package', {
     preHandler: [requireAuth, requireAdmin],
   }, async (request, reply) => {
     const deviceId = parseInt(request.params.id, 10)
     if (isNaN(deviceId)) return reply.status(400).send({ error: 'Bad Request', message: 'Invalid device ID' })
 
-    const platform = (request.query.platform ?? 'windows') as 'windows' | 'linux' | 'mac'
+    const platform = request.query.platform ?? 'windows'
+    if (!['windows', 'linux', 'mac'].includes(platform)) return reply.status(400).send({ error: 'Bad Request', message: 'Invalid agent platform' })
+    const architecture = request.query.arch ?? (platform === 'mac' ? 'arm64' : 'amd64')
+    if (!['amd64', 'arm64'].includes(architecture) || platform === 'windows' && architecture !== 'amd64') return reply.status(400).send({ error: 'Bad Request', message: 'Unsupported agent architecture' })
+    if (!['windows', 'linux', 'mac'].includes(platform)) return reply.status(400).send({ error: 'Bad Request', message: 'Invalid agent platform' })
 
     const service = createActiveBackupService(fastify.db)
     const device = service.getDevice(deviceId)
 
     // Resolve agent binary path — look relative to the project root
-    const projectRoot = resolve(fileURLToPath(import.meta.url), '..', '..', '..', '..', '..', '..')
+    const projectRoot = findProjectRoot(import.meta.url)
     const binaryName = platform === 'windows'
       ? 'homenas-agent.exe'
       : platform === 'mac'
-        ? 'homenas-agent-mac-arm64'
-        : 'homenas-agent-linux'
+        ? `homenas-agent-mac-${architecture}`
+        : architecture === 'arm64' ? 'homenas-agent-linux-arm64' : 'homenas-agent-linux'
     const binaryPath = join(projectRoot, 'apps', 'agent', 'build', binaryName)
 
     if (!existsSync(binaryPath)) {
@@ -480,9 +491,16 @@ export async function activeBackupRoutes(fastify: FastifyInstance) {
         ? ['~/Desktop', '~/Documents', '~/Pictures']
         : ['/home']
 
+    let fingerprint: string | undefined
+    if (nasURL.startsWith('https://') && process.env.CERT_PATH) {
+      const certificate = new X509Certificate(readFileSync(process.env.CERT_PATH))
+      fingerprint = createHash('sha256').update(certificate.raw).digest('hex')
+    }
+
     // Config JSON that will be bundled alongside the binary
     const configJSON = JSON.stringify({
       nas_url: nasURL,
+      tls_fingerprint_sha256: fingerprint,
       token: device.token,
       device_name: device.name,
       backup_paths: device.backup_paths ?? defaultPaths,
@@ -491,8 +509,8 @@ export async function activeBackupRoutes(fastify: FastifyInstance) {
 
     // Install script (Windows)
     const installCmd = platform === 'windows'
-      ? `@echo off\r\nhomenas-agent.exe --install\r\necho Instalación completada. El agente ya está funcionando en segundo plano.\r\npause\r\n`
-      : `#!/bin/bash\nchmod +x homenas-agent-${platform === 'mac' ? 'mac-arm64' : 'linux'}\nsudo ./homenas-agent-${platform === 'mac' ? 'mac-arm64' : 'linux'} --install\necho "Agente instalado correctamente."\n`
+      ? `@echo off\r\ncd /d "%~dp0"\r\nhomenas-agent.exe\r\nif errorlevel 1 exit /b 1\r\necho Instalación completada. El agente ya está funcionando en segundo plano.\r\npause\r\n`
+      : `#!/bin/bash\nset -e\ncd -- "$(dirname -- "$0")"\nchmod +x "${binaryName}"\nsudo "./${binaryName}"\necho "Agente instalado correctamente."\n`
 
     const zipName = `homenas-agent-${device.name.replace(/[^a-zA-Z0-9_-]/g, '_')}-${platform}.zip`
 
@@ -501,6 +519,8 @@ export async function activeBackupRoutes(fastify: FastifyInstance) {
 
     const archive = archiver('zip', { zlib: { level: 1 } })
     const pass = new PassThrough()
+    archive.on('error', error => pass.destroy(error))
+    reply.raw.on('close', () => { if (!pass.readableEnded) archive.abort() })
     archive.pipe(pass)
 
     archive.file(binaryPath, { name: binaryName })
@@ -516,7 +536,9 @@ export async function activeBackupRoutes(fastify: FastifyInstance) {
       { name: 'LEEME.txt' }
     )
 
-    await archive.finalize()
+    // Start consuming before finalization: otherwise a full PassThrough buffer
+    // blocks archiver and the download never gets its HTTP response.
+    void archive.finalize().catch(error => pass.destroy(error))
     return reply.send(pass)
   })
 

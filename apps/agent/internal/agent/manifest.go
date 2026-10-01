@@ -8,8 +8,8 @@ import (
 
 // ManifestEntry represents one file in a backup snapshot.
 type ManifestEntry struct {
-	Path  string `json:"path"`  // normalized relative path (forward slashes, no leading /)
-	Hash  string `json:"hash"`  // hex SHA-256
+	Path  string `json:"path"` // normalized relative path (forward slashes, no leading /)
+	Hash  string `json:"hash"` // hex SHA-256
 	Size  int64  `json:"size"`
 	Mtime int64  `json:"mtime"` // unix seconds
 }
@@ -48,5 +48,21 @@ func SaveManifest(configDir string, entries []ManifestEntry) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(manifestPath(configDir), data, 0o600)
+	tmp, err := os.CreateTemp(configDir, ".manifest-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err = tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), manifestPath(configDir))
 }

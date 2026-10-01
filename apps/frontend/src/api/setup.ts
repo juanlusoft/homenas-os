@@ -5,7 +5,11 @@ export const setupApi = {
   getStatus: async (): Promise<{ complete: boolean }> => {
     const res = await fetch('/api/setup/status')
     if (!res.ok) throw new Error(await res.text())
-    return res.json()
+    const status: unknown = await res.json()
+    if (!status || typeof status !== 'object' || !('complete' in status) || typeof status.complete !== 'boolean') {
+      throw new Error('Invalid setup status response')
+    }
+    return { complete: status.complete }
   },
 
   autologin: async (

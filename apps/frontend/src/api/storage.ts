@@ -73,7 +73,7 @@ export const storageApi = {
   getDiskPartitions: (diskName: string): Promise<DiskPartition[]> =>
     apiFetch(`/storage/disks/${diskName}/partitions`),
 
-  mountPartition: (diskName: string, body: { browserId: string }): Promise<{ mountPoint: string }> =>
+  mountPartition: (diskName: string, body: { browserId: string; partition?: string }): Promise<{ mountPoint: string }> =>
     apiFetch(`/storage/disks/${diskName}/mount`, { method: 'POST', body: JSON.stringify(body) }),
 
   unmountPartition: (diskName: string, body: { browserId: string }): Promise<void> =>

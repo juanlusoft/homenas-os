@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, chmod } from 'node:fs/promises'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3'
 import { exec, execWithInput } from '../lib/exec.js'
@@ -27,14 +27,16 @@ function sanitizeName(name: string): string {
 async function readConf(): Promise<string> {
   try {
     return await readFile(CONF_PATH, 'utf-8')
-  } catch {
-    return ''
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return ''
+    throw error
   }
 }
 
 async function writeConf(content: string): Promise<void> {
   await mkdir(join(CONF_PATH, '..'), { recursive: true })
-  await writeFile(CONF_PATH, content, 'utf-8')
+  await writeFile(CONF_PATH, content, { encoding: 'utf-8', mode: 0o600 })
+  await chmod(CONF_PATH, 0o600)
 }
 
 function rcloneType(type: DriveType): string {
@@ -46,7 +48,7 @@ function rcloneType(type: DriveType): string {
 const INI_KEY_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/
 
 function assertSafeIniKey(key: string): void {
-  if (!INI_KEY_RE.test(key)) {
+  if (!INI_KEY_RE.test(key) || ['type', 'password_command', 'ssh'].includes(key)) {
     throw new Error(`Invalid config key: ${key}`)
   }
 }
@@ -221,10 +223,12 @@ export function createNetworkDrivesService(db: Database.Database) {
       // Ensure config is in the conf file (may have been removed)
       await upsertInConf(drive.name, drive.type, drive.config)
 
-      await exec('mkdir', ['-p', drive.mount_point])
+      const created = await exec('mkdir', ['-p', drive.mount_point])
+      if (created.exitCode !== 0) throw new Error(`Cannot create mountpoint: ${created.stderr}`)
 
       const serviceContent = buildServiceFile(drive.name, drive.mount_point)
-      await execWithInput('tee', [serviceFilePath(drive.name)], serviceContent)
+      const written = await execWithInput('tee', [serviceFilePath(drive.name)], serviceContent)
+      if (written.exitCode !== 0) throw new Error(`Cannot write mount service: ${written.stderr}`)
 
       await exec('systemctl', ['daemon-reload'])
 
@@ -254,7 +258,8 @@ export function createNetworkDrivesService(db: Database.Database) {
 
       // Force unmount if still mounted
       if (await isMounted(drive.mount_point)) {
-        await exec('fusermount3', ['-u', drive.mount_point])
+        const unmounted = await exec('fusermount3', ['-u', drive.mount_point])
+        if (unmounted.exitCode !== 0 || await isMounted(drive.mount_point)) throw new Error('Cannot unmount network drive')
       }
 
       setMountedStmt.run(0, id)
@@ -265,8 +270,8 @@ export function createNetworkDrivesService(db: Database.Database) {
       if (!row) throw new Error('Drive not found')
       const drive = parseRow(row)
 
-      if (drive.is_mounted) {
-        try { await this.unmountDrive(id) } catch { /* best effort */ }
+      if (drive.is_mounted || await isMounted(drive.mount_point)) {
+        await this.unmountDrive(id)
       }
 
       await removeFromConf(drive.name)

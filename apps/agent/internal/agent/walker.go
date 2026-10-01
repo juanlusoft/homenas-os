@@ -3,6 +3,7 @@ package agent
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -23,7 +24,8 @@ type WalkResult struct {
 // NormalizePath converts an absolute path to a relative, forward-slash key
 // suitable for storing in the NAS (and manifest).
 // e.g. "C:\Users\Juan\file.txt" → "C/Users/Juan/file.txt"
-//      "/home/juan/file.txt"    → "home/juan/file.txt"
+//
+//	"/home/juan/file.txt"    → "home/juan/file.txt"
 func NormalizePath(absPath string) string {
 	if runtime.GOOS == "windows" {
 		// Replace backslashes
@@ -44,8 +46,7 @@ func WalkPath(root string, prevManifest map[string]ManifestEntry, vssTranslate f
 
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			// Skip unreadable files/dirs
-			return nil
+			return fmt.Errorf("walk %s: %w", path, err)
 		}
 		if d.IsDir() {
 			return nil
@@ -53,27 +54,17 @@ func WalkPath(root string, prevManifest map[string]ManifestEntry, vssTranslate f
 
 		info, err := d.Info()
 		if err != nil {
+			return err
+		}
+		// Symlinks and device files are not regular backup data. Never follow
+		// a symlink outside the selected tree or block reading a FIFO.
+		if !info.Mode().IsRegular() {
 			return nil
 		}
 
 		relPath := NormalizePath(path)
 		mtime := info.ModTime().Unix()
 		size := info.Size()
-
-		// Fast check: if mtime and size match the previous manifest, skip hashing
-		if prev, ok := prevManifest[relPath]; ok {
-			if prev.Mtime == mtime && prev.Size == size {
-				entry := ManifestEntry{
-					Path:  relPath,
-					Hash:  prev.Hash,
-					Size:  size,
-					Mtime: mtime,
-				}
-				result.Unchanged = append(result.Unchanged, entry)
-				result.All = append(result.All, entry)
-				return nil
-			}
-		}
 
 		// File is new or modified — compute hash
 		// On Windows, use VSS path for open-file access
@@ -84,8 +75,7 @@ func WalkPath(root string, prevManifest map[string]ManifestEntry, vssTranslate f
 
 		hash, err := hashFile(readPath)
 		if err != nil {
-			// Skip files we can't read (e.g. pagefile.sys)
-			return nil
+			return fmt.Errorf("hash %s: %w", path, err)
 		}
 
 		// If hash matches previous (size/mtime changed but content identical — e.g. touch), treat as unchanged

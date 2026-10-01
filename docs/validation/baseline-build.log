@@ -1,0 +1,78 @@
+
+> homenas-os-v3@1.0.3 build <WORKSPACE>
+> pnpm -r build
+
+Scope: 3 of 4 workspace projects
+packages/shared build$ tsc
+packages/shared build: Done
+apps/frontend build$ tsc && vite build
+apps/backend build$ tsc
+apps/backend build: Done
+apps/frontend build: vite v8.0.11 building client environment for production...
+apps/frontend build: [2K
+apps/frontend build: transforming...✓ 1778 modules transformed.
+apps/frontend build: rendering chunks...
+apps/frontend build: computing gzip size...
+apps/frontend build: dist/index.html                                0.85 kB │ gzip:   0.40 kB
+apps/frontend build: dist/assets/index-CmaWrsuI.css                79.57 kB │ gzip:  12.19 kB
+apps/frontend build: dist/assets/check-BIC3jaHq.js                  0.12 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/chevron-down-B6GiBdq6.js           0.12 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/play-gJMZUbc6.js                   0.13 kB │ gzip:   0.14 kB
+apps/frontend build: dist/assets/square-DW7TolTJ.js                 0.14 kB │ gzip:   0.15 kB
+apps/frontend build: dist/assets/plus-CcYLqazv.js                   0.15 kB │ gzip:   0.15 kB
+apps/frontend build: dist/assets/x-lHUvq3aH.js                      0.15 kB │ gzip:   0.15 kB
+apps/frontend build: dist/assets/clock-DEMaWljY.js                  0.18 kB │ gzip:   0.17 kB
+apps/frontend build: dist/assets/circle-check-big-CbLPBOjq.js       0.19 kB │ gzip:   0.18 kB
+apps/frontend build: dist/assets/rotate-ccw-Bl1QkNc8.js             0.20 kB │ gzip:   0.18 kB
+apps/frontend build: dist/assets/info-DJd8WA0D.js                   0.20 kB │ gzip:   0.17 kB
+apps/frontend build: dist/assets/circle-x-BEef59wi.js               0.20 kB │ gzip:   0.17 kB
+apps/frontend build: dist/assets/copy-DR8WMEba.js                   0.23 kB │ gzip:   0.21 kB
+apps/frontend build: dist/assets/database-DFcMBHBF.js               0.24 kB │ gzip:   0.20 kB
+apps/frontend build: dist/assets/circle-alert-uJdmpgXT.js           0.25 kB │ gzip:   0.18 kB
+apps/frontend build: dist/assets/monitor-D6Uwrysf.js                0.25 kB │ gzip:   0.20 kB
+apps/frontend build: dist/assets/download-C4QtnbR9.js               0.26 kB │ gzip:   0.22 kB
+apps/frontend build: dist/assets/key-Cp5uJKqd.js                    0.26 kB │ gzip:   0.22 kB
+apps/frontend build: dist/assets/triangle-alert-D9w90bnP.js         0.26 kB │ gzip:   0.21 kB
+apps/frontend build: dist/assets/pencil-dqrgVlX5.js                 0.27 kB │ gzip:   0.22 kB
+apps/frontend build: dist/assets/wifi-B3dQeD6W.js                   0.28 kB │ gzip:   0.21 kB
+apps/frontend build: dist/assets/folder-open-CtzxkA6J.js            0.29 kB │ gzip:   0.22 kB
+apps/frontend build: dist/assets/shield-check-DjtHnqbI.js           0.32 kB │ gzip:   0.25 kB
+apps/frontend build: dist/assets/circle-stop-DSVlOeV5.js            0.32 kB │ gzip:   0.22 kB
+apps/frontend build: dist/assets/file-text-r8Eg93mN.js              0.33 kB │ gzip:   0.22 kB
+apps/frontend build: dist/assets/server-DBgc2Sic.js                 0.33 kB │ gzip:   0.21 kB
+apps/frontend build: dist/assets/trash-2-DYAAWBHF.js                0.35 kB │ gzip:   0.25 kB
+apps/frontend build: dist/assets/jsx-runtime-DwtaYXCN.js            0.42 kB │ gzip:   0.30 kB
+apps/frontend build: dist/assets/qr-code-BQ00J_4D.js                0.65 kB │ gzip:   0.31 kB
+apps/frontend build: dist/assets/useSystem-D4SWSAHh.js              0.84 kB │ gzip:   0.44 kB
+apps/frontend build: dist/assets/client-D5F65D7_.js                 0.91 kB │ gzip:   0.56 kB
+apps/frontend build: dist/assets/preload-helper-DSXbuxSR.js         1.19 kB │ gzip:   0.68 kB
+apps/frontend build: dist/assets/useScheduler-DBsrMRLc.js           1.32 kB │ gzip:   0.44 kB
+apps/frontend build: dist/assets/useDocker-Bdvy-eAe.js              1.58 kB │ gzip:   0.66 kB
+apps/frontend build: dist/assets/useStorage-BgDPT_vs.js             3.34 kB │ gzip:   0.90 kB
+apps/frontend build: dist/assets/useNetwork-By2OO0Mx.js             4.70 kB │ gzip:   0.99 kB
+apps/frontend build: dist/assets/LoginView-CZfbwaxv.js              5.82 kB │ gzip:   1.90 kB
+apps/frontend build: dist/assets/authStore-NBaJj83S.js             10.93 kB │ gzip:   4.32 kB
+apps/frontend build: dist/assets/src--2gMCkZD.js                   12.57 kB │ gzip:   3.65 kB
+apps/frontend build: dist/assets/NetworkDrivesView-BSLorLIT.js     13.12 kB │ gzip:   3.62 kB
+apps/frontend build: dist/assets/SchedulerView-pKJV_aFe.js         15.66 kB │ gzip:   3.73 kB
+apps/frontend build: dist/assets/HomeStoreView-hCcbpXFW.js         19.53 kB │ gzip:   4.57 kB
+apps/frontend build: dist/assets/SyncthingView-Cdfg1WST.js         20.35 kB │ gzip:   4.02 kB
+apps/frontend build: dist/assets/DashboardView-CY-8B7di.js         20.66 kB │ gzip:   4.73 kB
+apps/frontend build: dist/assets/container-form-DV8laLy7.js        22.89 kB │ gzip:   4.90 kB
+apps/frontend build: dist/assets/SetupWizard-CHLEyCac.js           23.51 kB │ gzip:   5.51 kB
+apps/frontend build: dist/assets/DockerView-Ck1Ugz8t.js            24.56 kB │ gzip:   5.95 kB
+apps/frontend build: dist/assets/UsersView-rkJUpNov.js             25.30 kB │ gzip:   5.28 kB
+apps/frontend build: dist/assets/BackupView-BY42r941.js            27.11 kB │ gzip:   5.48 kB
+apps/frontend build: dist/assets/index.esm-CZZydNJA.js             27.94 kB │ gzip:  10.23 kB
+apps/frontend build: dist/assets/FilesView-Fy-rSUX1.js             28.14 kB │ gzip:   7.60 kB
+apps/frontend build: dist/assets/createLucideIcon-DALuBbDq.js      30.04 kB │ gzip:   9.44 kB
+apps/frontend build: dist/assets/CloudBackupView-BgmVOT0J.js       32.13 kB │ gzip:   6.72 kB
+apps/frontend build: dist/assets/ActiveDirectoryView-D4dsDtif.js   34.44 kB │ gzip:   6.40 kB
+apps/frontend build: dist/assets/ActiveBackupView-Cl05banJ.js      35.44 kB │ gzip:   7.53 kB
+apps/frontend build: dist/assets/SystemView-DrBNntAH.js            38.75 kB │ gzip:   8.76 kB
+apps/frontend build: dist/assets/StorageView-DkyZdlDv.js           52.68 kB │ gzip:   9.75 kB
+apps/frontend build: dist/assets/NetworkView-BKaSAvyb.js           57.41 kB │ gzip:   9.67 kB
+apps/frontend build: dist/assets/types-HPD6mvU2.js                 58.19 kB │ gzip:  13.51 kB
+apps/frontend build: dist/assets/index-DryQpbEg.js                366.46 kB │ gzip: 116.13 kB
+apps/frontend build: ✓ built in 238ms
+apps/frontend build: Done

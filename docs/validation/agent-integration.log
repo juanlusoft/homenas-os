@@ -1,0 +1,5 @@
+
+> homenas-os-v3@1.0.3 test:integration <WORKSPACE>
+> pnpm --filter @homenas/backend exec tsx tests/agent-integration.ts
+
+PASS Go/TCP/Fastify/SQLite: empty+multichunk uploads, incremental hardlinks, NAS missing files recovery, failed backup status and manifest preservation

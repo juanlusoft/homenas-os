@@ -3,7 +3,10 @@ package agent
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -24,22 +28,45 @@ type NASClient struct {
 }
 
 func NewNASClient(baseURL, token string) *NASClient {
-	// Self-signed cert from the NAS is accepted, but force at least TLS 1.2
-	// (Go default still allows 1.0/1.1). TODO: pin the cert SHA-256 once the
-	// installer publishes it alongside the token — until then this is the
-	// minimum reasonable hardening.
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec
-			MinVersion:         tls.VersionTLS12,
-		},
+	return NewNASClientWithTrust(baseURL, token, "", false)
+}
+
+// A fingerprint provided by the NAS administrator authenticates a self-signed
+// certificate. Verification is never disabled implicitly.
+func NewNASClientWithTrust(baseURL, token, fingerprint string, insecure bool) *NASClient {
+	cfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: insecure}
+	if fingerprint != "" {
+		expected := strings.ToLower(strings.ReplaceAll(fingerprint, ":", ""))
+		cfg.InsecureSkipVerify = true // VerifyConnection performs explicit pin validation.
+		cfg.VerifyConnection = func(state tls.ConnectionState) error {
+			if len(state.PeerCertificates) == 0 {
+				return fmt.Errorf("missing TLS certificate")
+			}
+			cert := state.PeerCertificates[0]
+			actual := sha256.Sum256(cert.Raw)
+			if hex.EncodeToString(actual[:]) != expected {
+				return fmt.Errorf("NAS TLS certificate fingerprint mismatch")
+			}
+			now := time.Now()
+			if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
+				return fmt.Errorf("NAS TLS certificate expired or not yet valid")
+			}
+			return nil
+		}
 	}
-	return &NASClient{
-		BaseURL: baseURL,
-		Token:   token,
-		// Hard timeout so a stuck/unreachable NAS doesn't hang uploads forever.
-		HTTP: &http.Client{Transport: transport, Timeout: 60 * time.Second},
+	return &NASClient{BaseURL: strings.TrimRight(baseURL, "/"), Token: token,
+		HTTP: &http.Client{Transport: &http.Transport{TLSClientConfig: cfg}, Timeout: 60 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				// Never forward the agent token across redirects.
+				return http.ErrUseLastResponse
+			}},
 	}
+}
+
+// CertificateFingerprint returns the SHA-256 pin of a PEM certificate.
+func CertificateFingerprint(cert *x509.Certificate) string {
+	sum := sha256.Sum256(cert.Raw)
+	return hex.EncodeToString(sum[:])
 }
 
 func (c *NASClient) do(req *http.Request) (*http.Response, error) {
@@ -131,13 +158,21 @@ func (c *NASClient) UploadFile(ctx context.Context, sessionID, localPath, relPat
 		if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
 			return fmt.Errorf("read chunk %d: %w", idx, err)
 		}
-		if n == 0 {
-			break
+		expected := chunkSize
+		if remaining := entry.Size - int64(idx)*chunkSize; remaining < int64(expected) {
+			expected = int(remaining)
+		}
+		if n != expected {
+			return fmt.Errorf("file size changed during backup: expected %d bytes, read %d", expected, n)
 		}
 
 		if err := c.uploadChunk(ctx, sessionID, relPath, entry, idx, totalChunks, buf[:n]); err != nil {
 			return fmt.Errorf("upload chunk %d/%d: %w", idx, totalChunks, err)
 		}
+	}
+	var extra [1]byte
+	if n, err := f.Read(extra[:]); n != 0 || (err != nil && err != io.EOF) {
+		return fmt.Errorf("file grew during backup")
 	}
 	return nil
 }
@@ -185,6 +220,9 @@ func (c *NASClient) uploadChunk(ctx context.Context, sessionID, relPath string, 
 
 // EndSession finalizes the backup session and sends the full manifest.
 func (c *NASClient) EndSession(ctx context.Context, sessionID string, manifest []ManifestEntry, filesCount int, sizeBytes int64, status, errMsg string) error {
+	if manifest == nil {
+		manifest = []ManifestEntry{}
+	}
 	resp, err := c.postJSON(ctx, "/api/active-backup/agent/backup/end", map[string]interface{}{
 		"session_id":    sessionID,
 		"files_count":   filesCount,
@@ -207,31 +245,39 @@ func (c *NASClient) EndSession(ctx context.Context, sessionID string, manifest [
 // Heartbeat polls the NAS — keeps last_seen fresh. Token goes in the
 // X-Agent-Token header (same as every other request) instead of a query
 // string, so it doesn't end up in nginx/journald access logs on the NAS.
-func (c *NASClient) Heartbeat(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		c.BaseURL+"/api/active-backup/agent/poll", nil)
+type PollTask struct {
+	Status string `json:"status"`
+}
+
+func (c *NASClient) Poll(ctx context.Context) (*PollTask, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/api/active-backup/agent/poll", nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := c.do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	resp.Body.Close()
-	return nil
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("heartbeat: HTTP %d", resp.StatusCode)
+	}
+	var task PollTask
+	if err := json.NewDecoder(resp.Body).Decode(&task); err != nil {
+		return nil, err
+	}
+	return &task, nil
 }
+
+func (c *NASClient) Heartbeat(ctx context.Context) error { _, err := c.Poll(ctx); return err }
 
 // Register registers this device with the NAS and returns the token.
 func Register(ctx context.Context, baseURL, deviceName, hostname, osType string) (string, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, //nolint:gosec
-				MinVersion:         tls.VersionTLS12,
-			},
-		},
-		Timeout: 30 * time.Second,
-	}
+	return RegisterWithTrust(ctx, baseURL, deviceName, hostname, osType, "", false)
+}
+
+func RegisterWithTrust(ctx context.Context, baseURL, deviceName, hostname, osType, fingerprint string, insecure bool) (string, error) {
+	client := NewNASClientWithTrust(baseURL, "", fingerprint, insecure).HTTP
 	data, _ := json.Marshal(map[string]string{
 		"name":     deviceName,
 		"hostname": hostname,

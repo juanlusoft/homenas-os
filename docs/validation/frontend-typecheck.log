@@ -1,0 +1,4 @@
+
+> @homenas/frontend@1.0.2 typecheck <WORKSPACE>/apps/frontend
+> tsc --noEmit
+

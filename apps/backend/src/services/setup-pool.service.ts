@@ -1,8 +1,7 @@
-import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { execa } from 'execa'
-import { exec, sudoWrap } from '../lib/exec.js'
+import { assertSafeToFormat, withFormatLock } from './storage-safety.js'
+import { exec, sudoWrap, writeFileAsRoot } from '../lib/exec.js'
 
 /**
  * Atomically write content to a root-owned path via sudo.
@@ -10,14 +9,7 @@ import { exec, sudoWrap } from '../lib/exec.js'
  * fails with EACCES. We stage in /tmp, then `install` it with root ownership.
  */
 async function writeRootFile(target: string, content: string, mode: string = '0644'): Promise<void> {
-  const tmp = join(tmpdir(), `homenas-${process.pid}-${Date.now()}.tmp`)
-  writeFileSync(tmp, content, 'utf8')
-  try {
-    const r = await execa(...sudoWrap('install', ['-m', mode, '-o', 'root', '-g', 'root', tmp, target]), { shell: false, reject: false })
-    if (r.exitCode !== 0) throw new Error(`Failed to write ${target}: ${r.stderr}`)
-  } finally {
-    try { unlinkSync(tmp) } catch { /* ignore */ }
-  }
+  await writeFileAsRoot(target, content, parseInt(mode, 8))
 }
 
 export type DiskRole = 'data' | 'parity' | 'cache'
@@ -43,19 +35,6 @@ function validateDevice(device: string): void {
   if (!DEVICE_RE.test(device)) throw new Error(`Invalid device path: ${device}`)
 }
 
-// Get the block device that contains the root filesystem
-async function getSystemDisk(): Promise<string> {
-  const r = await exec('findmnt', ['-n', '-o', 'SOURCE', '/'])
-  if (r.exitCode !== 0 || !r.stdout.trim()) {
-    // fallback: df
-    const df = await exec('df', ['/'])
-    const src = df.stdout.trim().split('\n')[1]?.split(/\s+/)[0] ?? ''
-    // strip partition suffix: /dev/sda1 → /dev/sda, /dev/mmcblk0p1 → /dev/mmcblk0
-    return src.replace(/p?\d+$/, '')
-  }
-  return r.stdout.trim().replace(/p?\d+$/, '')
-}
-
 // Partition suffix: /dev/sda → /dev/sda1, /dev/nvme0n1 → /dev/nvme0n1p1
 function partitionDevice(device: string): string {
   if (/nvme|mmcblk/.test(device)) return device + 'p1'
@@ -65,31 +44,16 @@ function partitionDevice(device: string): string {
 // ── Prepare disk (unmount + wipe) ─────────────────────────────────────────────
 
 async function prepDisk(device: string): Promise<void> {
-  // 1. Unmount all partitions of this device (lazy -l ensures it always succeeds)
-  try {
-    const mounts = readFileSync('/proc/mounts', 'utf8')
-    for (const line of mounts.split('\n')) {
-      const src = line.trim().split(/\s+/)[0] ?? ''
-      if (src.startsWith(device)) {
-        await execa(...sudoWrap('umount', ['-l', src]), { shell: false, reject: false })
-      }
-    }
-  } catch { /* /proc/mounts unreadable — skip */ }
-
-  // 2. Deactivate any LVM volume groups that reference this device
-  await execa(...sudoWrap('vgchange', ['-an']), { shell: false, reject: false })
-
-  // 3. Wipe all filesystem/partition-table signatures
-  await execa(...sudoWrap('wipefs', ['-a', '-f', device]), { shell: false, reject: false })
-
-  // 4. Zero the first 10 MB to clear MBR/GPT and any leftover metadata
-  await execa(...sudoWrap('dd', [
-    'if=/dev/zero', `of=${device}`, 'bs=1M', 'count=10', 'conv=fsync',
-  ]), { shell: false, reject: false })
-
-  // 5. Let the kernel re-read the (now empty) partition table
-  await execa(...sudoWrap('partprobe', [device]), { shell: false, reject: false })
-  await new Promise<void>(r => setTimeout(r, 1000))
+  // Mounted disks and RAID/LVM holders were rejected by preflight. Never
+  // deactivate unrelated volume groups or lazily detach filesystems here.
+  for (const [command, args] of [
+    ['wipefs', ['-a', '-f', device]],
+    ['dd', ['if=/dev/zero', `of=${device}`, 'bs=1M', 'count=10', 'conv=fsync']],
+    ['partprobe', [device]],
+  ] as [string, string[]][]) {
+    const result = await exec(command, args)
+    if (result.exitCode !== 0) throw new Error(`${command} failed on ${device}: ${result.stderr}`)
+  }
 }
 
 // ── Format a single disk ──────────────────────────────────────────────────────
@@ -182,7 +146,7 @@ async function mountMergerFS(cacheMounts: string[], dataMounts: string[]): Promi
     { shell: false, reject: false }
   )
   if (r.exitCode !== 0) {
-    console.warn('[setup-pool] mergerfs not available or failed:', r.stderr)
+    throw new Error(`Failed to mount MergerFS: ${r.stderr}`)
   }
 }
 
@@ -194,7 +158,7 @@ async function updateFstab(
   dataCacheMounts: string[],
 ): Promise<void> {
   let content = ''
-  try { content = readFileSync('/etc/fstab', 'utf8') } catch { content = '' }
+  content = readFileSync('/etc/fstab', 'utf8')
 
   // Remove previous homenas entries
   content = content
@@ -208,6 +172,7 @@ async function updateFstab(
   for (const { partition, mountPoint } of mounts) {
     const blkid = await exec('blkid', ['-s', 'UUID', '-o', 'value', partition])
     const uuid = blkid.stdout.trim()
+    if (blkid.exitCode !== 0 || !/^[a-fA-F0-9-]+$/.test(uuid)) throw new Error(`Cannot persist UUID for ${partition}`)
     if (uuid) {
       additions += `UUID=${uuid} ${mountPoint} auto defaults,nofail 0 2 # homenas-v3\n`
     }
@@ -219,6 +184,8 @@ async function updateFstab(
     additions += `${sources} /mnt/storage fuse.mergerfs defaults,allow_other,use_ino,func.create=ff,moveonenospc=true,minfreespace=4G,fsname=mergerfs,nofail 0 0 # homenas-v3\n`
   }
 
+  if (poolType === 'single' && dataCacheMounts.length === 1) additions += `${dataCacheMounts[0]} /mnt/storage none bind,nofail 0 0 # homenas-v3\n`
+
   // /etc/fstab is root-owned; the homenas user can't writeFileSync directly.
   await writeRootFile('/etc/fstab', content + additions)
 }
@@ -226,25 +193,34 @@ async function updateFstab(
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 export async function configurePool(config: PoolConfig): Promise<void> {
+  return withFormatLock(async () => {
   const { disks, fsType, poolType } = config
+  if (!['ext4', 'xfs'].includes(fsType) || !['single', 'mergerfs', 'snapraid'].includes(poolType)) throw new Error('Invalid pool configuration')
+  if (disks.some(d => !['data', 'parity', 'cache'].includes(d.role))) throw new Error('Invalid disk role')
 
   if (disks.length === 0) throw new Error('No disks selected')
 
   for (const d of disks) validateDevice(d.device)
 
-  // Guard: do not format the system disk
-  const sysDisk = await getSystemDisk()
-  for (const d of disks) {
-    if (d.device === sysDisk) throw new Error(`Cannot format system disk ${d.device}`)
-  }
+  await assertSafeToFormat(disks.map(d => d.device))
 
   const dataDisks   = disks.filter(d => d.role === 'data')
   const parityDisks = disks.filter(d => d.role === 'parity')
   const cacheDisks  = disks.filter(d => d.role === 'cache')
 
   if (dataDisks.length === 0) throw new Error('At least one data disk required')
+  if (poolType === 'single' && (dataDisks.length !== 1 || cacheDisks.length || parityDisks.length)) throw new Error('Single pool requires exactly one data disk')
+  if (poolType !== 'snapraid' && parityDisks.length) throw new Error('Parity disks require SnapRAID')
   if (poolType === 'snapraid' && parityDisks.length === 0) {
     throw new Error('SnapRAID requires at least one parity disk')
+  }
+
+  let dn = 0, pn = 0, cn = 0
+  const targets = disks.map(d => d.role === 'data' ? `/mnt/disks/disk${++dn}` : d.role === 'parity' ? `/mnt/parity${++pn}` : `/mnt/disks/cache${++cn}`)
+  for (const target of [...targets, '/mnt/storage']) {
+    const mounted = await exec('mountpoint', ['-q', target])
+    if (mounted.exitCode === 0) throw new Error(`Mountpoint ${target} is already in use; refusing to format`)
+    if (![1, 32].includes(mounted.exitCode)) throw new Error(`Cannot inspect mountpoint ${target}`)
   }
 
   // 1. Format all disks. Sequential because formatDisk runs `vgchange -an`
@@ -269,15 +245,21 @@ export async function configurePool(config: PoolConfig): Promise<void> {
     const mkdirResult = await execa(...sudoWrap('mkdir', ['-p', mp]), { shell: false, reject: false })
     if (mkdirResult.exitCode !== 0) throw new Error(`Failed to create mount point ${mp}: ${mkdirResult.stderr}`)
 
-    if (d.role === 'data') {
-      const snapraidDir = await execa(...sudoWrap('mkdir', ['-p', `${mp}/.snapraid`]), { shell: false, reject: false })
-      if (snapraidDir.exitCode !== 0) throw new Error(`Failed to create ${mp}/.snapraid: ${snapraidDir.stderr}`)
-    }
-
     const partition = partitionDevice(d.device)
     const mountResult = await execa(...sudoWrap('mount', [partition, mp]), { shell: false, reject: false })
     if (mountResult.exitCode !== 0) throw new Error(`Failed to mount ${partition} at ${mp}: ${mountResult.stderr}`)
 
+    if (d.role === 'data' || d.role === 'parity') {
+      const snapraidDir = await execa(...sudoWrap('mkdir', ['-p', `${mp}/.snapraid`]), { shell: false, reject: false })
+      if (snapraidDir.exitCode !== 0) throw new Error(`Failed to create ${mp}/.snapraid: ${snapraidDir.stderr}`)
+    }
+
+    if (d.role !== 'parity') {
+      for (const [command, args] of [['groupadd', ['-f', 'sambashare']], ['chown', ['homenas:sambashare', mp]], ['chmod', ['2775', mp]]] as [string, string[]][]) {
+        const result = await exec(command, args)
+        if (result.exitCode !== 0) throw new Error(`Cannot set disk permissions: ${result.stderr}`)
+      }
+    }
     mountEntries.push({ partition, mountPoint: mp, role: d.role })
   }
 
@@ -296,6 +278,14 @@ export async function configurePool(config: PoolConfig): Promise<void> {
     await mountMergerFS(cacheMounts.length ? cacheMounts : dataMounts, cacheMounts.length ? dataMounts : [])
   }
 
+  if (poolType === 'single') {
+    const created = await exec('mkdir', ['-p', '/mnt/storage'])
+    if (created.exitCode !== 0) throw new Error(`Cannot create storage path: ${created.stderr}`)
+    const mounted = await exec('mount', ['--bind', dataMounts[0], '/mnt/storage'])
+    if (mounted.exitCode !== 0) throw new Error(`Cannot mount single pool: ${mounted.stderr}`)
+  }
+
   // 5. Persist in fstab
   await updateFstab(mountEntries, poolType, cacheDataOrdered)
+  })
 }

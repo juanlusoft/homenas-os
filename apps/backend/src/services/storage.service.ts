@@ -1,8 +1,11 @@
+import { assertSafeToFormat, acquireStorageMutation, withFormatLock, primaryMergerfsMount } from './storage-safety.js'
 import { existsSync, readFileSync } from 'node:fs'
+import { lstat, realpath } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
 import { execa } from 'execa'
 import type { ResultPromise } from 'execa'
 import type { Database } from 'better-sqlite3'
-import { exec } from '../lib/exec.js'
+import { exec, sudoWrap } from '../lib/exec.js'
 import { getSetting, setSetting } from '../lib/settings.js'
 import type {
   Disk,
@@ -270,7 +273,9 @@ export async function listDisks(): Promise<Disk[]> {
     let fsType = device.fstype || null
     let mountPoint = device.mountpoint || null
     if ((!fsType || !mountPoint) && device.children) {
-      const mountedChild = device.children.find(c => c.mountpoint)
+      const descend = (n: LsblkDevice): LsblkDevice[] => [n, ...(n.children ?? []).flatMap(descend)]
+      const children = device.children.flatMap(descend)
+      const mountedChild = children.find(c => c.mountpoint === '/') ?? children.find(c => c.mountpoint)
       const fsChild = device.children.find(c => c.fstype)
       if (!mountPoint && mountedChild?.mountpoint) mountPoint = mountedChild.mountpoint
       if (!fsType) fsType = mountedChild?.fstype ?? fsChild?.fstype ?? null
@@ -334,7 +339,7 @@ export function startSnapRaid(operation: 'sync' | 'scrub' | 'fix' | 'check'): vo
   snapraidState.status = `Iniciando ${operation}...`
   snapraidState.error = null
 
-  const proc = execa('snapraid', [operation], { shell: false, reject: false })
+  const proc = execa(...sudoWrap('snapraid', [operation]), { shell: false, reject: false })
   snapraidState.process = proc
 
   // Parse stdout for progress
@@ -419,6 +424,34 @@ async function getDiskUsage(path: string): Promise<{ total: number; used: number
   return { total, used }
 }
 
+/** Resolve missing branch directories without ever falling back to host root. */
+export async function findNasBranchUsagePath(
+  branch: string,
+  diskBase = '/mnt/disks',
+  run: typeof exec = exec,
+): Promise<string | null> {
+  const base = resolve(diskBase)
+  if (!branch.startsWith(base + '/') || resolve(branch) !== branch) return null
+  let existing = branch
+  while (existing !== base && existing.startsWith(base + '/')) {
+    try {
+      const stat = await lstat(existing)
+      if (!stat.isDirectory() || stat.isSymbolicLink()) return null
+      const actual = await realpath(existing)
+      // Refuse aliases, including aliases in ancestors, and any root escape.
+      if (actual !== existing || !actual.startsWith(base + '/')) return null
+      const containing = await run('findmnt', ['-n', '-o', 'TARGET', '--target', existing])
+      const target = containing.stdout.trim()
+      if (containing.exitCode !== 0 || !target.startsWith(base + '/') || (existing !== target && !existing.startsWith(target + '/'))) return null
+      return existing
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      existing = dirname(existing)
+    }
+  }
+  return null
+}
+
 export async function getMergerFSStatus(): Promise<MergerFSStatus> {
   const defaultResult: MergerFSStatus = {
     mounted: false,
@@ -433,15 +466,13 @@ export async function getMergerFSStatus(): Promise<MergerFSStatus> {
   let detectedMount: string | null = null
   let rawSources: string[] = []
 
-  if (mountsResult.exitCode === 0) {
-    for (const line of mountsResult.stdout.split('\n')) {
-      const parts = line.trim().split(/\s+/)
-      if (parts[2] === 'fuse.mergerfs') {
-        detectedMount = parts[1]
-        rawSources = parts[0].split(':').filter(s => s.startsWith('/'))
-        break
-      }
-    }
+  if (mountsResult.exitCode !== 0) throw new Error('Cannot inspect MergerFS mounts')
+  const poolLines = mountsResult.stdout.split('\n').map(line => line.trim().split(/\s+/)).filter(parts => parts[2] === 'fuse.mergerfs')
+  detectedMount = await primaryMergerfsMount(poolLines.map(parts => parts[1]))
+  if (detectedMount) {
+    const selected = poolLines.find(parts => parts[1] === detectedMount)!
+    const branches = await exec('getfattr', ['--only-values', '-n', 'user.mergerfs.branches', `${detectedMount}/.mergerfs`])
+    rawSources = (branches.exitCode === 0 ? branches.stdout.trim() : selected[0]).split(':').map(branch => branch.replace(/=(?:RW|RO|NC)$/, '')).filter(source => source.startsWith('/'))
   }
 
   if (!detectedMount) return defaultResult
@@ -462,12 +493,11 @@ export async function getMergerFSStatus(): Promise<MergerFSStatus> {
   let poolUsed = 0
 
   for (const path of allPaths) {
-    // Check if this path is actually mounted
-    const mountCheck = await exec('mountpoint', ['-q', path])
-    if (mountCheck.exitCode !== 0) continue
+    const usagePath = await findNasBranchUsagePath(path)
+    if (!usagePath) continue
 
     const role: MergerFSDrive['role'] = /cache/i.test(path) ? 'cache' : /disk/i.test(path) ? 'data' : 'unknown'
-    const usage = await getDiskUsage(path)
+    const usage = await getDiskUsage(usagePath)
 
     drives.push({
       path,
@@ -502,6 +532,7 @@ export async function getMergerFSStatus(): Promise<MergerFSStatus> {
 const DRAIN_FILL_LIMIT = 0.90
 
 export async function drainMergerFSCache(): Promise<void> {
+  return withFormatLock(async () => {
   const status = await getMergerFSStatus()
   if (!status.mounted) throw new Error('MergerFS no está montado')
 
@@ -525,9 +556,10 @@ export async function drainMergerFSCache(): Promise<void> {
 
   // Listar los archivos de la caché con su tamaño: "<bytes>\t<ruta>".
   const listResult = await exec('find', [
-    cacheDisk.path, '-mindepth', '1', '-type', 'f', '-printf', '%s\\t%p\\n',
+    cacheDisk.path, '-mindepth', '1', '-type', 'f', '-printf', '%s\\t%p\\0',
   ])
-  const files = listResult.stdout.split('\n')
+  if (listResult.exitCode !== 0) throw new Error(`Cannot list cache: ${listResult.stderr}`)
+  const files = listResult.stdout.split('\0')
     .filter(l => l.includes('\t'))
     .map(l => {
       const tab = l.indexOf('\t')
@@ -559,7 +591,7 @@ export async function drainMergerFSCache(): Promise<void> {
     // rsync -R con "./" preserva la jerarquía relativa (downloads/complete/…).
     const rel = file.path.slice(cachePrefix.length)
     const result = await exec('rsync', [
-      '--remove-source-files', '--archive', '--relative',
+      '--remove-source-files', '--archive', '--relative', '--ignore-existing', '--',
       `${cachePrefix}./${rel}`, `${target}/`,
     ])
     if (result.exitCode !== 0) {
@@ -581,12 +613,14 @@ export async function drainMergerFSCache(): Promise<void> {
   const remaining = await exec('find', [
     cacheDisk.path, '-mindepth', '1', '-type', 'f',
   ])
+  if (remaining.exitCode !== 0) throw new Error(`Cannot inspect remaining cache files: ${remaining.stderr}`)
   if (remaining.stdout.trim()) {
     throw new Error(
-      `No se movieron todos los archivos: los discos de datos alcanzaron el límite de llenado del ${Math.round(DRAIN_FILL_LIMIT * 100)}%.` +
+      `No se movieron todos los archivos: revise colisiones de nombres, errores de lectura/escritura y el límite de llenado del ${Math.round(DRAIN_FILL_LIMIT * 100)}%.` +
       (lastError ? ` Detalle: ${lastError}` : '')
     )
   }
+  })
 }
 
 // ─── Cache drain scheduler ────────────────────────────────────────────────────
@@ -671,13 +705,16 @@ export function getBadblocksStatus(): BadblocksStatus {
   }
 }
 
-export function startBadblocks(device: string, writeMode: boolean): void {
+export async function startBadblocks(device: string, writeMode: boolean): Promise<void> {
   // Validate device path (extra safety beyond Zod)
   if (!/^\/dev\/[a-z0-9]+$/.test(device)) {
     throw new Error(`Invalid device path: ${device}`)
   }
 
-  if (badblocksState.running) return
+  if (badblocksState.running) throw new Error('A badblocks test is already running')
+  const releaseStorage = acquireStorageMutation()
+  try { if (writeMode) await assertSafeToFormat([device]) } catch (error) { releaseStorage(); throw error }
+  if (badblocksState.running) throw new Error('A badblocks test is already running')
 
   badblocksState.running = true
   badblocksState.device = device
@@ -690,7 +727,8 @@ export function startBadblocks(device: string, writeMode: boolean): void {
   // Use stdbuf -eU to force unbuffered stderr — without it, glibc buffers
   // badblocks' \r progress lines inside the pipe and node never receives them.
   const bbArgs = ['-v', ...(writeMode ? ['-w'] : []), device]
-  const proc = execa('stdbuf', ['-e0', 'badblocks', ...bbArgs], { shell: false, reject: false })
+  const proc = execa(...sudoWrap('stdbuf', ['-e0', 'badblocks', ...bbArgs]), { shell: false, reject: false })
+  void proc.finally(releaseStorage).catch(() => {})
   badblocksState.process = proc
 
   // badblocks writes progress to stderr using \r (carriage return) to update

@@ -14,7 +14,7 @@ export function useBackupProgress() {
   return useQuery({
     queryKey: ['backup', 'progress'],
     queryFn: () => backupApi.getProgress(),
-    refetchInterval: (query) => query.state.data?.running ? 2_000 : false,
+    refetchInterval: (query) => query.state.data?.running ? 2_000 : 10_000,
   })
 }
 

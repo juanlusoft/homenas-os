@@ -4,6 +4,8 @@ Panel de control para tu NAS casero. Gestiona discos, archivos, copias de seguri
 
 **Versión 1.0.0** · [homelabs.club](https://homelabs.club)
 
+El [informe de correcciones y validación](docs/REPAIR-REPORT.md) documenta las reparaciones, las pruebas reproducibles y los límites de instalación de esta versión.
+
 ---
 
 ## Instalación

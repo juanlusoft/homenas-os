@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: install.sh: native rebuild failure aborts before build and never executes as root
+ok 1 - install.sh: native rebuild failure aborts before build and never executes as root
+  ---
+  duration_ms: 5.245043
+  type: 'test'
+  ...
+# Subtest: install.sh: successful native checks run SQLite smoke check and build as service user
+ok 2 - install.sh: successful native checks run SQLite smoke check and build as service user
+  ---
+  duration_ms: 7.809172
+  type: 'test'
+  ...
+# Subtest: install.sh: rejects unsupported Node versions before build
+ok 3 - install.sh: rejects unsupported Node versions before build
+  ---
+  duration_ms: 453.189976
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: native rebuild failure aborts before build and never executes as root
+ok 4 - install-x86.sh: native rebuild failure aborts before build and never executes as root
+  ---
+  duration_ms: 5.360947
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: successful native checks run SQLite smoke check and build as service user
+ok 5 - install-x86.sh: successful native checks run SQLite smoke check and build as service user
+  ---
+  duration_ms: 8.606597
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: rejects unsupported Node versions before build
+ok 6 - install-x86.sh: rejects unsupported Node versions before build
+  ---
+  duration_ms: 420.651173
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 942.738582

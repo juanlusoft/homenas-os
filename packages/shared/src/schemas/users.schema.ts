@@ -12,6 +12,8 @@ export const UserSchema = z.object({
 const strongPassword = z.string()
   .min(8, 'Minimum 8 characters')
   .max(128)
+  .refine((p) => new TextEncoder().encode(p).length <= 72, { message: 'Password must not exceed 72 UTF-8 bytes (bcrypt limit)' })
+  .refine((p) => !/[\r\n\0]/.test(p), { message: 'Password must not contain newline or null characters' })
   .refine((p) => /[A-Z]/.test(p), { message: 'At least one uppercase letter required' })
   .refine((p) => /[0-9]/.test(p), { message: 'At least one number required' })
 

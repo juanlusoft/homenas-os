@@ -7,7 +7,7 @@ set -euo pipefail
 #   - Raspberry Pi OS / Debian arm64
 #   - Ubuntu 22.04 / 24.04 x86_64
 #   - Debian 12 (Bookworm) x86_64
-#   - Node.js >= 18
+#   - Node.js >= 22.12
 
 REPO="https://github.com/juanlusoft/homenas-os.git"
 INSTALL_DIR="/opt/homenas-v3"
@@ -66,6 +66,11 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+# Bootstrap package metadata before installing prerequisites on a fresh OS.
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y --no-install-recommends curl ca-certificates gnupg sudo git
+
 # ── Node.js ───────────────────────────────────────────────────────────────────
 info "Checking Node.js..."
 if ! command -v node &>/dev/null; then
@@ -74,32 +79,21 @@ if ! command -v node &>/dev/null; then
   apt-get install -y nodejs
 fi
 NODE_VER=$(node -e "console.log(parseInt(process.versions.node))")
-if (( NODE_VER < 18 )); then
-  error "Node.js ≥ 18 required (found $(node --version))"
+if (( NODE_VER < 22 )); then
+  error "Node.js ≥ 22.12 required (found $(node --version))"
+  exit 1
+fi
+if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit((major === 22 && minor >= 12) || major >= 24 ? 0 : 1)'; then
+  error "Node.js 22.12+ (or 24+) is required by the build dependencies"
   exit 1
 fi
 info "Node.js $(node --version) OK"
 
-# ── npm (upgrade to latest) ───────────────────────────────────────────────────
-# Keeps npm up to date against supply chain vulnerabilities in the registry
-# client itself and ensures latest audit/integrity features are available.
-info "Upgrading npm to latest..."
-if npm install -g npm@latest --loglevel=error 2>/dev/null; then
-  info "npm $(npm --version) OK"
-else
-  warn "npm upgrade failed (broken bundled npm) — reinstalling via Node.js corepack..."
-  if corepack enable npm 2>/dev/null && npm install -g npm@latest --loglevel=error 2>/dev/null; then
-    info "npm $(npm --version) OK"
-  else
-    warn "npm upgrade skipped — continuing with $(npm --version 2>/dev/null || echo 'unknown')"
-  fi
-fi
-
 # ── pnpm ─────────────────────────────────────────────────────────────────────
 info "Checking pnpm..."
-if ! command -v pnpm &>/dev/null; then
+if ! command -v pnpm &>/dev/null || [[ "$(pnpm --version)" != "9.15.9" ]]; then
   info "Installing pnpm..."
-  npm install -g pnpm
+  npm install -g pnpm@9.15.9
 fi
 info "pnpm $(pnpm --version) OK"
 
@@ -118,6 +112,7 @@ info "Installing system dependencies..."
 # "E: Unable to locate package stdbuf" on every Debian/Ubuntu install.
 BASE_PKGS=(
   xfsprogs
+  attr
   e2fsprogs
   parted
   util-linux
@@ -130,6 +125,18 @@ BASE_PKGS=(
   hdparm
   rsync
   lsof
+  sudo
+  curl
+  openssl
+  python3
+  make
+  g++
+  rclone
+  wireguard-tools
+  dnsmasq
+  unzip
+  zip
+  cron
 )
 
 # wsdd2 (Windows WS-Discovery): available in Debian 11+ and Ubuntu 22.04+ repos.
@@ -272,7 +279,7 @@ fi
 # ── Clone / update ────────────────────────────────────────────────────────────
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   info "Updating existing installation in $INSTALL_DIR..."
-  git -C "$INSTALL_DIR" pull --ff-only
+  sudo -u homenas git -C "$INSTALL_DIR" pull --ff-only
 else
   info "Cloning into $INSTALL_DIR..."
   git clone "$REPO" "$INSTALL_DIR"
@@ -303,27 +310,18 @@ sudo -u homenas git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/n
 info "Installing dependencies..."
 sudo -u homenas pnpm install --frozen-lockfile --ignore-scripts
 
-# Compile native addons that require a build step (better-sqlite3, esbuild).
-# pnpm rebuild is unreliable here because pnpm v11 uses a content-addressable
-# virtual store — the rebuild command may not locate the package correctly when
-# the lockfile was generated with an older pnpm. We call node-pre-gyp/npm
-# directly inside the package directory instead.
-info "Building native addons (better-sqlite3)..."
-SQLITE3_PKG=$(find "${INSTALL_DIR}/node_modules/.pnpm" -maxdepth 2 -name "better-sqlite3" -type d 2>/dev/null | grep "node_modules/better-sqlite3$" | head -1)
-if [[ -n "${SQLITE3_PKG}" ]]; then
-  if ! ls "${SQLITE3_PKG}"/build/Release/better_sqlite3.node &>/dev/null; then
-    (cd "${SQLITE3_PKG}" && npm install --ignore-scripts=false 2>&1 | tail -3) \
-      || warn "better-sqlite3 native build failed — app may not start"
-  else
-    info "better-sqlite3 already compiled"
-  fi
-else
-  warn "better-sqlite3 package not found in virtual store"
-fi
+# Rebuild only the approved native dependencies as the service user. Fail the
+# installation if SQLite cannot load: continuing would create a broken service.
+info "Building approved native addons..."
+sudo -u homenas pnpm rebuild better-sqlite3 esbuild
+sudo -u homenas pnpm --filter @homenas/backend exec node --input-type=module -e \
+  'import Database from "better-sqlite3"; const db = new Database(":memory:"); db.prepare("SELECT 1").get(); db.close()'
 
 # ── Build (as homenas) ────────────────────────────────────────────────────────
 info "Building frontend and backend..."
 sudo -u homenas NODE_ENV=production pnpm -r build
+info "Building Active Backup clients..."
+sudo -u homenas node scripts/build-agent.mjs
 
 # ── Self-signed TLS certificate ───────────────────────────────────────────────
 info "Generating self-signed TLS certificate..."
@@ -517,8 +515,12 @@ systemctl enable avahi-daemon
 systemctl restart avahi-daemon
 
 # ── wsdd2: Windows 10/11 WS-Discovery ────────────────────────────────────────
-systemctl enable wsdd2
-systemctl restart wsdd2
+if systemctl cat wsdd2.service &>/dev/null; then
+  systemctl enable wsdd2
+  systemctl restart wsdd2
+else
+  warn "wsdd2 service unavailable — Windows WS-Discovery skipped"
+fi
 
 info "Network discovery enabled (Mac Bonjour + Windows WSD)"
 
@@ -533,7 +535,7 @@ if systemctl is-active --quiet "$SERVICE_NAME"; then
   info "  Usuario:   admin"
   info "  El asistente de configuración te guiará al abrir el panel."
   info "  Si te pide la contraseña inicial:"
-  info "    sudo cat ${INSTALL_DIR}/data/initial-admin-password.txt"
+  info "    sudo cat ${INSTALL_DIR}/apps/backend/data/initial-admin-password.txt"
   info ""
   info "  Logs:  journalctl -u ${SERVICE_NAME} -f"
   info "  Stop:  systemctl stop ${SERVICE_NAME}"

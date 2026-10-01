@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync } from 'node:fs'
-import { exec } from '../lib/exec.js'
+import { assertSafeToFormat, withFormatLock } from './storage-safety.js'
+import { exec, writeFileAsRoot } from '../lib/exec.js'
 import type { DiskPartition } from '@homenas/shared'
 
 // ─── Security ─────────────────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ export async function mountPartitionReadOnly(
   device: string,
   browserId: string,
 ): Promise<{ mountPoint: string }> {
+  return withFormatLock(async () => {
   validateDevice(device)
   validateBrowserId(browserId)
 
@@ -161,7 +163,7 @@ export async function mountPartitionReadOnly(
     // Try ntfs3 (kernel driver, faster)
     mountResult = await exec('mount', [
       '-t', 'ntfs3',
-      '-o', 'ro,uid=1000',
+      '-o', 'ro,uid=1000,nodev,nosuid,noexec',
       device,
       mountPoint,
     ])
@@ -170,13 +172,14 @@ export async function mountPartitionReadOnly(
       // Fall back to ntfs-3g (FUSE)
       mountResult = await exec('mount', [
         '-t', 'ntfs-3g',
-        '-o', 'ro,uid=1000',
+        '-o', 'ro,uid=1000,nodev,nosuid,noexec',
         device,
         mountPoint,
       ])
     }
   } else {
-    mountResult = await exec('mount', ['-o', 'ro', device, mountPoint])
+    const recovery = ['ext3', 'ext4'].includes(fsType) ? ',noload' : fsType === 'xfs' ? ',norecovery' : fsType === 'btrfs' ? ',nologreplay' : ''
+    mountResult = await exec('mount', ['-o', `ro,nodev,nosuid,noexec${recovery}`, device, mountPoint])
   }
 
   if (mountResult.exitCode !== 0) {
@@ -184,6 +187,7 @@ export async function mountPartitionReadOnly(
   }
 
   return { mountPoint }
+  })
 }
 
 // ─── unmountBrowse ────────────────────────────────────────────────────────────
@@ -201,14 +205,17 @@ export async function unmountBrowse(browserId: string): Promise<void> {
 
 // ─── addDiskToPool ────────────────────────────────────────────────────────────
 
-async function findNextDiskN(): Promise<string> {
+async function findNextDiskN(count = 1): Promise<string> {
+  const created = await exec('mkdir', ['-p', '/mnt/disks'])
+  if (created.exitCode !== 0) throw new Error(`Cannot inspect disk mountpoints: ${created.stderr}`)
   const result = await exec('find', ['/mnt/disks', '-maxdepth', '1', '-mindepth', '1', '-type', 'd'])
+  if (result.exitCode !== 0) throw new Error(`Cannot inspect disk mountpoints: ${result.stderr}`)
   const existing = result.exitCode === 0
     ? result.stdout.split('\n').map(s => s.trim()).filter(Boolean)
     : []
 
   let n = 1
-  while (existing.some(p => p === `/mnt/disks/disk${n}`)) {
+  while (Array.from({ length: count }, (_, i) => `/mnt/disks/disk${n + i}`).some(p => existing.includes(p))) {
     n++
   }
   return `disk${n}`
@@ -216,18 +223,48 @@ async function findNextDiskN(): Promise<string> {
 
 async function findMergerFSMount(): Promise<{ mountPoint: string; sources: string[] } | null> {
   const mountsResult = await exec('cat', ['/proc/mounts'])
-  if (mountsResult.exitCode !== 0) return null
+  if (mountsResult.exitCode !== 0) throw new Error('Cannot inspect MergerFS mounts')
+  const poolLines = mountsResult.stdout.split('\n').filter(line => line.trim().split(/\s+/)[2] === 'fuse.mergerfs')
+  if (poolLines.length > 1) throw new Error('Multiple MergerFS views exist; adding a disk cannot safely update every view. No disk has been formatted')
 
-  for (const line of mountsResult.stdout.split('\n')) {
+  for (const line of poolLines) {
     const parts = line.trim().split(/\s+/)
     if (parts[2] === 'fuse.mergerfs') {
       const mountPoint = parts[1]
-      const sources = parts[0].split(':').filter(s => s.startsWith('/'))
+      const branches = await exec('getfattr', ['--only-values', '-n', 'user.mergerfs.branches', `${mountPoint}/.mergerfs`])
+      const sources = (branches.exitCode === 0 ? branches.stdout.trim() : parts[0]).split(':').filter(s => s.startsWith('/mnt/') && !/[\s\\]/.test(s))
+      if (!sources.length) throw new Error('Cannot read existing MergerFS branches; refusing to format')
       return { mountPoint, sources }
     }
   }
 
   return null
+}
+
+async function setDiskPermissions(mountPoint: string): Promise<void> {
+  for (const [command, args] of [['groupadd', ['-f', 'sambashare']], ['chown', ['homenas:sambashare', mountPoint]], ['chmod', ['2775', mountPoint]]] as [string, string[]][]) {
+    const result = await exec(command, args)
+    if (result.exitCode !== 0) throw new Error(`Cannot set disk permissions: ${result.stderr}`)
+  }
+}
+
+export function mergeMountEntries(fstab: string, entries: Array<{ mountPoint: string; line: string }>): string {
+  const mountpoints = new Set(entries.map(e => e.mountPoint))
+  const existing = fstab.split('\n').filter(line => line.trim().startsWith('#') || !mountpoints.has(line.trim().split(/\s+/)[1]))
+  return `${existing.join('\n').trimEnd()}\n${entries.map(e => e.line).join('\n')}\n`
+}
+
+async function persistMounts(assignments: Array<{ device: string; mountPoint: string }>, pool?: { mountPoint: string; sources: string[] }): Promise<void> {
+  const fstab = readFileSync('/etc/fstab', 'utf8')
+  const entries: Array<{ mountPoint: string; line: string }> = []
+  for (const item of assignments) {
+    const result = await exec('blkid', ['-s', 'UUID', '-o', 'value', item.device])
+    const uuid = result.stdout.trim()
+    if (result.exitCode !== 0 || !/^[a-fA-F0-9-]+$/.test(uuid)) throw new Error(`Cannot persist mount UUID for ${item.device}`)
+    entries.push({ mountPoint: item.mountPoint, line: `UUID=${uuid} ${item.mountPoint} ext4 defaults,nofail 0 2 # homenas-v3` })
+  }
+  if (pool) entries.push({ mountPoint: pool.mountPoint, line: `${pool.sources.join(':')} ${pool.mountPoint} fuse.mergerfs defaults,use_ino,allow_other,func.getattr=newest,category.create=mfs,nofail 0 0 # homenas-v3` })
+  await writeFileAsRoot('/etc/fstab', mergeMountEntries(fstab, entries))
 }
 
 export async function addDiskToPool(
@@ -240,14 +277,19 @@ export async function addDiskToPool(
 export async function bulkAddToPool(
   devices: string[],
 ): Promise<Array<{ device: string; mountPoint: string; poolUpdated: boolean }>> {
+  return withFormatLock(async () => {
   if (devices.length === 0) return []
+  await assertSafeToFormat(devices)
 
   for (const device of devices) {
     validateDevice(device)
   }
 
+  const mergerfs = await findMergerFSMount()
+  if (!mergerfs) throw new Error('No MergerFS pool exists; create a pool first')
+
   // Assign disk names up-front (sequential, no race)
-  const startN = await findNextDiskN()
+  const startN = await findNextDiskN(devices.length)
   const startIndex = parseInt(startN.replace('disk', ''), 10)
 
   const assignments = devices.map((device, i) => ({
@@ -256,9 +298,8 @@ export async function bulkAddToPool(
     mountPoint: `/mnt/disks/disk${startIndex + i}`,
   }))
 
-  // Format and mount all disks in parallel
-  await Promise.all(
-    assignments.map(async ({ device, diskName, mountPoint }) => {
+  // Sequential formatting keeps the mutation lock until every command stops.
+  for (const { device, diskName, mountPoint } of assignments) {
       const mkdirResult = await exec('mkdir', ['-p', mountPoint])
       if (mkdirResult.exitCode !== 0) {
         throw new Error(`Cannot create ${mountPoint}: ${mkdirResult.stderr}`)
@@ -273,26 +314,31 @@ export async function bulkAddToPool(
       if (mountResult.exitCode !== 0) {
         throw new Error(`Failed to mount ${device} at ${mountPoint}: ${mountResult.stderr}`)
       }
-    }),
-  )
+      await persistMounts([{ device, mountPoint }])
+      await setDiskPermissions(mountPoint)
+  }
 
   // Add all new mount points to the MergerFS pool in one remount
-  const mergerfs = await findMergerFSMount()
   let poolUpdated = false
 
   if (mergerfs) {
     const newMounts = assignments.map(a => a.mountPoint)
     const updatedSources = [...mergerfs.sources, ...newMounts].join(':')
 
-    const remountResult = await exec('mount', [
-      '-o', `remount,use_ino,allow_other,func.getattr=newest,category.create=mfs,${updatedSources}`,
-      mergerfs.mountPoint,
+    const remountResult = await exec('setfattr', [
+      '-n', 'user.mergerfs.branches', '-v', updatedSources, `${mergerfs.mountPoint}/.mergerfs`,
     ])
+    if (remountResult.exitCode !== 0) {
+      await persistMounts(assignments)
+      throw new Error(`New disks mounted but pool update failed: ${remountResult.stderr}`)
+    }
+    await persistMounts(assignments, { mountPoint: mergerfs.mountPoint, sources: updatedSources.split(':') })
 
     poolUpdated = remountResult.exitCode === 0
   }
 
   return assignments.map(a => ({ device: a.device, mountPoint: a.mountPoint, poolUpdated }))
+  })
 }
 
 // ─── createPool ───────────────────────────────────────────────────────────────
@@ -314,16 +360,18 @@ async function findAvailablePoolMount(): Promise<string> {
 export async function createPool(
   devices: string[],
 ): Promise<{ poolMount: string; drives: string[] }> {
+  return withFormatLock(async () => {
   if (devices.length === 0) throw new Error('At least one device is required')
+  await assertSafeToFormat(devices)
+  const startIndex = parseInt((await findNextDiskN(devices.length)).replace('disk', ''), 10)
 
   for (const device of devices) {
     validateDevice(device)
   }
 
-  // Format and mount all disks in parallel
-  const drives = await Promise.all(
-    devices.map(async (device, i) => {
-      const diskName = `disk${i + 1}`
+  const drives: string[] = []
+  for (const [i, device] of devices.entries()) {
+      const diskName = `disk${startIndex + i}`
       const mountPoint = `/mnt/disks/${diskName}`
 
       const mkdirResult = await exec('mkdir', ['-p', mountPoint])
@@ -341,9 +389,10 @@ export async function createPool(
         throw new Error(`Failed to mount ${device} at ${mountPoint}: ${mountResult.stderr}`)
       }
 
-      return mountPoint
-    }),
-  )
+      await persistMounts([{ device, mountPoint }])
+      await setDiskPermissions(mountPoint)
+      drives.push(mountPoint)
+  }
 
   const poolMount = await findAvailablePoolMount()
 
@@ -366,7 +415,9 @@ export async function createPool(
     throw new Error(`Failed to create MergerFS pool: ${mergeResult.stderr || mergeResult.stdout}`)
   }
 
+  await persistMounts(devices.map((device, i) => ({ device, mountPoint: drives[i] })), { mountPoint: poolMount, sources: drives })
   return { poolMount, drives }
+  })
 }
 
 // Re-export type for use in routes

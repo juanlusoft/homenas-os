@@ -1,3 +1,4 @@
+import { refreshBackupSchedules } from '../../services/backup-scheduler.service.js'
 import type { FastifyInstance } from 'fastify'
 import { createCloudBackupService } from '../../services/cloud-backup.service.js'
 import type { RemoteType, JobOperation } from '../../services/cloud-backup.service.js'
@@ -74,7 +75,7 @@ export async function cloudBackupRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const remote = svc().configureRemote(name, type as RemoteType, config)
+      const remote = await svc().configureRemote(name, type as RemoteType, config)
       return reply.status(201).send(remote)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -90,6 +91,7 @@ export async function cloudBackupRoutes(fastify: FastifyInstance) {
     }
     try {
       svc().deleteRemote(name)
+      refreshBackupSchedules(fastify.db)
       return reply.send({ ok: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -143,6 +145,7 @@ export async function cloudBackupRoutes(fastify: FastifyInstance) {
 
     try {
       const job = svc().createJob({ name, remote_id, operation: operation as JobOperation, source, destination, cron_expression, enabled })
+      refreshBackupSchedules(fastify.db)
       return reply.status(201).send(job)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -176,6 +179,7 @@ export async function cloudBackupRoutes(fastify: FastifyInstance) {
 
     try {
       const job = svc().updateJob(jobId, patch)
+      refreshBackupSchedules(fastify.db)
       return reply.send(job)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -193,6 +197,7 @@ export async function cloudBackupRoutes(fastify: FastifyInstance) {
     }
     try {
       svc().deleteJob(jobId)
+      refreshBackupSchedules(fastify.db)
       return reply.send({ ok: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'

@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, invalidateSession } from './client'
 import type { AbDevice, AbBackupRun, AbProgress, AbFileEntry } from '@homenas/shared'
 
 export interface DeviceDetail {
@@ -51,6 +51,7 @@ export const activeBackupApi = {
       `/api/active-backup/devices/${id}/restore/download?version=${encodeURIComponent(version)}&path=${encodeURIComponent(filePath)}`,
       { headers: { 'X-Session-Id': sessionId ?? '' } }
     )
+    if (res.status === 401) { invalidateSession(sessionId); throw new Error('UNAUTHORIZED') }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: 'Error desconocido' }))
       throw new Error(err.message ?? 'Error al descargar')
@@ -67,12 +68,13 @@ export const activeBackupApi = {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   },
 
-  downloadAgentPackage: async (id: number, platform: 'windows' | 'linux' | 'mac', deviceName: string): Promise<void> => {
+  downloadAgentPackage: async (id: number, platform: 'windows' | 'linux' | 'mac', deviceName: string, arch?: 'amd64' | 'arm64'): Promise<void> => {
     const { useAuthStore } = await import('../stores/authStore')
     const sessionId = useAuthStore.getState().sessionId
-    const res = await fetch(`/api/active-backup/devices/${id}/agent-package?platform=${platform}`, {
+    const res = await fetch(`/api/active-backup/devices/${id}/agent-package?platform=${platform}${arch ? `&arch=${arch}` : ''}`, {
       headers: { 'X-Session-Id': sessionId ?? '' },
     })
+    if (res.status === 401) { invalidateSession(sessionId); throw new Error('UNAUTHORIZED') }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: 'Error desconocido' }))
       throw new Error(err.message ?? 'Error al generar el paquete')
@@ -81,7 +83,7 @@ export const activeBackupApi = {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `homenas-agent-${deviceName}-${platform}.zip`
+    a.download = `homenas-agent-${deviceName}-${platform}${arch ? `-${arch}` : ''}.zip`
     a.click()
     // See note in downloadRestoreFile — defer revoke so Firefox doesn't kill
     // the download mid-flight.

@@ -1,0 +1,6 @@
+
+> homenas-os-v3@1.0.3 lint <WORKSPACE>
+> pnpm -r lint
+
+Scope: 3 of 4 workspace projects
+None of the selected packages has a "lint" script

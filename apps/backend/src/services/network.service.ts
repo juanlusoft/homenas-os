@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { mkdirSync } from 'node:fs'
-import { normalize as normalizePath } from 'node:path'
+import { normalize as normalizePath, dirname } from 'node:path'
 import { execa } from 'execa'
 import { exec, execWithInput, writeFileAsRoot } from '../lib/exec.js'
 import type {
@@ -403,7 +403,7 @@ export async function addWireguardPeer(
   await writeFileAsRoot(WG0_CONF, newConf, 0o600)
 
   // Sync running wg interface if active
-  const syncResult = await exec('wg', ['syncconf', 'wg0', WG0_CONF])
+  await syncWireguardIfActive()
   // syncconf may fail if wg0 is not up — that is acceptable
 
   // Build client .conf text
@@ -449,9 +449,17 @@ PersistentKeepalive = 25`
     // graceful — peer config saved in return value anyway
   }
 
-  void syncResult // suppress unused warning
 
   return { config: configText, qrCode }
+}
+
+async function syncWireguardIfActive(): Promise<void> {
+  const active = await exec('wg', ['show', 'wg0'])
+  if (active.exitCode !== 0) return
+  const stripped = await exec('wg-quick', ['strip', 'wg0'])
+  if (stripped.exitCode !== 0) throw new Error(`Cannot strip WireGuard config: ${stripped.stderr}`)
+  const result = await execWithInput('wg', ['syncconf', 'wg0', '/dev/stdin'], stripped.stdout)
+  if (result.exitCode !== 0) throw new Error(`Cannot sync WireGuard: ${result.stderr}`)
 }
 
 // ─── removeWireguardPeer ──────────────────────────────────────────────────────
@@ -472,7 +480,7 @@ export async function removeWireguardPeer(publicKey: string): Promise<void> {
     await writeFileAsRoot(WG0_CONF, filtered.join(''), 0o600)
 
     // Sync if active
-    await exec('wg', ['syncconf', 'wg0', WG0_CONF])
+    await syncWireguardIfActive()
   }
 
   // Remove sidecar config if exists
@@ -622,7 +630,11 @@ export async function listSambaShares(): Promise<SambaShare[]> {
 const SHARE_ALLOWED_PREFIXES = ['/mnt/']
 
 function validateSharePath(p: string): void {
+  assertConfigSafe(p, 'path')
   const normalized = normalizePath(p)
+  let ancestor = normalized
+  while (!existsSync(ancestor) && dirname(ancestor) !== ancestor) ancestor = dirname(ancestor)
+  if (existsSync(ancestor) && ancestor !== '/mnt' && !realpathSync(ancestor).startsWith('/mnt/')) throw new Error('Share path resolves outside /mnt/')
   if (!SHARE_ALLOWED_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
     throw new Error(`Share path must be under /mnt/ (got: ${p})`)
   }
@@ -652,7 +664,8 @@ export async function createSambaShare(share: CreateSambaShareInput): Promise<Sa
 
   // Create path if it doesn't exist
   if (!existsSync(path)) {
-    mkdirSync(path, { recursive: true })
+    const created = await exec('mkdir', ['-p', '--', path])
+    if (created.exitCode !== 0) throw new Error(`Cannot create share directory: ${created.stderr}`)
   }
 
   // Build section
@@ -672,7 +685,8 @@ export async function createSambaShare(share: CreateSambaShareInput): Promise<Sa
   await writeSmbConf(conf + '\n' + lines.join('\n'))
 
   // Restart Samba
-  await exec('systemctl', ['restart', 'smbd'])
+  const restarted = await exec('systemctl', ['restart', 'smbd'])
+  if (restarted.exitCode !== 0) throw new Error(`Samba restart failed: ${restarted.stderr}`)
 
   return {
     name,
@@ -737,7 +751,8 @@ export async function updateSambaShare(
   if (!found) throw new Error(`Share "${name}" not found`)
 
   await writeSmbConf(updatedSections.join(''))
-  await exec('systemctl', ['restart', 'smbd'])
+  const restarted = await exec('systemctl', ['restart', 'smbd'])
+  if (restarted.exitCode !== 0) throw new Error(`Samba restart failed: ${restarted.stderr}`)
 
   // Return updated share
   const updated = await listSambaShares()
@@ -765,7 +780,8 @@ export async function deleteSambaShare(name: string): Promise<void> {
   }
 
   await writeSmbConf(filtered.join(''))
-  await exec('systemctl', ['restart', 'smbd'])
+  const restarted = await exec('systemctl', ['restart', 'smbd'])
+  if (restarted.exitCode !== 0) throw new Error(`Samba restart failed: ${restarted.stderr}`)
 }
 
 // ─── listConnectedUsers ───────────────────────────────────────────────────────
@@ -883,7 +899,8 @@ function buildExportLine(path: string, clients: string, options: string): string
 }
 
 async function reloadExports(): Promise<void> {
-  await exec('exportfs', ['-ra'])
+  const reloaded = await exec('exportfs', ['-ra'])
+  if (reloaded.exitCode !== 0) throw new Error(`NFS reload failed: ${reloaded.stderr}`)
 }
 
 // ─── listNfsExports ───────────────────────────────────────────────────────────
@@ -951,7 +968,8 @@ export async function createNfsExport(input: CreateNfsExportInput): Promise<NfsE
 
   // Create directory if it doesn't exist
   if (!existsSync(path)) {
-    mkdirSync(path, { recursive: true })
+    const created = await exec('mkdir', ['-p', '--', path])
+    if (created.exitCode !== 0) throw new Error(`Cannot create share directory: ${created.stderr}`)
   }
 
   // Check for duplicates

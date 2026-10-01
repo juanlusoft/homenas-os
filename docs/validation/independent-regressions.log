@@ -1,0 +1,70 @@
+TAP version 13
+# {"level":30,"time":1790852159733,"pid":1193836,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-bootstrap-3AFrrA/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790852159768,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852159771,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":200},"responseTime":2.996533999999997,"msg":"request completed"}
+# {"level":30,"time":1790852159771,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852159772,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-2","res":{"statusCode":200},"responseTime":0.5070729999999912,"msg":"request completed"}
+# {"level":30,"time":1790852159772,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-3","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852159772,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852160218,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-3","res":{"statusCode":200},"responseTime":445.77748699999995,"msg":"request completed"}
+# {"level":30,"time":1790852160218,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-4","res":{"statusCode":409},"responseTime":446.036831,"msg":"request completed"}
+# {"level":30,"time":1790852160218,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-5","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852160441,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-5","res":{"statusCode":200},"responseTime":222.19526199999996,"msg":"request completed"}
+# Subtest: independent review: a concurrently revoked bootstrap session cannot overwrite administrator password
+ok 1 - independent review: a concurrently revoked bootstrap session cannot overwrite administrator password
+  ---
+  duration_ms: 821.606678
+  type: 'test'
+  ...
+# {"level":30,"time":1790852160515,"pid":1193836,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-5a3UQG/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790852160537,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852160538,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":401},"responseTime":0.995377999999846,"msg":"request completed"}
+# Subtest: independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+    # Subtest: password
+    ok 1 - password
+      ---
+      duration_ms: 90.962224
+      type: 'test'
+      ...
+# {"level":30,"time":1790852160604,"pid":1193836,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-hHArGQ/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790852160623,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852160624,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":401},"responseTime":0.8148819999998977,"msg":"request completed"}
+    # Subtest: totp
+    ok 2 - totp
+      ---
+      duration_ms: 84.695796
+      type: 'test'
+      ...
+# {"level":30,"time":1790852160691,"pid":1193836,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-mAlsme/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790852160705,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852160706,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":401},"responseTime":0.9511219999999412,"msg":"request completed"}
+    # Subtest: delete
+    ok 3 - delete
+      ---
+      duration_ms: 84.596884
+      type: 'test'
+      ...
+# {"level":30,"time":1790852160782,"pid":1193836,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-RVohJX/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790852160796,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790852160797,"pid":1193836,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":429},"responseTime":1.596322999999984,"msg":"request completed"}
+    # Subtest: lockout
+    ok 4 - lockout
+      ---
+      duration_ms: 87.470121
+      type: 'test'
+      ...
+    1..4
+ok 2 - independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+  ---
+  duration_ms: 349.782725
+  type: 'test'
+  ...
+1..2
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1744.455041

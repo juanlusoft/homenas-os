@@ -189,7 +189,7 @@ export function createActiveBackupRepo(db: Database) {
     },
 
     updateDeviceLastSeen(id: number): void {
-      db.prepare('UPDATE ab_devices SET last_seen = unixepoch(), status = ? WHERE id = ?').run('active', id)
+      db.prepare('UPDATE ab_devices SET last_seen = unixepoch() WHERE id = ?').run(id)
     },
 
     updateDevice(id: number, patch: UpdateDeviceInput): void {

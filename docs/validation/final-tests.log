@@ -1,0 +1,501 @@
+
+> homenas-os-v3@1.0.3 test <WORKSPACE>
+> pnpm test:installers && pnpm --filter @homenas/backend test && pnpm --filter @homenas/frontend test
+
+
+> homenas-os-v3@1.0.3 test:installers <WORKSPACE>
+> node --test tests/installers.test.mjs
+
+TAP version 13
+# Subtest: install.sh: native rebuild failure aborts before build and never executes as root
+ok 1 - install.sh: native rebuild failure aborts before build and never executes as root
+  ---
+  duration_ms: 5.696987
+  type: 'test'
+  ...
+# Subtest: install.sh: successful native checks run SQLite smoke check and build as service user
+ok 2 - install.sh: successful native checks run SQLite smoke check and build as service user
+  ---
+  duration_ms: 8.031458
+  type: 'test'
+  ...
+# Subtest: install.sh: rejects unsupported Node versions before build
+ok 3 - install.sh: rejects unsupported Node versions before build
+  ---
+  duration_ms: 431.544445
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: native rebuild failure aborts before build and never executes as root
+ok 4 - install-x86.sh: native rebuild failure aborts before build and never executes as root
+  ---
+  duration_ms: 4.734799
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: successful native checks run SQLite smoke check and build as service user
+ok 5 - install-x86.sh: successful native checks run SQLite smoke check and build as service user
+  ---
+  duration_ms: 6.477144
+  type: 'test'
+  ...
+# Subtest: install-x86.sh: rejects unsupported Node versions before build
+ok 6 - install-x86.sh: rejects unsupported Node versions before build
+  ---
+  duration_ms: 445.289994
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 939.775904
+
+> @homenas/backend@1.0.2 test <WORKSPACE>/apps/backend
+> tsx --test tests/*.test.ts
+
+TAP version 13
+# {"level":30,"time":1790860728200,"pid":1810831,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backup-cron-9ALnAQ/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790860728235,"pid":1810831,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728238,"pid":1810831,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":200},"responseTime":2.8301340000000437,"msg":"request completed"}
+# {"level":30,"time":1790860728239,"pid":1810831,"hostname":"jlu.app","reqId":"req-2","req":{"method":"POST","url":"/api/backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728242,"pid":1810831,"hostname":"jlu.app","reqId":"req-2","res":{"statusCode":201},"responseTime":3.168933000000038,"msg":"request completed"}
+# {"level":30,"time":1790860728242,"pid":1810831,"hostname":"jlu.app","reqId":"req-3","req":{"method":"DELETE","url":"/api/backup/jobs/5","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728243,"pid":1810831,"hostname":"jlu.app","reqId":"req-3","res":{"statusCode":200},"responseTime":0.5558059999999614,"msg":"request completed"}
+# {"level":30,"time":1790860728243,"pid":1810831,"hostname":"jlu.app","reqId":"req-4","req":{"method":"POST","url":"/api/cloud-backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728244,"pid":1810831,"hostname":"jlu.app","reqId":"req-4","res":{"statusCode":201},"responseTime":1.2049240000000054,"msg":"request completed"}
+# {"level":30,"time":1790860728244,"pid":1810831,"hostname":"jlu.app","reqId":"req-5","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/2","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728245,"pid":1810831,"hostname":"jlu.app","reqId":"req-5","res":{"statusCode":200},"responseTime":0.46927800000003117,"msg":"request completed"}
+# {"level":30,"time":1790860728245,"pid":1810831,"hostname":"jlu.app","reqId":"req-6","req":{"method":"PUT","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728246,"pid":1810831,"hostname":"jlu.app","reqId":"req-6","res":{"statusCode":200},"responseTime":0.7922370000000001,"msg":"request completed"}
+# {"level":30,"time":1790860728246,"pid":1810831,"hostname":"jlu.app","reqId":"req-7","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728246,"pid":1810831,"hostname":"jlu.app","reqId":"req-7","res":{"statusCode":200},"responseTime":0.4761580000000549,"msg":"request completed"}
+# {"level":30,"time":1790860728247,"pid":1810831,"hostname":"jlu.app","reqId":"req-8","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728247,"pid":1810831,"hostname":"jlu.app","reqId":"req-8","res":{"statusCode":200},"responseTime":0.43926299999998264,"msg":"request completed"}
+# {"level":30,"time":1790860728248,"pid":1810831,"hostname":"jlu.app","reqId":"req-9","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728249,"pid":1810831,"hostname":"jlu.app","reqId":"req-9","res":{"statusCode":200},"responseTime":1.0312130000000934,"msg":"request completed"}
+# {"level":30,"time":1790860728249,"pid":1810831,"hostname":"jlu.app","reqId":"req-a","req":{"method":"DELETE","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728250,"pid":1810831,"hostname":"jlu.app","reqId":"req-a","res":{"statusCode":200},"responseTime":0.42364600000007613,"msg":"request completed"}
+# Subtest: backup cron initializes persisted jobs, preserves runners/contracts, refreshes API edits and stops cleanly
+ok 1 - backup cron initializes persisted jobs, preserves runners/contracts, refreshes API edits and stops cleanly
+  ---
+  duration_ms: 154.501017
+  type: 'test'
+  ...
+# Subtest: actual node-cron clock dispatches an enabled persisted backup without running system commands
+ok 2 - actual node-cron clock dispatches an enabled persisted backup without running system commands
+  ---
+  duration_ms: 750.361649
+  type: 'test'
+  ...
+# {"level":30,"time":1790860728248,"pid":1810832,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-W9db8d/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790860728286,"pid":1810832,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728289,"pid":1810832,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":200},"responseTime":3.2071399999999812,"msg":"request completed"}
+# {"level":30,"time":1790860728290,"pid":1810832,"hostname":"jlu.app","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728290,"pid":1810832,"hostname":"jlu.app","reqId":"req-2","res":{"statusCode":200},"responseTime":0.5991820000000416,"msg":"request completed"}
+# {"level":30,"time":1790860728291,"pid":1810832,"hostname":"jlu.app","reqId":"req-3","req":{"method":"POST","url":"/api/setup/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728291,"pid":1810832,"hostname":"jlu.app","reqId":"req-3","res":{"statusCode":409},"responseTime":0.4770859999999857,"msg":"request completed"}
+# {"level":30,"time":1790860728291,"pid":1810832,"hostname":"jlu.app","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728518,"pid":1810832,"hostname":"jlu.app","reqId":"req-4","res":{"statusCode":200},"responseTime":226.34321799999998,"msg":"request completed"}
+# {"level":30,"time":1790860728518,"pid":1810832,"hostname":"jlu.app","reqId":"req-5","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728518,"pid":1810832,"hostname":"jlu.app","reqId":"req-5","res":{"statusCode":403},"responseTime":0.36865499999998974,"msg":"request completed"}
+# {"level":30,"time":1790860728519,"pid":1810832,"hostname":"jlu.app","reqId":"req-6","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728519,"pid":1810832,"hostname":"jlu.app","reqId":"req-6","res":{"statusCode":401},"responseTime":0.2528949999998531,"msg":"request completed"}
+# {"level":30,"time":1790860728519,"pid":1810832,"hostname":"jlu.app","reqId":"req-7","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728519,"pid":1810832,"hostname":"jlu.app","reqId":"req-7","res":{"statusCode":200},"responseTime":0.2307349999998678,"msg":"request completed"}
+# {"level":30,"time":1790860728519,"pid":1810832,"hostname":"jlu.app","reqId":"req-8","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728741,"pid":1810832,"hostname":"jlu.app","reqId":"req-8","res":{"statusCode":200},"responseTime":221.57362000000012,"msg":"request completed"}
+# {"level":30,"time":1790860728743,"pid":1810832,"hostname":"jlu.app","reqId":"req-9","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728965,"pid":1810832,"hostname":"jlu.app","reqId":"req-9","res":{"statusCode":401},"responseTime":222.42425700000013,"msg":"request completed"}
+# {"level":30,"time":1790860728966,"pid":1810832,"hostname":"jlu.app","reqId":"req-a","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729187,"pid":1810832,"hostname":"jlu.app","reqId":"req-a","res":{"statusCode":401},"responseTime":221.04959099999996,"msg":"request completed"}
+# {"level":30,"time":1790860729187,"pid":1810832,"hostname":"jlu.app","reqId":"req-b","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729408,"pid":1810832,"hostname":"jlu.app","reqId":"req-b","res":{"statusCode":401},"responseTime":220.66239200000018,"msg":"request completed"}
+# {"level":30,"time":1790860729408,"pid":1810832,"hostname":"jlu.app","reqId":"req-c","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729629,"pid":1810832,"hostname":"jlu.app","reqId":"req-c","res":{"statusCode":401},"responseTime":220.84883899999977,"msg":"request completed"}
+# {"level":30,"time":1790860729629,"pid":1810832,"hostname":"jlu.app","reqId":"req-d","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729849,"pid":1810832,"hostname":"jlu.app","reqId":"req-d","res":{"statusCode":401},"responseTime":220.28300200000012,"msg":"request completed"}
+# {"level":30,"time":1790860729849,"pid":1810832,"hostname":"jlu.app","reqId":"req-e","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729850,"pid":1810832,"hostname":"jlu.app","reqId":"req-e","res":{"statusCode":429},"responseTime":0.5278859999998531,"msg":"request completed"}
+# {"level":30,"time":1790860729850,"pid":1810832,"hostname":"jlu.app","reqId":"req-f","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729850,"pid":1810832,"hostname":"jlu.app","reqId":"req-f","res":{"statusCode":401},"responseTime":0.19271900000012465,"msg":"request completed"}
+# Subtest: bootstrap credential changes revoke other sessions; authenticated wizard can resume; 2FA failures lock account
+ok 3 - bootstrap credential changes revoke other sessions; authenticated wizard can resume; 2FA failures lock account
+  ---
+  duration_ms: 1711.460707
+  type: 'test'
+  ...
+# {"level":30,"time":1790860729921,"pid":1810832,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-f3lH4V/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: scheduler rejects untrusted binaries, combined rsync interpreter flags and unsafe toggle
+ok 4 - scheduler rejects untrusted binaries, combined rsync interpreter flags and unsafe toggle
+  ---
+  duration_ms: 95.214468
+  type: 'test'
+  ...
+# Subtest: path guards accept dotted names, reject symlink escapes/missing leaves and pool roots
+ok 5 - path guards accept dotted names, reject symlink escapes/missing leaves and pool roots
+  ---
+  duration_ms: 2.422056
+  type: 'test'
+  ...
+# Subtest: upload safety checks binary signatures and case-insensitive text signatures
+ok 6 - upload safety checks binary signatures and case-insensitive text signatures
+  ---
+  duration_ms: 2.30836
+  type: 'test'
+  ...
+# Subtest: Compose validates relative binds, device access, inherited definitions and volume driver bypasses
+ok 7 - Compose validates relative binds, device access, inherited definitions and volume driver bypasses
+  ---
+  duration_ms: 7.940899
+  type: 'test'
+  ...
+# {"level":30,"time":1790860730029,"pid":1810832,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-9Xhh2w/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: DDNS retries failed providers at unchanged IP and updates newly configured domains
+ok 8 - DDNS retries failed providers at unchanged IP and updates newly configured domains
+  ---
+  duration_ms: 85.501399
+  type: 'test'
+  ...
+# Subtest: Cloudflare selects the correct CPU binary and passwords respect bcrypt byte limits
+ok 9 - Cloudflare selects the correct CPU binary and passwords respect bcrypt byte limits
+  ---
+  duration_ms: 0.754253
+  type: 'test'
+  ...
+# Subtest: application fast-forward refuses upstream collisions with ignored local custom files
+ok 10 - application fast-forward refuses upstream collisions with ignored local custom files
+  ---
+  duration_ms: 173.009669
+  type: 'test'
+  ...
+# Subtest: independent review: expired interrupted backup can be retried
+ok 11 - independent review: expired interrupted backup can be retried
+  ---
+  duration_ms: 1.800393
+  type: 'test'
+  ...
+# Subtest: independent review: queued push backup exposes running state and can be cancelled
+ok 12 - independent review: queued push backup exposes running state and can be cancelled
+  ---
+  duration_ms: 0.878092
+  type: 'test'
+  ...
+# Subtest: independent review: polling never approves an unapproved agent
+ok 13 - independent review: polling never approves an unapproved agent
+  ---
+  duration_ms: 0.367199
+  type: 'test'
+  ...
+# {"level":30,"time":1790860728228,"pid":1810840,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-bootstrap-qd08h7/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790860728271,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728274,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":200},"responseTime":3.419652000000042,"msg":"request completed"}
+# {"level":30,"time":1790860728275,"pid":1810840,"hostname":"jlu.app","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728275,"pid":1810840,"hostname":"jlu.app","reqId":"req-2","res":{"statusCode":200},"responseTime":0.6488930000000437,"msg":"request completed"}
+# {"level":30,"time":1790860728276,"pid":1810840,"hostname":"jlu.app","reqId":"req-3","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728276,"pid":1810840,"hostname":"jlu.app","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728722,"pid":1810840,"hostname":"jlu.app","reqId":"req-3","res":{"statusCode":200},"responseTime":446.60061899999994,"msg":"request completed"}
+# {"level":30,"time":1790860728723,"pid":1810840,"hostname":"jlu.app","reqId":"req-4","res":{"statusCode":409},"responseTime":446.8372099999999,"msg":"request completed"}
+# {"level":30,"time":1790860728723,"pid":1810840,"hostname":"jlu.app","reqId":"req-5","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860728945,"pid":1810840,"hostname":"jlu.app","reqId":"req-5","res":{"statusCode":200},"responseTime":221.512516,"msg":"request completed"}
+# Subtest: independent review: a concurrently revoked bootstrap session cannot overwrite administrator password
+ok 14 - independent review: a concurrently revoked bootstrap session cannot overwrite administrator password
+  ---
+  duration_ms: 821.035406
+  type: 'test'
+  ...
+# {"level":30,"time":1790860729013,"pid":1810840,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-ZliD25/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790860729032,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729033,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":401},"responseTime":0.8954360000000179,"msg":"request completed"}
+# Subtest: independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+    # Subtest: password
+    ok 1 - password
+      ---
+      duration_ms: 85.382712
+      type: 'test'
+      ...
+# {"level":30,"time":1790860729099,"pid":1810840,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-ejqhcF/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790860729116,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729117,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":401},"responseTime":0.8863160000000789,"msg":"request completed"}
+    # Subtest: totp
+    ok 2 - totp
+      ---
+      duration_ms: 85.582551
+      type: 'test'
+      ...
+# {"level":30,"time":1790860729184,"pid":1810840,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-6pw1Pt/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790860729197,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729198,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":401},"responseTime":1.016587999999956,"msg":"request completed"}
+    # Subtest: delete
+    ok 3 - delete
+      ---
+      duration_ms: 79.022014
+      type: 'test'
+      ...
+# {"level":30,"time":1790860729265,"pid":1810840,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-Kdyyrf/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790860729278,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790860729279,"pid":1810840,"hostname":"jlu.app","reqId":"req-1","res":{"statusCode":429},"responseTime":1.5567470000000867,"msg":"request completed"}
+    # Subtest: lockout
+    ok 4 - lockout
+      ---
+      duration_ms: 82.870305
+      type: 'test'
+      ...
+    1..4
+ok 15 - independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+  ---
+  duration_ms: 334.759302
+  type: 'test'
+  ...
+# {"level":30,"time":1790860728247,"pid":1810851,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-cron-close-upSc7m/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: independent review: server hook cancels backups before SQLite closes
+ok 16 - independent review: server hook cancels backups before SQLite closes
+  ---
+  duration_ms: 134.520371
+  type: 'test'
+  ...
+# {"level":30,"time":1790860728348,"pid":1810851,"hostname":"jlu.app","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-ddns-close-UFRP2C/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: independent review: closing waits for in-flight DDNS before SQLite closes
+ok 17 - independent review: closing waits for in-flight DDNS before SQLite closes
+  ---
+  duration_ms: 89.279129
+  type: 'test'
+  ...
+# Subtest: independent review: update and agent package resolve actual tsc production layout
+ok 18 - independent review: update and agent package resolve actual tsc production layout
+  ---
+  duration_ms: 0.752814
+  type: 'test'
+  ...
+# Subtest: independent storage review: branch policies and cache subpaths never measure root
+ok 19 - independent storage review: branch policies and cache subpaths never measure root
+  ---
+  duration_ms: 323.694859
+  type: 'test'
+  ...
+# Subtest: real multipart consumes file and validates full backup, including empty files and hardlink dedup
+ok 20 - real multipart consumes file and validates full backup, including empty files and hardlink dedup
+  ---
+  duration_ms: 31.353917
+  type: 'test'
+  ...
+# Subtest: format entrypoints refuse root before destructive commands; add/create mount only mocked disks and persist UUID
+ok 21 - format entrypoints refuse root before destructive commands; add/create mount only mocked disks and persist UUID
+  ---
+  duration_ms: 1178.285935
+  type: 'test'
+  ...
+# Subtest: missing logical cache branch measures only its existing mounted NAS ancestor
+ok 22 - missing logical cache branch measures only its existing mounted NAS ancestor
+  ---
+  duration_ms: 12.902272
+  type: 'test'
+  ...
+# Subtest: format guard resolves NVMe root without truncating namespace
+ok 23 - format guard resolves NVMe root without truncating namespace
+  ---
+  duration_ms: 0.834893
+  type: 'test'
+  ...
+# Subtest: format guard refuses unknown topology, duplicates, mounted children and LVM
+ok 24 - format guard refuses unknown topology, duplicates, mounted children and LVM
+  ---
+  duration_ms: 0.165215
+  type: 'test'
+  ...
+# Subtest: format guard protects every physical ancestor of LVM/RAID root
+ok 25 - format guard protects every physical ancestor of LVM/RAID root
+  ---
+  duration_ms: 0.152031
+  type: 'test'
+  ...
+# Subtest: format lock excludes concurrent entrypoints and releases after failures
+ok 26 - format lock excludes concurrent entrypoints and releases after failures
+  ---
+  duration_ms: 0.162544
+  type: 'test'
+  ...
+# Subtest: backup rejects attached and bundled shell execution flags
+ok 27 - backup rejects attached and bundled shell execution flags
+  ---
+  duration_ms: 0.268447
+  type: 'test'
+  ...
+# Subtest: metrics avoid counting virtual guest CPU twice and parse attached RX counter
+ok 28 - metrics avoid counting virtual guest CPU twice and parse attached RX counter
+  ---
+  duration_ms: 0.443774
+  type: 'test'
+  ...
+# Subtest: disk persistence replaces only matching mountpoints and preserves unrelated entries
+ok 29 - disk persistence replaces only matching mountpoints and preserves unrelated entries
+  ---
+  duration_ms: 0.179567
+  type: 'test'
+  ...
+# Subtest: cloud remote config rejects INI directive injection and executable password commands
+ok 30 - cloud remote config rejects INI directive injection and executable password commands
+  ---
+  duration_ms: 0.154064
+  type: 'test'
+  ...
+# Subtest: project-root discovery supports source and compiled backend nesting
+ok 31 - project-root discovery supports source and compiled backend nesting
+  ---
+  duration_ms: 0.618733
+  type: 'test'
+  ...
+# Subtest: flat lsblk topology is refused and disconnected disks are never formatted
+ok 32 - flat lsblk topology is refused and disconnected disks are never formatted
+  ---
+  duration_ms: 0.382895
+  type: 'test'
+  ...
+# Subtest: multi-view pools select storage alias instead of first archive; ambiguity fails closed
+ok 33 - multi-view pools select storage alias instead of first archive; ambiguity fails closed
+  ---
+  duration_ms: 0.086591
+  type: 'test'
+  ...
+# Subtest: primary pool resolver follows a real storage symlink with temporary mounts
+ok 34 - primary pool resolver follows a real storage symlink with temporary mounts
+  ---
+  duration_ms: 8.862096
+  type: 'test'
+  ...
+# Subtest: database downloads use live SQLite with custom data directory; SSH command failures do not report success
+ok 35 - database downloads use live SQLite with custom data directory; SSH command failures do not report success
+  ---
+  duration_ms: 150.810982
+  type: 'test'
+  ...
+1..35
+# tests 39
+# suites 0
+# pass 39
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2621.186523
+
+> @homenas/frontend@1.0.2 test <WORKSPACE>/apps/frontend
+> node --test tests/*.test.mjs
+
+TAP version 13
+# (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+#   - `__dirname` (vite.config.ts:10:39). Use `import.meta.dirname` instead
+# Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+# Subtest: TOTP challenge survives HTTP 401 and login submits the second factor
+ok 1 - TOTP challenge survives HTTP 401 and login submits the second factor
+  ---
+  duration_ms: 738.796151
+  type: 'test'
+  ...
+# Subtest: invalid login reports backend message without a spurious TOTP prompt
+ok 2 - invalid login reports backend message without a spurious TOTP prompt
+  ---
+  duration_ms: 330.43897
+  type: 'test'
+  ...
+# Subtest: changing sessions clears private cache; old 401 cannot invalidate new login
+ok 3 - changing sessions clears private cache; old 401 cannot invalidate new login
+  ---
+  duration_ms: 206.454143
+  type: 'test'
+  ...
+# Subtest: API accepts native Headers and sends session and CSRF headers
+ok 4 - API accepts native Headers and sends session and CSRF headers
+  ---
+  duration_ms: 260.297116
+  type: 'test'
+  ...
+# Subtest: editing existing static IP saves payload and advances storage step
+ok 5 - editing existing static IP saves payload and advances storage step
+  ---
+  duration_ms: 604.080649
+  type: 'test'
+  ...
+# Subtest: failed setup completion remains on wizard and displays error; retry succeeds
+ok 6 - failed setup completion remains on wizard and displays error; retry succeeds
+  ---
+  duration_ms: 768.839828
+  type: 'test'
+  ...
+# Subtest: upload invalid JSON rejects instead of leaving its promise pending
+ok 7 - upload invalid JSON rejects instead of leaving its promise pending
+  ---
+  duration_ms: 250.517057
+  type: 'test'
+  ...
+# Subtest: cron previews contain future runs only and omit unsupported expressions
+ok 8 - cron previews contain future runs only and omit unsupported expressions
+  ---
+  duration_ms: 246.290098
+  type: 'test'
+  ...
+# Subtest: disk browsing sends selected partition, not just parent disk
+ok 9 - disk browsing sends selected partition, not just parent disk
+  ---
+  duration_ms: 262.045417
+  type: 'test'
+  ...
+# Subtest: compose completion refreshes stack status and rejected action displays error
+ok 10 - compose completion refreshes stack status and rejected action displays error
+  ---
+  duration_ms: 2917.65657
+  type: 'test'
+  ...
+# Subtest: changing selected disks resets destructive setup confirmation
+ok 11 - changing selected disks resets destructive setup confirmation
+  ---
+  duration_ms: 851.868877
+  type: 'test'
+  ...
+# Subtest: setup API rejects malformed status instead of rendering as incomplete
+ok 12 - setup API rejects malformed status instead of rendering as incomplete
+  ---
+  duration_ms: 247.165924
+  type: 'test'
+  ...
+# Subtest: setup does not offer formatting mounted or system disks
+ok 13 - setup does not offer formatting mounted or system disks
+  ---
+  duration_ms: 540.799282
+  type: 'test'
+  ...
+# Subtest: delayed 401 from downloads/list/upload cannot log out a newer session
+ok 14 - delayed 401 from downloads/list/upload cannot log out a newer session
+  ---
+  duration_ms: 251.773974
+  type: 'test'
+  ...
+# Subtest: 401 from the current download session logs out consistently
+ok 15 - 401 from the current download session logs out consistently
+  ---
+  duration_ms: 258.918715
+  type: 'test'
+  ...
+# Subtest: agent package requests preserve default API and select Linux/macOS architectures explicitly
+ok 16 - agent package requests preserve default API and select Linux/macOS architectures explicitly
+  ---
+  duration_ms: 250.962057
+  type: 'test'
+  ...
+# Subtest: agent install modal offers each supported processor and sends its selection
+ok 17 - agent install modal offers each supported processor and sends its selection
+  ---
+  duration_ms: 792.809901
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10144.47209

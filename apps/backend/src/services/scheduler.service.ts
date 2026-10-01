@@ -11,7 +11,7 @@ import type { CreateTaskInput, UpdateTaskInput, ScheduledTask } from '@homenas/s
 const execFileAsync = promisify(execFile)
 
 // Map of task id → scheduled cron job
-const activeJobs = new Map<number, CronJob>()
+const jobMaps = new WeakMap<Database, Map<number, CronJob>>()
 
 // Allowlist of commands that scheduled tasks are allowed to run. Anything
 // else is rejected at validation time, before reaching execFile.
@@ -49,7 +49,9 @@ const ALLOWED_COMMANDS = (() => {
 const ARG_BLOCKED_PREFIXES: Record<string, string[]> = {
   find: ['-exec', '-execdir', '-ok', '-okdir', '-fprintf', '-fprint', '-fprint0', '-delete'],
   rsync: ['-e', '--rsh', '--rsync-path', '--remote-option', '--copy-dest', '--compare-dest'],
-  rclone: ['--rc', '--rc-'],
+  rclone: ['--rc', '--rc-', '--password-command'],
+  restic: ['--password-command'],
+  borg: ['--rsh', '--remote-path'],
 }
 
 function assertCommandAllowed(command: string, args: readonly string[] = []): void {
@@ -60,6 +62,9 @@ function assertCommandAllowed(command: string, args: readonly string[] = []): vo
   // and bare `rsync`. We forbid path separators in the basename to block
   // attempts like `bash\0rsync` or unicode lookalikes — basename sanitises.
   const name = basename(command)
+  if (command.includes('\0') || (command !== name && command !== `/usr/bin/${name}` && command !== `/bin/${name}` && command !== `/usr/sbin/${name}` && command !== `/sbin/${name}`)) {
+    throw new Error('Scheduler command must use a trusted system binary path')
+  }
   if (!ALLOWED_COMMANDS.has(name)) {
     throw new Error(
       `Scheduler command "${name}" is not in the allowlist. ` +
@@ -72,7 +77,9 @@ function assertCommandAllowed(command: string, args: readonly string[] = []): vo
       throw new Error('Invalid scheduler argument')
     }
     for (const prefix of blocked) {
-      if (arg === prefix || arg.startsWith(`${prefix}=`) || arg.startsWith(`${prefix} `)) {
+      const flag = arg.split(/[= ]/, 1)[0]!
+      const abbreviatedLongOption = prefix.startsWith('--') && flag.startsWith('--') && flag.length > 2 && prefix.startsWith(flag)
+      if (abbreviatedLongOption || arg === prefix || arg.startsWith(`${prefix}=`) || arg.startsWith(`${prefix} `) || (prefix.endsWith('-') && arg.startsWith(prefix)) || (prefix === '-e' && arg.startsWith('-') && !arg.startsWith('--') && arg.slice(1).includes('e'))) {
         throw new Error(`Scheduler argument not allowed for ${name}: ${prefix}`)
       }
     }
@@ -111,13 +118,16 @@ function toScheduledTask(record: ReturnType<ReturnType<typeof createSchedulerRep
 
 export function createSchedulerService(db: Database) {
   const repo = createSchedulerRepo(db)
+  let activeJobs = jobMaps.get(db)
+  if (!activeJobs) { activeJobs = new Map(); jobMaps.set(db, activeJobs) }
+  const jobs = activeJobs
 
   function scheduleTask(taskId: number, cronExpression: string, command: string, args: string[]) {
     // Cancel existing job if any
-    const existing = activeJobs.get(taskId)
+    const existing = jobs.get(taskId)
     if (existing) {
       existing.stop()
-      activeJobs.delete(taskId)
+      jobs.delete(taskId)
     }
 
     if (!nodeCron.validate(cronExpression)) return
@@ -138,14 +148,14 @@ export function createSchedulerService(db: Database) {
       }
     })
 
-    activeJobs.set(taskId, job)
+    jobs.set(taskId, job)
   }
 
   function unscheduleTask(taskId: number) {
-    const job = activeJobs.get(taskId)
+    const job = jobs.get(taskId)
     if (job) {
       job.stop()
-      activeJobs.delete(taskId)
+      jobs.delete(taskId)
     }
   }
 
@@ -247,6 +257,7 @@ export function createSchedulerService(db: Database) {
       if (!existing) throw new Error('Task not found')
 
       const newEnabled = !existing.enabled
+      if (newEnabled) assertCommandAllowed(existing.command, existing.args)
       repo.setEnabled(id, newEnabled)
 
       if (newEnabled) {
@@ -286,7 +297,7 @@ export function createSchedulerService(db: Database) {
       for (const [, job] of activeJobs) {
         job.stop()
       }
-      activeJobs.clear()
+      jobs.clear()
     },
   }
 }

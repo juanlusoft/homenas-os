@@ -1,8 +1,9 @@
+import { validateBackupCron } from '../lib/backup-cron.js'
 import { execa, type Subprocess } from 'execa'
-import { exec } from '../lib/exec.js'
+import { exec, execWithInput, sudoWrap } from '../lib/exec.js'
 import { encryptSecret, decryptSecret } from '../lib/crypto.js'
 import type { Database } from 'better-sqlite3'
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { writeFileSync, mkdirSync, existsSync, readFileSync, chmodSync } from 'node:fs'
 import { join } from 'node:path'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -17,6 +18,12 @@ export type RemoteType =
   | 'sftp'
   | 'ftp'
   | 'webdav'
+
+export function validateRemoteConfig(config: Record<string, string>): void {
+  for (const [key, value] of Object.entries(config)) {
+    if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(key) || ['type', 'password_command', 'ssh'].includes(key) || typeof value !== 'string' || /[\r\n\0]/.test(value)) throw new Error(`Invalid remote configuration field: ${key}`)
+  }
+}
 
 export type JobOperation = 'sync' | 'copy' | 'move'
 
@@ -78,6 +85,7 @@ interface RunningTransfer {
   process: Subprocess
   output: string[]
   startedAt: number
+  cancelled: boolean
 }
 
 let activeTransfer: RunningTransfer | null = null
@@ -144,7 +152,7 @@ export function createCloudBackupService(db: Database) {
     if (curlResult.exitCode !== 0) {
       throw new Error(`Failed to download rclone install script: ${curlResult.stderr}`)
     }
-    const proc = execa('bash', ['-s', '--'], {
+    const proc = execa(...sudoWrap('bash', ['-s', '--']), {
       input: curlResult.stdout,
       shell: false,
       reject: false,
@@ -203,6 +211,7 @@ export function createCloudBackupService(db: Database) {
       lines.push('')
     }
     writeFileSync(RCLONE_CONF_PATH, lines.join('\n'), { mode: 0o600 })
+    chmodSync(RCLONE_CONF_PATH, 0o600)
   }
 
   // ─── Remotes ─────────────────────────────────────────────────────────────────
@@ -217,18 +226,25 @@ export function createCloudBackupService(db: Database) {
     return { items, total }
   }
 
-  function configureRemote(
+  async function configureRemote(
     name: string,
     type: RemoteType,
     config: Record<string, string>
-  ): CloudRemote {
+  ): Promise<CloudRemote> {
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
       throw new Error('Remote name must be alphanumeric with dashes/underscores only')
     }
 
+    validateRemoteConfig(config)
+    const secured = { ...config }
+    if (secured.pass) {
+      const obscured = await execWithInput('rclone', ['obscure', '-'], secured.pass)
+      if (obscured.exitCode !== 0 || !obscured.stdout.trim()) throw new Error('Cannot obscure rclone password')
+      secured.pass = obscured.stdout.trim()
+    }
     // Write to rclone.conf
     const sections = readConf()
-    sections[name] = { type, ...config }
+    sections[name] = { ...secured, type }
     writeConf(sections)
 
     // Upsert in DB — config stored encrypted
@@ -290,6 +306,8 @@ export function createCloudBackupService(db: Database) {
     cron_expression?: string | null
     enabled?: number
   }): CloudJobRow {
+    validateBackupCron(input.cron_expression)
+    if (input.enabled !== undefined && input.enabled !== 0 && input.enabled !== 1) throw new Error('enabled must be 0 or 1')
     const remote = db.prepare('SELECT id FROM cloud_backup_remotes WHERE id = ?').get(input.remote_id)
     if (!remote) throw new Error('Remote not found')
 
@@ -320,6 +338,8 @@ export function createCloudBackupService(db: Database) {
       enabled: number
     }>
   ): CloudJobRow {
+    validateBackupCron(input.cron_expression)
+    if (input.enabled !== undefined && input.enabled !== 0 && input.enabled !== 1) throw new Error('enabled must be 0 or 1')
     const existing = db.prepare('SELECT * FROM cloud_backup_jobs WHERE id = ?').get(id) as CloudJobRow | undefined
     if (!existing) throw new Error('Job not found')
 
@@ -337,6 +357,7 @@ export function createCloudBackupService(db: Database) {
     const existing = db.prepare('SELECT id FROM cloud_backup_jobs WHERE id = ?').get(id)
     if (!existing) throw new Error('Job not found')
     if (activeTransfer && activeTransfer.jobId === id) {
+      activeTransfer.cancelled = true
       try { activeTransfer.process.kill() } catch { /* ignore */ }
       activeTransfer = null
     }
@@ -369,6 +390,7 @@ export function createCloudBackupService(db: Database) {
       '--progress',
       '--stats-one-line',
       '--stats', '2s',
+      '--',
       job.source,
       job.destination,
     ]
@@ -382,7 +404,8 @@ export function createCloudBackupService(db: Database) {
     const outputLines: string[] = []
     const startedAt = Math.floor(Date.now() / 1000)
 
-    activeTransfer = { jobId, transferId, process: proc, output: outputLines, startedAt }
+    const thisTransfer: RunningTransfer = { jobId, transferId, process: proc, output: outputLines, startedAt, cancelled: false }
+    activeTransfer = thisTransfer
 
     if (proc.all) {
       proc.all.on('data', (chunk: Buffer | string) => {
@@ -398,6 +421,7 @@ export function createCloudBackupService(db: Database) {
     }
 
     void proc.then((res) => {
+      if (thisTransfer.cancelled) return
       const finishedAt = Math.floor(Date.now() / 1000)
       const status = res.exitCode === 0 ? 'success' : 'error'
       const errorMessage = res.exitCode !== 0 ? (res.stderr ?? '').slice(0, 2048) : null
@@ -423,7 +447,7 @@ export function createCloudBackupService(db: Database) {
         UPDATE cloud_backup_jobs SET last_run = ?, last_status = ? WHERE id = ?
       `).run(finishedAt, status, jobId)
 
-      activeTransfer = null
+      if (activeTransfer === thisTransfer) activeTransfer = null
     })
 
     return { started: true }
@@ -458,6 +482,7 @@ export function createCloudBackupService(db: Database) {
   function cancelTransfer(): void {
     if (!activeTransfer) throw new Error('No transfer is currently running')
 
+    activeTransfer.cancelled = true
     const { transferId, jobId, startedAt, process: proc } = activeTransfer
 
     try {

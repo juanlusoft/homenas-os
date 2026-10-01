@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { execa } from 'execa'
+import { exec } from '../../lib/exec.js'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getSystemMetrics } from '../../services/system.service.js'
 import { systemInfoRoutes } from './info.js'
@@ -33,8 +35,10 @@ export async function systemRoutes(fastify: FastifyInstance) {
   fastify.get('/db-backup', {
     preHandler: [requireAuth, requireAdmin],
   }, async (_request, reply) => {
-    const { createReadStream, unlinkSync, statSync } = await import('node:fs')
-    const backupPath = join(process.cwd(), 'data', `homenas-backup-${Date.now()}.db`)
+    const { createReadStream, statSync } = await import('node:fs')
+    const { mkdtemp, rm } = await import('node:fs/promises')
+    const backupDir = await mkdtemp(join(tmpdir(), 'homenas-db-backup-'))
+    const backupPath = join(backupDir, 'homenas.db')
     try {
       await fastify.db.backup(backupPath)
       const stat = statSync(backupPath)
@@ -43,10 +47,10 @@ export async function systemRoutes(fastify: FastifyInstance) {
       reply.header('Content-Type', 'application/octet-stream')
       reply.header('Content-Length', stat.size)
       const stream = createReadStream(backupPath)
-      stream.on('close', () => { try { unlinkSync(backupPath) } catch { /* ok */ } })
+      stream.on('close', () => { void rm(backupDir, { recursive: true, force: true }).catch(err => fastify.log.error(err, 'Database backup cleanup failed')) })
       return reply.send(stream)
     } catch (err) {
-      try { unlinkSync(backupPath) } catch { /* ok */ }
+      await rm(backupDir, { recursive: true, force: true })
       const message = err instanceof Error ? err.message : 'Unknown error'
       return reply.status(500).send({ error: 'Internal Server Error', message })
     }
@@ -93,7 +97,8 @@ export async function systemRoutes(fastify: FastifyInstance) {
     config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
   }, async (request, reply) => {
     const svc = await sshServiceName()
-    await execa('sudo', ['systemctl', 'enable', '--now', svc], { reject: false })
+    const result = await exec('systemctl', ['enable', '--now', svc])
+    if (result.exitCode !== 0) return reply.status(500).send({ error: 'System Error', message: `Cannot enable SSH: ${result.stderr}` })
     fastify.db.prepare(`INSERT INTO audit_log (user_id, username, action, detail, ip) VALUES (?, ?, 'ssh_enabled', ?, ?)`)
       .run(request.user.id, request.user.username, `service: ${svc}`, request.ip)
     return reply.send({ ok: true })
@@ -105,7 +110,8 @@ export async function systemRoutes(fastify: FastifyInstance) {
     config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
   }, async (request, reply) => {
     const svc = await sshServiceName()
-    await execa('sudo', ['systemctl', 'disable', '--now', svc], { reject: false })
+    const result = await exec('systemctl', ['disable', '--now', svc])
+    if (result.exitCode !== 0) return reply.status(500).send({ error: 'System Error', message: `Cannot disable SSH: ${result.stderr}` })
     fastify.db.prepare(`INSERT INTO audit_log (user_id, username, action, detail, ip) VALUES (?, ?, 'ssh_disabled', ?, ?)`)
       .run(request.user.id, request.user.username, `service: ${svc}`, request.ip)
     return reply.send({ ok: true })

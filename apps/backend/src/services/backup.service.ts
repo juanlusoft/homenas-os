@@ -1,3 +1,4 @@
+import { validateBackupCron } from '../lib/backup-cron.js'
 import { execa, type Subprocess } from 'execa'
 import type { Database } from 'better-sqlite3'
 import { createBackupRepo } from '../repositories/backup.repo.js'
@@ -7,16 +8,18 @@ import type { BackupJob, BackupProgress, BackupRun, CreateBackupJobInput } from 
 
 // Flags that allow arbitrary command execution — must never be passed through
 const RSYNC_BLOCKED_PREFIXES = ['-e', '--rsh', '--rsync-path', '--copy-dest', '--compare-dest', '--remote-option']
-const TAR_BLOCKED_PREFIXES = ['--use-compress-program', '-I', '--to-command', '--checkpoint-action']
+const TAR_BLOCKED_PREFIXES = ['--use-compress-program', '-I', '--to-command', '--checkpoint-action', '--rmt-command', '--rsh-command']
 
-function validateExtraArgs(type: CreateBackupJobInput['type'], args: string[]): void {
+export function validateExtraArgs(type: CreateBackupJobInput['type'], args: string[]): void {
   const blockedPrefixes = type === 'rsync' ? RSYNC_BLOCKED_PREFIXES
     : type === 'tar' ? TAR_BLOCKED_PREFIXES
-    : [] // rclone has no known RCE vectors via args when shell:false
+    : ['--config', '--rc', '--rc-addr', '--rc-no-auth', '--log-file', '--password-command']
 
   for (const arg of args) {
+    if (/^-[^-]/.test(arg) && ((type === 'rsync' && arg.slice(1).includes('e')) || (type === 'tar' && arg.slice(1).includes('I')))) throw new Error('Command execution option is not allowed')
     for (const blocked of blockedPrefixes) {
-      if (arg === blocked || arg.startsWith(`${blocked}=`) || arg.startsWith(`${blocked} `)) {
+      const option = arg.split('=', 1)[0]
+      if ((option.startsWith('--') && option.length > 2 && blocked.startsWith(option)) || arg === blocked || arg.startsWith(`${blocked}=`) || arg.startsWith(`${blocked} `) || (blocked.length === 2 && arg.startsWith(blocked))) {
         throw new Error(`Argument not allowed: ${blocked}`)
       }
     }
@@ -79,10 +82,12 @@ export function createBackupService(db: Database) {
     },
 
     createJob(input: CreateBackupJobInput): BackupJob {
+      validateBackupCron(input.cronExpression)
       return repo.createJob(input)
     },
 
     updateJob(id: number, input: Partial<CreateBackupJobInput>): BackupJob {
+      validateBackupCron(input.cronExpression)
       const existing = repo.getJob(id)
       if (!existing) throw new Error('Job not found')
       return repo.updateJob(id, input)
@@ -215,7 +220,7 @@ export function createBackupService(db: Database) {
 
         const finishedAt = Math.floor(Date.now() / 1000)
         const duration = finishedAt - startedAt
-        const exitCode = result.exitCode ?? 0
+        const exitCode = result.exitCode ?? 1
         const status: BackupRun['status'] = exitCode === 0 ? 'success' : 'error'
         const fullOutput = outputLines.join('\n')
 

@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import { useComposeStacks, useComposeAction, useComposeProgress } from '../../hooks/useDocker'
 import type { ComposeStack } from '@homenas/shared'
+import { useQueryClient } from '@tanstack/react-query'
 import { useT } from '../../i18n/useT'
 
 function StackStatusBadge({ status }: { status: ComposeStack['status'] }) {
@@ -207,6 +208,16 @@ export function ComposeStacksCard() {
   const { data: progress } = useComposeProgress()
   const [activeStackPath, setActiveStackPath] = useState<string | null>(null)
   const t = useT()
+  const queryClient = useQueryClient()
+  const wasRunning = useRef(false)
+
+  useEffect(() => {
+    if (wasRunning.current && !progress?.running) {
+      void queryClient.invalidateQueries({ queryKey: ['docker', 'stacks'] })
+      void queryClient.invalidateQueries({ queryKey: ['docker', 'containers'] })
+    }
+    wasRunning.current = progress?.running ?? false
+  }, [progress?.running, queryClient])
 
   function handleAction(path: string, action: string) {
     setActiveStackPath(path)
@@ -236,6 +247,7 @@ export function ComposeStacksCard() {
       </div>
 
       <div className="p-4">
+        {actionMutation.error && <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">{actionMutation.error.message}</p>}
         {isLoading && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -257,7 +269,7 @@ export function ComposeStacksCard() {
                 key={stack.path}
                 stack={stack}
                 onAction={handleAction}
-                pending={actionMutation.isPending}
+                pending={actionMutation.isPending || !!progress?.running}
                 isActive={activeStackPath === stack.path}
               />
             ))}

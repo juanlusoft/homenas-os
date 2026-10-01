@@ -1,0 +1,13 @@
+{"path":"/api/auth/me","status":200}
+{"path":"/api/setup/status","status":200}
+{"path":"/api/system/metrics","status":200}
+{"path":"/api/storage/disks","status":200,"rows":7}
+{"path":"/api/storage/mergerfs/status","status":200,"pool":{"mounted":true,"mountPoint":"/mnt/pool","drives":[{"path":"/mnt/disks/cache1/pool-cache","role":"cache","totalBytes":511858737152,"usedBytes":null},{"path":"/mnt/disks/disk1","role":"data","totalBytes":27888530153472,"usedBytes":null},{"path":"/mnt/disks/disk2","role":"data","totalBytes":27888530153472,"usedBytes":null},{"path":"/mnt/disks/disk3","role":"data","totalBytes":27888530153472,"usedBytes":null},{"path":"/mnt/disks/disk4","role":"data","totalBytes":27888530153472,"usedBytes":null},{"path":"/mnt/disks/disk5","role":"data","totalBytes":27888530153472,"usedBytes":null},{"path":"/mnt/disks/disk6","role":"data","totalBytes":27888530153472,"usedBytes":null}],"totalBytes":167331180920832,"usedBytes":null}}
+{"path":"/api/network/samba/shares","status":200,"rows":3}
+{"path":"/api/docker/containers","status":200,"rows":3}
+{"path":"/api/cloud-backup/jobs","status":200}
+VIEW PASS /storage
+VIEW PASS /docker
+VIEW PASS /network
+VIEW PASS /cloud-backup
+PASS real remote browser login+8 APIs+4 views; read-only NAS operations

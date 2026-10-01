@@ -1,5 +1,7 @@
-import { exec } from '../lib/exec.js'
-import { mkdir, writeFile } from 'fs/promises'
+import { exec, writeFileAsRoot } from '../lib/exec.js'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { existsSync } from 'fs'
 import type { Database } from 'better-sqlite3'
 import type { CloudflareStatus } from '@homenas/shared'
@@ -10,11 +12,11 @@ const CLOUDFLARED_BIN = '/usr/local/bin/cloudflared'
 const SERVICE_NAME = 'cloudflared'
 
 // Platform-specific download URL
-function getDownloadUrl(): string {
-  if (process.platform === 'darwin') {
-    return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64'
-  }
-  return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64'
+export function getDownloadUrl(platform: string = process.platform, arch: string = process.arch): string {
+  const os = platform === 'darwin' ? 'darwin' : platform === 'linux' ? 'linux' : null
+  const cpu = arch === 'x64' ? 'amd64' : arch === 'arm64' ? 'arm64' : arch === 'arm' ? 'arm' : null
+  if (!os || !cpu || (os === 'darwin' && cpu === 'arm')) throw new Error(`Unsupported cloudflared platform: ${platform}/${arch}`)
+  return `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-${os}-${cpu}`
 }
 
 export function isInstalled(): boolean {
@@ -53,21 +55,14 @@ export async function getStatus(db: Database): Promise<CloudflareStatus> {
 
 export async function install(): Promise<void> {
   const downloadUrl = getDownloadUrl()
-
-  const download = await exec('curl', ['-L', '-o', '/tmp/cloudflared', downloadUrl])
-  if (download.exitCode !== 0) {
-    throw new Error(`Failed to download cloudflared: ${download.stderr}`)
-  }
-
-  const chmod = await exec('chmod', ['+x', '/tmp/cloudflared'])
-  if (chmod.exitCode !== 0) {
-    throw new Error(`Failed to chmod cloudflared: ${chmod.stderr}`)
-  }
-
-  const mv = await exec('mv', ['/tmp/cloudflared', CLOUDFLARED_BIN])
-  if (mv.exitCode !== 0) {
-    throw new Error(`Failed to move cloudflared to ${CLOUDFLARED_BIN}: ${mv.stderr}`)
-  }
+  const dir = await mkdtemp(join(tmpdir(), 'homenas-cloudflared-'))
+  const binary = join(dir, 'cloudflared')
+  try {
+    const download = await exec('curl', ['--fail', '--location', '--proto', '=https', '--max-time', '180', '-o', binary, downloadUrl])
+    if (download.exitCode !== 0) throw new Error(`Failed to download cloudflared: ${download.stderr}`)
+    const installed = await exec('install', ['-m', '0755', '-o', 'root', '-g', 'root', binary, CLOUDFLARED_BIN])
+    if (installed.exitCode !== 0) throw new Error(`Failed to install cloudflared: ${installed.stderr}`)
+  } finally { await rm(dir, { recursive: true, force: true }) }
 }
 
 // Cloudflare tunnel tokens are base64url-encoded JWTs — allow only safe chars
@@ -82,16 +77,15 @@ function validateToken(token: string): void {
 export async function configure(db: Database, token: string): Promise<void> {
   validateToken(token)
 
-  // Save token to settings (encrypted)
-  setSetting(db, 'cloudflare_token', encryptSecret(token))
 
   // Clear any previous error
   deleteSetting(db, 'cloudflare_last_error')
 
   // Write token to env file (mode 0600) — keeps it out of ps aux / unit file
   try {
-    await mkdir('/etc/cloudflared', { recursive: true })
-    await writeFile('/etc/cloudflared/tunnel.env', `TUNNEL_TOKEN=${token}\n`, { mode: 0o600 })
+    const directory = await exec('mkdir', ['-p', '/etc/cloudflared'])
+    if (directory.exitCode !== 0) throw new Error(directory.stderr || 'Could not create cloudflared directory')
+    await writeFileAsRoot('/etc/cloudflared/tunnel.env', `TUNNEL_TOKEN=${token}\n`, 0o600)
   } catch (envErr) {
     const message = envErr instanceof Error ? envErr.message : String(envErr)
     setSetting(db, 'cloudflare_last_error', `env file write failed: ${message}`)
@@ -114,10 +108,13 @@ RestartSec=5s
 [Install]
 WantedBy=multi-user.target
 `
-    await writeFile('/etc/systemd/system/cloudflared.service', unitContent, { mode: 0o644 })
+    await writeFileAsRoot('/etc/systemd/system/cloudflared.service', unitContent, 0o644)
 
-    await exec('systemctl', ['daemon-reload'])
-    await exec('systemctl', ['enable', SERVICE_NAME])
+    for (const args of [['daemon-reload'], ['enable', SERVICE_NAME]]) {
+      const result = await exec('systemctl', args)
+      if (result.exitCode !== 0) throw new Error(result.stderr || 'systemctl failed')
+    }
+    setSetting(db, 'cloudflare_token', encryptSecret(token))
   } catch (unitErr) {
     const message = unitErr instanceof Error ? unitErr.message : String(unitErr)
     setSetting(db, 'cloudflare_last_error', `unit file write failed: ${message}`)

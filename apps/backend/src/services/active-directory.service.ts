@@ -288,12 +288,14 @@ export async function createUser(username: string, password: string, displayName
     throw new Error('Password must be at least 8 characters')
   }
 
-  const args = ['user', 'create', username, password]
+  if (/[\r\n\0]/.test(password)) throw new Error('Password must not contain newline or null characters')
+  const args = ['user', 'create', username]
   if (displayName.trim()) {
     args.push(`--given-name=${displayName.trim()}`)
   }
 
-  const result = await exec('samba-tool', args)
+  // Omit PASSWORD from argv; Samba prompts on stdin when no password argument is supplied.
+  const result = await execWithInput('samba-tool', args, `${password}\n${password}\n`)
   if (result.exitCode !== 0) {
     throw new Error(result.stderr || 'samba-tool user create failed')
   }
@@ -329,6 +331,7 @@ export async function disableUser(username: string): Promise<void> {
 export async function resetPassword(username: string, newPassword: string): Promise<void> {
   if (!validateUsername(username)) throw new Error('Invalid username')
   if (newPassword.length < 8) throw new Error('Password must be at least 8 characters')
+  if (/[\r\n\0]/.test(newPassword)) throw new Error('Password must not contain newline or null characters')
 
   // samba-tool reads the new password from stdin when --newpassword is omitted.
   // Sending it twice covers versions that prompt for confirmation.

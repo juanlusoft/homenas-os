@@ -30,8 +30,8 @@ export function createSessionsRepo(db: Database) {
   return {
     create(data: { id: string; userId: number; csrfToken: string; expiresAt: number }): void {
       db.prepare(
-        `INSERT INTO sessions (id, user_id, csrf_token, expires_at) VALUES (?, ?, ?, ?)`
-      ).run(data.id, data.userId, data.csrfToken, data.expiresAt)
+        `INSERT INTO sessions (id, user_id, csrf_token, expires_at, idle_expires_at) VALUES (?, ?, ?, ?, ?)`
+      ).run(data.id, data.userId, data.csrfToken, data.expiresAt, Math.floor(Date.now() / 1000) + 8 * 60 * 60)
     },
 
     findById(id: string): Session | undefined {

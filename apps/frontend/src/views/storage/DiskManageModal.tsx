@@ -64,7 +64,7 @@ export function DiskManageModal({ disk, onClose, onSuccess }: DiskManageModalPro
     const browserId = `browse_${diskName}_${Date.now()}`
     setStep({ kind: 'progress', message: `Montando ${partition.partition} en modo lectura...` })
     try {
-      const result = await storageApi.mountPartition(diskName, { browserId })
+      const result = await storageApi.mountPartition(diskName, { browserId, partition: partition.partition })
       setStep({ kind: 'success', message: `Disco montado en ${result.mountPoint} (solo lectura)` })
     } catch (err) {
       setStep({ kind: 'error', message: (err as Error).message })

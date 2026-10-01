@@ -1,3 +1,4 @@
+import { invalidateSession } from './client'
 import { useAuthStore } from '../stores/authStore'
 
 export interface FileEntry {
@@ -36,9 +37,17 @@ function getHeaders(mutating = false): Record<string, string> {
   return headers
 }
 
+// Capture the session with the request, before awaiting its response.
+async function authenticatedFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers)
+  const sessionId = headers.get('X-Session-Id')
+  const res = await fetch(path, options)
+  if (res.status === 401) invalidateSession(sessionId)
+  return res
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (res.status === 401) {
-    useAuthStore.getState().logout()
     throw new Error('UNAUTHORIZED')
   }
   if (!res.ok) throw new Error(await res.text())
@@ -47,57 +56,57 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export const filesApi = {
   getLocations: (): Promise<FileLocation[]> =>
-    fetch('/api/files/locations', {
+    authenticatedFetch('/api/files/locations', {
       headers: getHeaders(false),
     }).then((r) => handleResponse<FileLocation[]>(r)),
 
   list: (path: string): Promise<FileEntry[]> =>
-    fetch(`/api/files/list?path=${encodeURIComponent(path)}`, {
+    authenticatedFetch(`/api/files/list?path=${encodeURIComponent(path)}`, {
       headers: getHeaders(false),
     }).then((r) => handleResponse<FileEntry[]>(r)),
 
   mkdir: (path: string): Promise<{ ok: boolean }> =>
-    fetch('/api/files/mkdir', {
+    authenticatedFetch('/api/files/mkdir', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getHeaders(true) },
       body: JSON.stringify({ path }),
     }).then((r) => handleResponse<{ ok: boolean }>(r)),
 
   deleteItem: (path: string): Promise<{ ok: boolean }> =>
-    fetch('/api/files/item', {
+    authenticatedFetch('/api/files/item', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', ...getHeaders(true) },
       body: JSON.stringify({ path }),
     }).then((r) => handleResponse<{ ok: boolean }>(r)),
 
   rename: (oldPath: string, newPath: string): Promise<{ ok: boolean }> =>
-    fetch('/api/files/rename', {
+    authenticatedFetch('/api/files/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getHeaders(true) },
       body: JSON.stringify({ oldPath, newPath }),
     }).then((r) => handleResponse<{ ok: boolean }>(r)),
 
   move: (source: string, destination: string): Promise<{ ok: boolean }> =>
-    fetch('/api/files/move', {
+    authenticatedFetch('/api/files/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getHeaders(true) },
       body: JSON.stringify({ source, destination }),
     }).then((r) => handleResponse<{ ok: boolean }>(r)),
 
   copy: (source: string, destination: string): Promise<{ ok: boolean }> =>
-    fetch('/api/files/copy', {
+    authenticatedFetch('/api/files/copy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getHeaders(true) },
       body: JSON.stringify({ source, destination }),
     }).then((r) => handleResponse<{ ok: boolean }>(r)),
 
   search: (path: string, q: string): Promise<string[]> =>
-    fetch(`/api/files/search?path=${encodeURIComponent(path)}&q=${encodeURIComponent(q)}`, {
+    authenticatedFetch(`/api/files/search?path=${encodeURIComponent(path)}&q=${encodeURIComponent(q)}`, {
       headers: getHeaders(false),
     }).then((r) => handleResponse<string[]>(r)),
 
   getInfo: (path: string): Promise<FileInfo> =>
-    fetch(`/api/files/info?path=${encodeURIComponent(path)}`, {
+    authenticatedFetch(`/api/files/info?path=${encodeURIComponent(path)}`, {
       headers: getHeaders(false),
     }).then((r) => handleResponse<FileInfo>(r)),
 
@@ -110,12 +119,11 @@ export const filesApi = {
   // `/api/files/download?path=...&token=...`). This avoids the blob round-trip
   // for very large files and lets the browser stream straight to disk.
   getDownloadUrl: async (path: string): Promise<string> => {
-    const res = await fetch(`/api/files/download?path=${encodeURIComponent(path)}`, {
+    const res = await authenticatedFetch(`/api/files/download?path=${encodeURIComponent(path)}`, {
       headers: getHeaders(false),
     })
     if (res.status === 401) {
-      useAuthStore.getState().logout()
-      throw new Error('UNAUTHORIZED')
+        throw new Error('UNAUTHORIZED')
     }
     if (!res.ok) throw new Error(await res.text())
     const blob = await res.blob()
@@ -144,15 +152,21 @@ export const filesApi = {
 
       xhr.onload = () => {
         if (xhr.status === 401) {
-          useAuthStore.getState().logout()
+          invalidateSession(sessionId)
           reject(new Error('UNAUTHORIZED'))
-        } else if (xhr.status >= 400) {
+        } else if (xhr.status < 200 || xhr.status >= 300) {
           reject(new Error(xhr.responseText))
         } else {
-          resolve(JSON.parse(xhr.responseText))
+          try {
+            resolve(JSON.parse(xhr.responseText))
+          } catch {
+            reject(new Error('Invalid upload response'))
+          }
         }
       }
       xhr.onerror = () => reject(new Error('Network error during upload'))
+      xhr.onabort = () => reject(new Error('Upload cancelled'))
+      xhr.ontimeout = () => reject(new Error('Upload timed out'))
       xhr.send(formData)
     })
   },

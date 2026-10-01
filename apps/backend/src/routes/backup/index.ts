@@ -1,3 +1,4 @@
+import { refreshBackupSchedules } from '../../services/backup-scheduler.service.js'
 import type { FastifyInstance } from 'fastify'
 import { CreateBackupJobSchema } from '@homenas/shared'
 import { createBackupService } from '../../services/backup.service.js'
@@ -25,6 +26,7 @@ export async function backupRoutes(fastify: FastifyInstance) {
     const service = createBackupService(fastify.db)
     try {
       const job = service.createJob(result.data)
+      refreshBackupSchedules(fastify.db)
       return reply.status(201).send(job)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -50,6 +52,7 @@ export async function backupRoutes(fastify: FastifyInstance) {
     const service = createBackupService(fastify.db)
     try {
       const job = service.updateJob(jobId, result.data)
+      refreshBackupSchedules(fastify.db)
       return reply.send(job)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -71,6 +74,7 @@ export async function backupRoutes(fastify: FastifyInstance) {
     const service = createBackupService(fastify.db)
     try {
       service.deleteJob(jobId)
+      refreshBackupSchedules(fastify.db)
       return reply.send({ ok: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'

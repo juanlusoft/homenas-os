@@ -26,7 +26,7 @@ export async function exec(
     return {
       stdout: result.stdout ?? '',
       stderr: result.stderr ?? '',
-      exitCode: result.exitCode ?? 0,
+      exitCode: result.exitCode ?? 1,
     }
   } catch (err) {
     if (err && typeof err === 'object' && 'stdout' in err && 'stderr' in err && 'exitCode' in err) {
@@ -65,7 +65,7 @@ export async function execWithInput(
     return {
       stdout: result.stdout ?? '',
       stderr: result.stderr ?? '',
-      exitCode: result.exitCode ?? 0,
+      exitCode: result.exitCode ?? 1,
     }
   } catch (err) {
     if (err && typeof err === 'object' && 'stdout' in err && 'stderr' in err && 'exitCode' in err) {

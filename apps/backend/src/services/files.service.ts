@@ -44,7 +44,7 @@ export function validatePath(inputPath: string): string {
   const normalized = normalize(inputPath)
 
   // Reject if the normalized path contains ".." segments (double-check after normalize)
-  if (normalized.includes('..')) {
+  if (normalized.split('/').includes('..') || inputPath.includes('\0')) {
     throw new Error('Path traversal not allowed')
   }
 
@@ -66,9 +66,9 @@ export async function validateRealPath(inputPath: string): Promise<string> {
   let resolved: string
   try {
     resolved = await realpath(normalized)
-  } catch {
-    // Path doesn't exist yet — fall back to normalized (e.g. new file destination)
-    return normalized
+  } catch (err) {
+    // Reads must resolve an existing path; a missing leaf below a symlink is not safe.
+    throw err
   }
 
   // Verify the resolved (symlink-free) path is still within allowed roots.
@@ -125,7 +125,7 @@ export async function validateWritableRealPath(inputPath: string): Promise<strin
 }
 
 /** Prevents deleting the pool root directories themselves */
-function validateNotRoot(p: string): void {
+export function validateNotRoot(p: string): void {
   const normalized = normalize(p)
   for (const root of ALLOWED_ROOTS) {
     // e.g. /mnt or /mnt/ — must not delete the root mount point itself
@@ -300,6 +300,7 @@ export async function deleteItem(inputPath: string): Promise<void> {
 
 export async function renameItem(oldPath: string, newPath: string): Promise<void> {
   const safeOld = await validateWritableRealPath(oldPath)
+  validateNotRoot(safeOld)
   // New path must stay within the same writable area
   const safeNew = await validateWritableRealPath(newPath)
 
@@ -318,6 +319,7 @@ export async function renameItem(oldPath: string, newPath: string): Promise<void
 
 export async function moveItem(source: string, destination: string): Promise<void> {
   const safeSrc = await validateWritableRealPath(source)
+  validateNotRoot(safeSrc)
   const safeDst = await validateWritableRealPath(destination)
 
   const result = await exec('mv', [safeSrc, safeDst])
@@ -341,7 +343,7 @@ export async function copyItem(source: string, destination: string): Promise<voi
 // ─── searchFiles ──────────────────────────────────────────────────────────────
 
 export async function searchFiles(basePath: string, query: string): Promise<string[]> {
-  const safePath = validatePath(basePath)
+  const safePath = await validateRealPath(basePath)
 
   if (!query || query.trim() === '') {
     throw new Error('Search query is required')

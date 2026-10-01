@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ApiError } from '../../api/client'
 import { authApi } from '../../api/auth'
 import { useAuthStore } from '../../stores/authStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -43,14 +44,7 @@ export function LoginView() {
       navigate('/', { replace: true })
     } catch (err) {
       const msg = err instanceof Error ? err.message : t.auth.loginFailed
-      // Server told us TOTP is required.
-      // TODO: backend returns a structured `requireTotp: true` flag in the
-      // 401 body — surface it through apiFetch (e.g. throw a typed
-      // ApiError with the parsed body) instead of pattern-matching the
-      // human-readable message. The string check here is a stop-gap that
-      // breaks if the message is ever localised. Until then, keep matching
-      // both the plain string and the legacy flag name.
-      if (msg.includes('TOTP') || msg.includes('requireTotp')) {
+      if (err instanceof ApiError && err.requireTotp) {
         setPending({ username, password })
         setStep('totp')
       } else {
@@ -179,7 +173,7 @@ export function LoginView() {
             </button>
             <button
               type="button"
-              onClick={() => { setStep('credentials'); setTotpCode(''); setError(null) }}
+              onClick={() => { setStep('credentials'); setPending(null); setTotpCode(''); setError(null) }}
               className="w-full text-sm text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/60 transition-colors"
             >
               ← Back

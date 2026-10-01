@@ -1,0 +1,10 @@
+
+> homenas-os-v3@1.0.3 build:agent <WORKSPACE>
+> node scripts/build-agent.mjs
+
+Downloading verified Go 1.25.14 (arm64) for agent builds
+Built homenas-agent.exe (windows/amd64)
+Built homenas-agent-linux (linux/amd64)
+Built homenas-agent-linux-arm64 (linux/arm64)
+Built homenas-agent-mac-amd64 (darwin/amd64)
+Built homenas-agent-mac-arm64 (darwin/arm64)

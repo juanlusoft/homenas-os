@@ -1,0 +1,318 @@
+TAP version 13
+# {"level":30,"time":1790853651497,"pid":1290102,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backup-cron-8yQEoD/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790853651543,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651546,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":200},"responseTime":3.3206910000000107,"msg":"request completed"}
+# {"level":30,"time":1790853651547,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-2","req":{"method":"POST","url":"/api/backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651554,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-2","res":{"statusCode":201},"responseTime":6.9062790000000405,"msg":"request completed"}
+# {"level":30,"time":1790853651554,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-3","req":{"method":"DELETE","url":"/api/backup/jobs/5","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651555,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-3","res":{"statusCode":200},"responseTime":0.7594730000000709,"msg":"request completed"}
+# {"level":30,"time":1790853651555,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-4","req":{"method":"POST","url":"/api/cloud-backup/jobs","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651557,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-4","res":{"statusCode":201},"responseTime":1.538626000000022,"msg":"request completed"}
+# {"level":30,"time":1790853651557,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-5","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/2","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651558,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-5","res":{"statusCode":200},"responseTime":0.603601000000026,"msg":"request completed"}
+# {"level":30,"time":1790853651558,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-6","req":{"method":"PUT","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651559,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-6","res":{"statusCode":200},"responseTime":1.0140329999999267,"msg":"request completed"}
+# {"level":30,"time":1790853651559,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-7","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651560,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-7","res":{"statusCode":200},"responseTime":0.5857290000000148,"msg":"request completed"}
+# {"level":30,"time":1790853651560,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-8","req":{"method":"PUT","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651560,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-8","res":{"statusCode":200},"responseTime":0.49265700000000834,"msg":"request completed"}
+# {"level":30,"time":1790853651561,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-9","req":{"method":"DELETE","url":"/api/cloud-backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651562,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-9","res":{"statusCode":200},"responseTime":1.1258249999999634,"msg":"request completed"}
+# {"level":30,"time":1790853651563,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-a","req":{"method":"DELETE","url":"/api/backup/jobs/1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651563,"pid":1290102,"hostname":"TEST_WORKSTATION","reqId":"req-a","res":{"statusCode":200},"responseTime":0.4816969999999401,"msg":"request completed"}
+# Subtest: backup cron initializes persisted jobs, preserves runners/contracts, refreshes API edits and stops cleanly
+ok 1 - backup cron initializes persisted jobs, preserves runners/contracts, refreshes API edits and stops cleanly
+  ---
+  duration_ms: 173.359593
+  type: 'test'
+  ...
+# Subtest: actual node-cron clock dispatches an enabled persisted backup without running system commands
+ok 2 - actual node-cron clock dispatches an enabled persisted backup without running system commands
+  ---
+  duration_ms: 434.855473
+  type: 'test'
+  ...
+# {"level":30,"time":1790853651474,"pid":1290103,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-2el5yN/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790853651508,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651511,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":200},"responseTime":3.0243239999999787,"msg":"request completed"}
+# {"level":30,"time":1790853651511,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651512,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-2","res":{"statusCode":200},"responseTime":0.4706090000000813,"msg":"request completed"}
+# {"level":30,"time":1790853651512,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-3","req":{"method":"POST","url":"/api/setup/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651512,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-3","res":{"statusCode":409},"responseTime":0.42495999999994183,"msg":"request completed"}
+# {"level":30,"time":1790853651513,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651738,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-4","res":{"statusCode":200},"responseTime":225.07379300000014,"msg":"request completed"}
+# {"level":30,"time":1790853651738,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-5","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651738,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-5","res":{"statusCode":403},"responseTime":0.31030500000019856,"msg":"request completed"}
+# {"level":30,"time":1790853651739,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-6","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651739,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-6","res":{"statusCode":401},"responseTime":0.22420800000008967,"msg":"request completed"}
+# {"level":30,"time":1790853651739,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-7","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651739,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-7","res":{"statusCode":200},"responseTime":0.21654499999999643,"msg":"request completed"}
+# {"level":30,"time":1790853651739,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-8","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651961,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-8","res":{"statusCode":200},"responseTime":221.46751700000004,"msg":"request completed"}
+# {"level":30,"time":1790853651962,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-9","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652184,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-9","res":{"statusCode":401},"responseTime":221.6277889999999,"msg":"request completed"}
+# {"level":30,"time":1790853652184,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-a","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652406,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-a","res":{"statusCode":401},"responseTime":221.1736760000001,"msg":"request completed"}
+# {"level":30,"time":1790853652406,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-b","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652627,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-b","res":{"statusCode":401},"responseTime":220.62637900000004,"msg":"request completed"}
+# {"level":30,"time":1790853652627,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-c","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652849,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-c","res":{"statusCode":401},"responseTime":222.51415700000007,"msg":"request completed"}
+# {"level":30,"time":1790853652849,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-d","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853653070,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-d","res":{"statusCode":401},"responseTime":220.70239599999968,"msg":"request completed"}
+# {"level":30,"time":1790853653070,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-e","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853653071,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-e","res":{"statusCode":429},"responseTime":0.39468799999986004,"msg":"request completed"}
+# {"level":30,"time":1790853653071,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-f","req":{"method":"GET","url":"/api/auth/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853653071,"pid":1290103,"hostname":"TEST_WORKSTATION","reqId":"req-f","res":{"statusCode":401},"responseTime":0.16382500000008804,"msg":"request completed"}
+# Subtest: bootstrap credential changes revoke other sessions; authenticated wizard can resume; 2FA failures lock account
+ok 3 - bootstrap credential changes revoke other sessions; authenticated wizard can resume; 2FA failures lock account
+  ---
+  duration_ms: 1704.313742
+  type: 'test'
+  ...
+# {"level":30,"time":1790853653142,"pid":1290103,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-21OkE9/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: scheduler rejects untrusted binaries, combined rsync interpreter flags and unsafe toggle
+ok 4 - scheduler rejects untrusted binaries, combined rsync interpreter flags and unsafe toggle
+  ---
+  duration_ms: 95.329846
+  type: 'test'
+  ...
+# Subtest: path guards accept dotted names, reject symlink escapes/missing leaves and pool roots
+ok 5 - path guards accept dotted names, reject symlink escapes/missing leaves and pool roots
+  ---
+  duration_ms: 2.437682
+  type: 'test'
+  ...
+# Subtest: upload safety checks binary signatures and case-insensitive text signatures
+ok 6 - upload safety checks binary signatures and case-insensitive text signatures
+  ---
+  duration_ms: 3.700564
+  type: 'test'
+  ...
+# Subtest: Compose validates relative binds, device access, inherited definitions and volume driver bypasses
+ok 7 - Compose validates relative binds, device access, inherited definitions and volume driver bypasses
+  ---
+  duration_ms: 9.24041
+  type: 'test'
+  ...
+# {"level":30,"time":1790853653251,"pid":1290103,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-backend-test-XAvjRt/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: DDNS retries failed providers at unchanged IP and updates newly configured domains
+ok 8 - DDNS retries failed providers at unchanged IP and updates newly configured domains
+  ---
+  duration_ms: 85.73086
+  type: 'test'
+  ...
+# Subtest: Cloudflare selects the correct CPU binary and passwords respect bcrypt byte limits
+ok 9 - Cloudflare selects the correct CPU binary and passwords respect bcrypt byte limits
+  ---
+  duration_ms: 0.928033
+  type: 'test'
+  ...
+# Subtest: independent review: expired interrupted backup can be retried
+ok 10 - independent review: expired interrupted backup can be retried
+  ---
+  duration_ms: 1.800578
+  type: 'test'
+  ...
+# Subtest: independent review: queued push backup exposes running state and can be cancelled
+ok 11 - independent review: queued push backup exposes running state and can be cancelled
+  ---
+  duration_ms: 0.907345
+  type: 'test'
+  ...
+# Subtest: independent review: polling never approves an unapproved agent
+ok 12 - independent review: polling never approves an unapproved agent
+  ---
+  duration_ms: 0.384929
+  type: 'test'
+  ...
+# {"level":30,"time":1790853651527,"pid":1290105,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-bootstrap-PLooCE/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790853651561,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651564,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":200},"responseTime":2.871762999999987,"msg":"request completed"}
+# {"level":30,"time":1790853651564,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-2","req":{"method":"POST","url":"/api/setup/autologin","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651564,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-2","res":{"statusCode":200},"responseTime":0.49212899999997717,"msg":"request completed"}
+# {"level":30,"time":1790853651565,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-3","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853651565,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-4","req":{"method":"POST","url":"/api/setup/password","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652018,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-3","res":{"statusCode":200},"responseTime":453.499317,"msg":"request completed"}
+# {"level":30,"time":1790853652019,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-4","res":{"statusCode":409},"responseTime":453.80594099999996,"msg":"request completed"}
+# {"level":30,"time":1790853652019,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-5","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652240,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-5","res":{"statusCode":200},"responseTime":220.86697200000003,"msg":"request completed"}
+# Subtest: independent review: a concurrently revoked bootstrap session cannot overwrite administrator password
+ok 13 - independent review: a concurrently revoked bootstrap session cannot overwrite administrator password
+  ---
+  duration_ms: 818.881547
+  type: 'test'
+  ...
+# {"level":30,"time":1790853652308,"pid":1290105,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-yB1et8/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790853652326,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652327,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":401},"responseTime":0.8984330000000682,"msg":"request completed"}
+# Subtest: independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+    # Subtest: password
+    ok 1 - password
+      ---
+      duration_ms: 85.015147
+      type: 'test'
+      ...
+# {"level":30,"time":1790853652393,"pid":1290105,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-5hllQB/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790853652407,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652408,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":401},"responseTime":0.6750080000001617,"msg":"request completed"}
+    # Subtest: totp
+    ok 2 - totp
+      ---
+      duration_ms: 82.38484
+      type: 'test'
+      ...
+# {"level":30,"time":1790853652477,"pid":1290105,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-O1zDGY/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790853652490,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652490,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":401},"responseTime":0.7770089999999072,"msg":"request completed"}
+    # Subtest: delete
+    ok 3 - delete
+      ---
+      duration_ms: 79.520916
+      type: 'test'
+      ...
+# {"level":30,"time":1790853652558,"pid":1290105,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-login-L2cO2b/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# {"level":30,"time":1790853652571,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+# {"level":30,"time":1790853652573,"pid":1290105,"hostname":"TEST_WORKSTATION","reqId":"req-1","res":{"statusCode":429},"responseTime":1.5985940000000483,"msg":"request completed"}
+    # Subtest: lockout
+    ok 4 - lockout
+      ---
+      duration_ms: 82.402744
+      type: 'test'
+      ...
+    1..4
+ok 14 - independent review: login cannot issue sessions from stale password, TOTP or deleted-user state
+  ---
+  duration_ms: 331.340642
+  type: 'test'
+  ...
+# {"level":30,"time":1790853651524,"pid":1290111,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-cron-close-HwBDmJ/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: independent review: server hook cancels backups before SQLite closes
+ok 15 - independent review: server hook cancels backups before SQLite closes
+  ---
+  duration_ms: 148.034479
+  type: 'test'
+  ...
+# {"level":30,"time":1790853651634,"pid":1290111,"hostname":"TEST_WORKSTATION","msg":"*** FIRST RUN: default admin created. Initial password written to /tmp/homenas-review-ddns-close-VOvOdL/initial-admin-password.txt — read it once with `sudo cat`, use it in the setup wizard, then delete the file. ***"}
+# Subtest: independent review: closing waits for in-flight DDNS before SQLite closes
+ok 16 - independent review: closing waits for in-flight DDNS before SQLite closes
+  ---
+  duration_ms: 85.927996
+  type: 'test'
+  ...
+# Subtest: independent review: update and agent package resolve actual tsc production layout
+ok 17 - independent review: update and agent package resolve actual tsc production layout
+  ---
+  duration_ms: 0.787808
+  type: 'test'
+  ...
+# Subtest: independent storage review: branch policies and cache subpaths never measure root
+ok 18 - independent storage review: branch policies and cache subpaths never measure root
+  ---
+  duration_ms: 289.684853
+  type: 'test'
+  ...
+# Subtest: real multipart consumes file and validates full backup, including empty files and hardlink dedup
+ok 19 - real multipart consumes file and validates full backup, including empty files and hardlink dedup
+  ---
+  duration_ms: 28.36035
+  type: 'test'
+  ...
+# Subtest: format entrypoints refuse root before destructive commands; add/create mount only mocked disks and persist UUID
+ok 20 - format entrypoints refuse root before destructive commands; add/create mount only mocked disks and persist UUID
+  ---
+  duration_ms: 1298.683356
+  type: 'test'
+  ...
+# Subtest: missing logical cache branch measures only its existing mounted NAS ancestor
+ok 21 - missing logical cache branch measures only its existing mounted NAS ancestor
+  ---
+  duration_ms: 5.300566
+  type: 'test'
+  ...
+# Subtest: format guard resolves NVMe root without truncating namespace
+ok 22 - format guard resolves NVMe root without truncating namespace
+  ---
+  duration_ms: 0.889041
+  type: 'test'
+  ...
+# Subtest: format guard refuses unknown topology, duplicates, mounted children and LVM
+ok 23 - format guard refuses unknown topology, duplicates, mounted children and LVM
+  ---
+  duration_ms: 0.181216
+  type: 'test'
+  ...
+# Subtest: format guard protects every physical ancestor of LVM/RAID root
+ok 24 - format guard protects every physical ancestor of LVM/RAID root
+  ---
+  duration_ms: 0.178464
+  type: 'test'
+  ...
+# Subtest: format lock excludes concurrent entrypoints and releases after failures
+ok 25 - format lock excludes concurrent entrypoints and releases after failures
+  ---
+  duration_ms: 0.176736
+  type: 'test'
+  ...
+# Subtest: backup rejects attached and bundled shell execution flags
+ok 26 - backup rejects attached and bundled shell execution flags
+  ---
+  duration_ms: 0.297089
+  type: 'test'
+  ...
+# Subtest: metrics avoid counting virtual guest CPU twice and parse attached RX counter
+ok 27 - metrics avoid counting virtual guest CPU twice and parse attached RX counter
+  ---
+  duration_ms: 3.023555
+  type: 'test'
+  ...
+# Subtest: disk persistence replaces only matching mountpoints and preserves unrelated entries
+ok 28 - disk persistence replaces only matching mountpoints and preserves unrelated entries
+  ---
+  duration_ms: 0.52872
+  type: 'test'
+  ...
+# Subtest: cloud remote config rejects INI directive injection and executable password commands
+ok 29 - cloud remote config rejects INI directive injection and executable password commands
+  ---
+  duration_ms: 0.416385
+  type: 'test'
+  ...
+# Subtest: project-root discovery supports source and compiled backend nesting
+ok 30 - project-root discovery supports source and compiled backend nesting
+  ---
+  duration_ms: 7.360088
+  type: 'test'
+  ...
+# Subtest: flat lsblk topology is refused and disconnected disks are never formatted
+ok 31 - flat lsblk topology is refused and disconnected disks are never formatted
+  ---
+  duration_ms: 0.966689
+  type: 'test'
+  ...
+# Subtest: multi-view pools select storage alias instead of first archive; ambiguity fails closed
+ok 32 - multi-view pools select storage alias instead of first archive; ambiguity fails closed
+  ---
+  duration_ms: 0.238176
+  type: 'test'
+  ...
+# Subtest: primary pool resolver follows a real storage symlink with temporary mounts
+ok 33 - primary pool resolver follows a real storage symlink with temporary mounts
+  ---
+  duration_ms: 13.182975
+  type: 'test'
+  ...
+# Subtest: database downloads use live SQLite with custom data directory; SSH command failures do not report success
+ok 34 - database downloads use live SQLite with custom data directory; SSH command failures do not report success
+  ---
+  duration_ms: 146.915613
+  type: 'test'
+  ...
+1..34
+# tests 38
+# suites 0
+# pass 38
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2603.511903

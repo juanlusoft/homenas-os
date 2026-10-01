@@ -1,7 +1,8 @@
 import { execa } from 'execa'
 import type { ResultPromise } from 'execa'
 import { readFile } from 'node:fs/promises'
-import { normalize } from 'node:path'
+import { assertContainedHostPath } from '../lib/path-security.js'
+import { normalize, resolve, dirname } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { exec } from '../lib/exec.js'
 import type { Container, ComposeStack, ComposeProgress } from '@homenas/shared'
@@ -56,12 +57,25 @@ export async function validateComposeFile(composePath: string): Promise<void> {
     throw new Error('Compose file must be a YAML object')
   }
 
+  if (doc['include']) throw new Error('Compose include must be flattened before validation')
+  const declaredVolumes = doc['volumes']
+  if (declaredVolumes && typeof declaredVolumes === 'object') {
+    for (const volume of Object.values(declaredVolumes)) {
+      if (volume && typeof volume === 'object' && 'driver_opts' in volume) {
+        throw new Error('Compose volume driver_opts can bypass host path restrictions')
+      }
+    }
+  }
+
   const services = doc['services'] as Record<string, unknown> | undefined
   if (!services || typeof services !== 'object') return
 
   for (const [serviceName, service] of Object.entries(services)) {
     if (!service || typeof service !== 'object') continue
     const svc = service as Record<string, unknown>
+
+    if (svc['extends']) throw new Error('Compose extends must be flattened before validation')
+    if (svc['devices'] || svc['device_cgroup_rules']) throw new Error('Compose host devices are not allowed')
 
     // Block privileged containers
     if (svc['privileged'] === true) {
@@ -102,19 +116,19 @@ export async function validateComposeFile(composePath: string): Promise<void> {
         if (typeof vol === 'string') {
           const parts = vol.split(':')
           // Named volumes (no leading slash) are fine — skip
-          if (parts[0] && parts[0].startsWith('/')) {
-            hostPath = parts[0]
+          if (parts.length > 1 && parts[0] && (parts[0].startsWith('/') || parts[0].startsWith('.'))) {
+            hostPath = resolve(dirname(composePath), parts[0])
           }
         } else if (vol && typeof vol === 'object') {
           const v = vol as Record<string, unknown>
-          if (typeof v['source'] === 'string' && v['source'].startsWith('/')) {
-            hostPath = v['source']
+          if (typeof v['source'] === 'string' && (v['type'] === 'bind' || v['source'].startsWith('/') || v['source'].startsWith('.'))) {
+            hostPath = resolve(dirname(composePath), v['source'])
           }
         }
 
         if (!hostPath) continue
 
-        const normalized = normalize(hostPath)
+        const normalized = assertContainedHostPath(normalize(hostPath), ALLOWED_VOLUME_PREFIXES)
 
         // Block exact dangerous paths
         if (BLOCKED_PATHS.includes(normalized)) {
@@ -521,10 +535,8 @@ export async function composeAction(path: string, action: string): Promise<{ sta
     ? path
     : `${path}/docker-compose.yml`
 
-  // Validate compose file contents before executing (only for 'up')
-  if (action === 'up') {
-    await validateComposeFile(composePath)
-  }
+  // Docker reads the Compose definition for all lifecycle actions.
+  await validateComposeFile(composePath)
 
   composeState.running = true
   composeState.action = action

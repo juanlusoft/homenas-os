@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"homenas.io/agent/internal/config"
 	"homenas.io/agent/internal/vss"
@@ -15,6 +17,18 @@ import (
 // RunBackup performs a full backup cycle: VSS → walk → dedup check → upload → finalize.
 func RunBackup(ctx context.Context, cfg *config.Config, client *NASClient) error {
 	log.Println("[backup] starting backup")
+	if len(cfg.BackupPaths) == 0 {
+		return fmt.Errorf("no backup paths configured")
+	}
+	// Resolve relative paths before walking; NAS keys remain absolute-normalized.
+	roots := make([]string, 0, len(cfg.BackupPaths))
+	for _, path := range cfg.BackupPaths {
+		root, err := filepath.Abs(path)
+		if err != nil {
+			return err
+		}
+		roots = append(roots, root)
+	}
 
 	// ── 1. Load previous manifest ──────────────────────────────────────────
 	prevManifest, err := LoadManifest(config.Dir())
@@ -35,6 +49,16 @@ func RunBackup(ctx context.Context, cfg *config.Config, client *NASClient) error
 		return fmt.Errorf("begin session: %w", err)
 	}
 	log.Printf("[backup] session %s, version %s", sessionID, version)
+	completed := false
+	defer func() {
+		if !completed {
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := client.EndSession(cleanupCtx, sessionID, nil, 0, 0, "error", "Backup interrupted or incomplete"); err != nil {
+				log.Printf("[backup] could not report failed session: %v", err)
+			}
+		}
+	}()
 
 	// ── 3. VSS snapshot (Windows only) ────────────────────────────────────
 	// Collect unique volumes from backup paths
@@ -74,17 +98,20 @@ func RunBackup(ctx context.Context, cfg *config.Config, client *NASClient) error
 
 	// ── 4. Walk filesystem ─────────────────────────────────────────────────
 	var allEntries []ManifestEntry
-	var changedEntries []ManifestEntry
+	seen := map[string]bool{}
 
-	for _, backupPath := range cfg.BackupPaths {
+	for _, backupPath := range roots {
 		log.Printf("[backup] walking %s", backupPath)
 		result, err := WalkPath(backupPath, prevManifest, vssTranslate)
 		if err != nil {
-			log.Printf("[backup] walk error for %s: %v", backupPath, err)
-			continue
+			return fmt.Errorf("walk %s: %w", backupPath, err)
 		}
-		allEntries = append(allEntries, result.All...)
-		changedEntries = append(changedEntries, result.Changed...)
+		for _, entry := range result.All {
+			if !seen[entry.Path] {
+				allEntries = append(allEntries, entry)
+				seen[entry.Path] = true
+			}
+		}
 		log.Printf("[backup] %s: %d total, %d changed, %d unchanged",
 			backupPath, len(result.All), len(result.Changed), len(result.Unchanged))
 	}
@@ -103,7 +130,7 @@ func RunBackup(ctx context.Context, cfg *config.Config, client *NASClient) error
 			batch := allEntries[i:end]
 			have, err := client.CheckFiles(ctx, sessionID, batch)
 			if err != nil {
-				log.Printf("[backup] file-check warning: %v", err)
+				return fmt.Errorf("file-check: %w", err)
 			}
 			for _, p := range have {
 				alreadyHave[p] = true
@@ -112,11 +139,15 @@ func RunBackup(ctx context.Context, cfg *config.Config, client *NASClient) error
 		log.Printf("[backup] dedup: %d files already on NAS", len(alreadyHave))
 	}
 
-	// ── 6. Upload changed files not already on NAS ─────────────────────────
+	// ── 6. Upload all files not present on NAS ─────────────────────────
 	var totalBytes int64
+	var uploadedBytes int64
+	for _, entry := range allEntries {
+		totalBytes += entry.Size
+	}
 	uploaded := 0
 
-	for _, entry := range changedEntries {
+	for _, entry := range allEntries {
 		if alreadyHave[entry.Path] {
 			continue // NAS has it with same hash in a previous version
 		}
@@ -129,23 +160,24 @@ func RunBackup(ctx context.Context, cfg *config.Config, client *NASClient) error
 
 		log.Printf("[backup] uploading %s (%d bytes)", entry.Path, entry.Size)
 		if err := client.UploadFile(ctx, sessionID, readPath, entry.Path, entry); err != nil {
-			log.Printf("[backup] upload error %s: %v — skipping", entry.Path, err)
-			continue
+			return fmt.Errorf("upload %s: %w", entry.Path, err)
 		}
-		totalBytes += entry.Size
+		uploadedBytes += entry.Size
 		uploaded++
 	}
 
-	log.Printf("[backup] uploaded %d files (%d bytes)", uploaded, totalBytes)
+	log.Printf("[backup] uploaded %d files (%d bytes)", uploaded, uploadedBytes)
 
 	// ── 7. Finalize ────────────────────────────────────────────────────────
 	if err := client.EndSession(ctx, sessionID, allEntries, len(allEntries), totalBytes, "success", ""); err != nil {
 		return fmt.Errorf("end session: %w", err)
 	}
 
+	completed = true
+
 	// ── 8. Save updated manifest locally ──────────────────────────────────
 	if err := SaveManifest(config.Dir(), allEntries); err != nil {
-		log.Printf("[backup] warning: could not save manifest: %v", err)
+		return fmt.Errorf("save manifest: %w", err)
 	}
 
 	log.Printf("[backup] completed — version %s, %d files", version, len(allEntries))
@@ -170,7 +202,8 @@ func uniqueVolumes(paths []string) []string {
 
 // denormalizePath converts a normalized NAS path back to a local absolute path.
 // e.g. "C/Users/Juan/file.txt" → "C:\Users\Juan\file.txt" on Windows
-//      "home/juan/file.txt"    → "/home/juan/file.txt" on Linux
+//
+//	"home/juan/file.txt"    → "/home/juan/file.txt" on Linux
 func denormalizePath(normalized string) string {
 	if runtime.GOOS == "windows" {
 		// "C/Users/..." → "C:\Users\..."

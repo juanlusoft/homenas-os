@@ -2,10 +2,15 @@ import { execa } from 'execa'
 import type { Database } from 'better-sqlite3'
 import { exec, sudoWrap } from '../lib/exec.js'
 import { getSetting, setSetting } from '../lib/settings.js'
-import { resolve } from 'node:path'
+import { findProjectRoot } from '../lib/project-root.js'
 
 // Repo root is two levels up from apps/backend (WorkingDirectory in systemd)
-const REPO_ROOT = resolve(process.cwd(), '../..')
+const REPO_ROOT = findProjectRoot(import.meta.url)
+
+export function getAppUpdateMergeArgs(remoteHead: string): string[] {
+  // Ignored runtime/custom files still belong to the installation, not upstream.
+  return ['merge', '--ff-only', '--no-overwrite-ignore', remoteHead]
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -83,7 +88,7 @@ async function checkAppUpdates(): Promise<AppUpdateInfo> {
   // Allow git to operate under sudo/different owner
   await execa('git', ['config', '--global', '--add', 'safe.directory', REPO_ROOT], { shell: false, reject: false })
 
-  const currentResult = await exec('git', ['rev-parse', '--short', 'HEAD'])
+  const currentResult = await execa('git', ['rev-parse', '--short', 'HEAD'], gitOpts)
   const currentCommit = currentResult.exitCode === 0 ? currentResult.stdout.trim() : 'unknown'
 
   await execa('git', ['fetch', 'origin'], gitOpts)
@@ -164,6 +169,8 @@ async function runAppUpdate(): Promise<void> {
 
   try {
     append('=== Starting app update ===')
+    const dirty = await run('git', ['status', '--porcelain'])
+    if (dirty.exitCode !== 0 || dirty.stdout.trim()) throw new Error('Repository has local changes; refusing automatic update')
 
     // Fetch latest from origin (prune stale/corrupted remote refs first)
     append('> git remote prune origin')
@@ -181,18 +188,13 @@ async function runAppUpdate(): Promise<void> {
     const remoteHead = remoteHeadResult.stdout?.trim().replace('refs/remotes/', '') || 'origin/main'
     append(`remote HEAD: ${remoteHead}`)
 
-    // Ensure we are on the default branch locally before resetting
-    const defaultBranch = remoteHead.replace('origin/', '')
-    const checkoutResult = await run('git', ['checkout', '-B', defaultBranch, remoteHead])
-    append(checkoutResult.all ?? '')
-
-    // Hard reset to remote — more reliable than pull (no merge conflicts)
-    append(`> git reset --hard ${remoteHead}`)
-    const resetResult = await run('git', ['reset', '--hard', remoteHead])
-    append(resetResult.all ?? '')
-    if (resetResult.exitCode !== 0) {
-      throw new Error(`git reset failed: ${resetResult.stderr}`)
-    }
+    // Preserve local branches/commits: only advance a clean default branch.
+    const branch = await run('git', ['branch', '--show-current'])
+    if (branch.exitCode !== 0 || branch.stdout.trim() !== remoteHead.replace('origin/', '')) throw new Error('Update requires the default branch; local branch preserved')
+    append(`> git merge --ff-only --no-overwrite-ignore ${remoteHead}`)
+    const mergeResult = await run('git', getAppUpdateMergeArgs(remoteHead))
+    append(mergeResult.all ?? '')
+    if (mergeResult.exitCode !== 0) throw new Error(`Cannot fast-forward update: ${mergeResult.stderr}`)
 
     // Fix ownership BEFORE install — git reset/previous root runs may leave
     // node_modules/.pnpm entries owned by root, causing EACCES during install
@@ -225,6 +227,11 @@ async function runAppUpdate(): Promise<void> {
       throw new Error(`pnpm build failed: ${buildResult.stderr}`)
     }
 
+    append('> node scripts/build-agent.mjs')
+    const agentBuild = await run('node', ['scripts/build-agent.mjs'])
+    append(agentBuild.all ?? '')
+    if (agentBuild.exitCode !== 0) throw new Error(`Agent build failed: ${agentBuild.stderr}`)
+
     // Restart service — needs sudo (homenas has NOPASSWD: ALL in sudoers)
     append('> systemctl restart homenas.service')
     const restartResult = await execa(...sudoWrap('systemctl', ['restart', 'homenas.service']), {
@@ -250,6 +257,7 @@ async function runAppUpdate(): Promise<void> {
 // ─── updateOs ─────────────────────────────────────────────────────────────────
 
 export function updateOs(packages: string[]): void {
+  if (packages.some(pkg => !/^[a-z0-9][a-z0-9.+-]*(?::[a-z0-9]+)?$/.test(pkg))) throw new Error('Invalid package name')
   if (processState.status === 'updating') {
     throw new Error('An update is already in progress')
   }
@@ -278,7 +286,7 @@ async function runOsUpdate(packages: string[]): Promise<void> {
     const cmd = packages.length > 0 ? 'apt-get install' : 'apt-get upgrade'
     append(`> ${cmd} ${packages.join(' ')}`)
 
-    const result = await execa(...sudoWrap('apt-get', ['upgrade', '-y', ...packages]), {
+    const result = await execa(...sudoWrap('apt-get', [packages.length ? 'install' : 'upgrade', '-y', '--', ...packages]), {
       shell: false,
       reject: false,
       all: true,
@@ -340,7 +348,7 @@ function _restartAutoTimer(): void {
   const ms = Math.max(5, _autoConfig.intervalMinutes) * 60 * 1000
   _autoTimer = setInterval(() => { void _autoPoll() }, ms)
   // Run once after 1 minute on startup so the first check happens quickly
-  setTimeout(() => { void _autoPoll() }, 60_000)
+  setTimeout(() => { if (_autoConfig.enabled) void _autoPoll() }, 60_000)
 }
 
 async function _autoPoll(): Promise<void> {

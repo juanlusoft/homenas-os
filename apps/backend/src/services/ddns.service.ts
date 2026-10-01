@@ -200,10 +200,11 @@ export function getStatus(db: Database): DdnsConfig[] {
 
 // ─── Background updater ───────────────────────────────────────────────────────
 
-let lastKnownIp: string | null = null
-let updaterInterval: ReturnType<typeof setInterval> | null = null
+const updaters = new Map<Database, { interval: ReturnType<typeof setInterval>; pending: Promise<void> | null }>()
 
-async function runUpdater(db: Database): Promise<void> {
+export async function runUpdater(db: Database): Promise<void> {
+  const rows = db.prepare('SELECT * FROM ddns_config WHERE enabled = 1').all() as DdnsConfigRow[]
+  if (rows.length === 0) return
   let currentIp: string
   try {
     currentIp = await getPublicIp()
@@ -211,12 +212,9 @@ async function runUpdater(db: Database): Promise<void> {
     return  // Can't get IP — skip this cycle
   }
 
-  // Only update if IP changed or never updated
-  if (currentIp === lastKnownIp) return
-  lastKnownIp = currentIp
-
-  const rows = db.prepare('SELECT * FROM ddns_config WHERE enabled = 1').all() as DdnsConfigRow[]
+  // Retry failed records and update newly added records even when the IP is unchanged.
   for (const row of rows) {
+    if (row.last_ip === currentIp && row.last_status === 'ok') continue
     const config = rowToConfig(row)
     const now = Math.floor(Date.now() / 1000)
     try {
@@ -234,18 +232,24 @@ async function runUpdater(db: Database): Promise<void> {
 }
 
 export function startDdnsUpdater(db: Database): void {
-  if (updaterInterval) return
-
-  // Run immediately on start
-  void runUpdater(db)
-
-  // Then every 5 minutes
-  updaterInterval = setInterval(() => void runUpdater(db), 5 * 60 * 1000)
+  if (updaters.has(db)) return
+  const state = { interval: null as unknown as ReturnType<typeof setInterval>, pending: null as Promise<void> | null }
+  const tick = () => {
+    if (state.pending) return
+    state.pending = runUpdater(db).catch((err) => console.warn('[ddns] updater failed:', err instanceof Error ? err.message : String(err)))
+      .finally(() => { state.pending = null })
+  }
+  state.interval = setInterval(tick, 5 * 60 * 1000)
+  state.interval.unref()
+  updaters.set(db, state)
+  tick()
 }
 
-export function stopDdnsUpdater(): void {
-  if (updaterInterval) {
-    clearInterval(updaterInterval)
-    updaterInterval = null
+export async function stopDdnsUpdater(db?: Database): Promise<void> {
+  for (const [connection, state] of updaters) {
+    if (db && connection !== db) continue
+    clearInterval(state.interval)
+    updaters.delete(connection)
+    await state.pending
   }
 }

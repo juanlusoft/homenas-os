@@ -42,7 +42,7 @@ function buildLogger() {
     return { level }
   }
   // In production: write JSON logs to rotating file AND stdout
-  const logsDir = join(process.cwd(), '..', '..', 'logs')
+  const logsDir = process.env.HOMENAS_LOG_DIR ?? join(process.cwd(), '..', '..', 'logs')
   try { mkdirSync(logsDir, { recursive: true }) } catch { /* ok */ }
   return {
     level,
@@ -194,7 +194,8 @@ export function buildApp(httpsOptions?: HttpsOptions) {
     const frontendDist = join(process.cwd(), '..', 'frontend', 'dist')
     if (existsSync(frontendDist)) {
       app.register(staticPlugin, { root: frontendDist, prefix: '/' })
-      app.setNotFoundHandler((_request, reply) => {
+      app.setNotFoundHandler((request, reply) => {
+        if (request.url.split('?')[0] === '/api' || request.url.startsWith('/api/')) return reply.status(404).send({ error: 'Not Found', message: 'API route not found' })
         return reply.sendFile('index.html')
       })
     }

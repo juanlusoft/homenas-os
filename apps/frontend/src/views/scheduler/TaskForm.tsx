@@ -2,7 +2,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { X, Clock } from 'lucide-react'
-import { CreateTaskSchema, type CreateTaskInput, type ScheduledTask } from '@homenas/shared'
+import { type CreateTaskInput, type ScheduledTask } from '@homenas/shared'
 import { useCreateTask, useUpdateTask } from '../../hooks/useScheduler'
 
 // Frontend form schema — args as comma-separated string for UX
@@ -17,47 +17,7 @@ const TaskFormSchema = z.object({
 
 type TaskFormValues = z.infer<typeof TaskFormSchema>
 
-// Simple next-runs preview — just compute based on current minute and cron-like logic
-function getNextRunsPreview(cronExpr: string): string[] {
-  // We can't compute real next runs without a library, so display a helper message
-  const parts = cronExpr.trim().split(/\s+/)
-  if (parts.length !== 5) return []
-
-  const [min, hour] = parts
-  const previews: string[] = []
-  const now = new Date()
-
-  try {
-    // Simple preview: show next 3 occurrences based on current time + 1/2/3 units
-    for (let i = 1; i <= 3; i++) {
-      const d = new Date(now)
-      if (min === '*' && hour === '*') {
-        d.setMinutes(d.getMinutes() + i)
-        d.setSeconds(0)
-      } else if (min !== '*' && hour === '*') {
-        const targetMin = parseInt(min, 10)
-        d.setMinutes(targetMin + (i - 1) * 60)
-        d.setSeconds(0)
-      } else if (min === '*' && hour !== '*') {
-        const targetHour = parseInt(hour, 10)
-        d.setHours(targetHour + (i - 1), 0, 0)
-      } else {
-        const targetMin = parseInt(min, 10)
-        const targetHour = parseInt(hour, 10)
-        if (!isNaN(targetMin) && !isNaN(targetHour)) {
-          d.setHours(targetHour + (i - 1) * 24, targetMin, 0)
-        } else {
-          break
-        }
-      }
-      previews.push(d.toLocaleString())
-    }
-  } catch {
-    // ignore
-  }
-
-  return previews
-}
+import { getNextRunsPreview } from '../../lib/cronPreview'
 
 interface Props {
   task?: ScheduledTask

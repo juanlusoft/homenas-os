@@ -33,7 +33,7 @@ export function useComposeProgress() {
   return useQuery({
     queryKey: ['docker', 'stacks', 'progress'],
     queryFn: () => dockerApi.getComposeProgress(),
-    refetchInterval: (query) => query.state.data?.running ? 2_000 : false,
+    refetchInterval: (query) => query.state.data?.running ? 2_000 : 10_000,
   })
 }
 

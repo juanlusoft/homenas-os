@@ -108,10 +108,10 @@ section "Node.js"
 
 if command -v node &>/dev/null; then
   NODE_MAJOR=$(node -e "process.stdout.write(String(parseInt(process.versions.node)))")
-  if (( NODE_MAJOR >= 18 )); then
+  if (( NODE_MAJOR >= 22 )); then
     info "Node.js $(node --version) already installed — skipping"
   else
-    warn "Node.js ${NODE_MAJOR} is too old (need >= 18). Upgrading to 22 LTS..."
+    warn "Node.js ${NODE_MAJOR} is too old (need >= 22.12). Upgrading to 22 LTS..."
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
   fi
@@ -121,15 +121,19 @@ else
   apt-get install -y nodejs
 fi
 
+if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit((major === 22 && minor >= 12) || major >= 24 ? 0 : 1)'; then
+  error "Node.js 22.12+ (or 24+) is required by the build dependencies"
+  exit 1
+fi
 info "Node.js $(node --version) — npm $(npm --version)"
 
 # ── pnpm ─────────────────────────────────────────────────────────────────────
 
 section "pnpm"
 
-if ! command -v pnpm &>/dev/null; then
+if ! command -v pnpm &>/dev/null || [[ "$(pnpm --version)" != "9.15.9" ]]; then
   info "Installing pnpm..."
-  npm install -g pnpm
+  npm install -g pnpm@9.15.9
 fi
 info "pnpm $(pnpm --version)"
 
@@ -150,6 +154,7 @@ section "System tools"
 SYSTEM_PKGS=(
   # Filesystem
   xfsprogs
+  attr
   e2fsprogs
   parted
   util-linux
@@ -166,13 +171,23 @@ SYSTEM_PKGS=(
   rsync
   # stdbuf binary ships in coreutils (already pulled in transitively) — NOT a separate package
   lsof
+  sudo
+  curl
+  openssl
+  python3
+  make
+  g++
+  rclone
+  wireguard-tools
+  dnsmasq
+  unzip
+  zip
+  cron
   # Network
   ethtool
   # Discovery
   avahi-daemon
-  # WireGuard
-  wireguard
-  wireguard-tools
+  # WireGuard QR export
   qrencode
   # UPS (optional)
   nut
@@ -320,7 +335,7 @@ section "HomeNas OS v3 source"
 
 if [[ -d "${INSTALL_DIR}/.git" ]]; then
   info "Updating existing installation in ${INSTALL_DIR}..."
-  git -C "${INSTALL_DIR}" pull --ff-only
+  sudo -u homenas git -C "${INSTALL_DIR}" pull --ff-only
 else
   info "Cloning into ${INSTALL_DIR}..."
   git clone "${REPO}" "${INSTALL_DIR}"
@@ -361,22 +376,17 @@ info "Installing pnpm dependencies..."
 # resolution; native addons are compiled explicitly below.
 sudo -u homenas pnpm install --frozen-lockfile --ignore-scripts
 
-# Compile native addons that require a build step (better-sqlite3).
-info "Building native addons (better-sqlite3)..."
-SQLITE3_PKG=$(find "${INSTALL_DIR}/node_modules/.pnpm" -maxdepth 2 -name "better-sqlite3" -type d 2>/dev/null | grep "node_modules/better-sqlite3$" | head -1)
-if [[ -n "${SQLITE3_PKG}" ]]; then
-  if ! ls "${SQLITE3_PKG}"/build/Release/better_sqlite3.node &>/dev/null; then
-    (cd "${SQLITE3_PKG}" && sudo -u homenas npm install --ignore-scripts=false 2>&1 | tail -3) \
-      || warn "better-sqlite3 native build failed — app may not start"
-  else
-    info "better-sqlite3 already compiled"
-  fi
-else
-  warn "better-sqlite3 package not found in virtual store"
-fi
+# Rebuild only the approved native dependencies as the service user. Fail the
+# installation if SQLite cannot load: continuing would create a broken service.
+info "Building approved native addons..."
+sudo -u homenas pnpm rebuild better-sqlite3 esbuild
+sudo -u homenas pnpm --filter @homenas/backend exec node --input-type=module -e \
+  'import Database from "better-sqlite3"; const db = new Database(":memory:"); db.prepare("SELECT 1").get(); db.close()'
 
 info "Building frontend and backend (NODE_ENV=production)..."
 sudo -u homenas NODE_ENV=production pnpm -r build
+info "Building Active Backup clients..."
+sudo -u homenas node scripts/build-agent.mjs
 
 # ── TLS certificate ───────────────────────────────────────────────────────────
 
@@ -542,7 +552,7 @@ info "Avahi started"
 
 # ── wsdd2 ─────────────────────────────────────────────────────────────────────
 
-if systemctl list-unit-files wsdd2.service &>/dev/null 2>&1; then
+if systemctl cat wsdd2.service &>/dev/null; then
   systemctl enable wsdd2
   systemctl restart wsdd2
   info "wsdd2 started (Windows WS-Discovery)"
@@ -564,7 +574,7 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
   info "  User      : admin"
   info "  The setup wizard will guide you when you open the panel."
   info "  If it asks for the initial password:"
-  info "    sudo cat ${INSTALL_DIR}/data/initial-admin-password.txt"
+  info "    sudo cat ${INSTALL_DIR}/apps/backend/data/initial-admin-password.txt"
   info ""
   info "  Logs  : journalctl -u ${SERVICE_NAME} -f"
   info "  Stop  : systemctl stop ${SERVICE_NAME}"

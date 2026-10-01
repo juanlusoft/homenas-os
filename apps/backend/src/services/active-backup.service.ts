@@ -1,14 +1,16 @@
 import { randomBytes, createHash } from 'node:crypto'
 import {
   mkdirSync, readdirSync, lstatSync, symlinkSync, unlinkSync,
-  existsSync, rmSync, createWriteStream, linkSync, readFileSync, writeFileSync,
+  existsSync, rmSync, createWriteStream, linkSync, readFileSync, writeFileSync, renameSync, utimesSync, realpathSync,
 } from 'node:fs'
 import { join, resolve, basename, dirname } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import type { Readable } from 'node:stream'
 import { execa, type Subprocess } from 'execa'
 import type { Database } from 'better-sqlite3'
+import { getSetting, setSetting, deleteSetting } from '../lib/settings.js'
 import { createActiveBackupRepo } from '../repositories/active-backup.repo.js'
+import { ManifestEntrySchema } from '@homenas/shared'
 import type { AbDevice, AbBackupRun, AbProgress, AbFileEntry, ManifestEntry, UpdateDeviceInput } from '@homenas/shared'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -26,6 +28,12 @@ interface RunningBackup {
 }
 
 const runningBackups = new Map<number, RunningBackup>()
+const busySessions = new Set<string>()
+async function withSessionLock<T>(id: string, operation: () => Promise<T>): Promise<T> {
+  if (busySessions.has(id)) throw new Error('Backup session is busy; retry after current upload')
+  busySessions.add(id)
+  try { return await operation() } finally { busySessions.delete(id) }
+}
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
@@ -48,6 +56,11 @@ function safeBrowsePath(deviceId: number, subPath: string): string {
   if (!candidate.startsWith(root + '/') && candidate !== root) {
     throw new Error('Path traversal not allowed')
   }
+  if (existsSync(candidate)) {
+    const actual = realpathSync(candidate)
+    const realRoot = realpathSync(root)
+    if (actual !== realRoot && !actual.startsWith(realRoot + '/')) throw new Error('Path traversal not allowed')
+  }
   return candidate
 }
 
@@ -58,15 +71,11 @@ function safeBrowsePath(deviceId: number, subPath: string): string {
  * Removes leading slashes, normalizes separators, prevents traversal.
  */
 function sanitizePath(p: string): string {
-  // Split into segments and drop empty/'.'/'..' components. Segment-based
-  // filtering cannot be bypassed the way a single `.replace(/\.\.+\//)` can
-  // (e.g. `....//` or `..../`), because there is no residual string to re-form
-  // a traversal sequence after the filter.
-  return p
-    .replace(/\\/g, '/')
-    .split('/')
-    .filter((seg) => seg !== '' && seg !== '.' && seg !== '..')
-    .join('/')
+  const normalized = p.replace(/\\/g, '/')
+  if (!normalized || normalized.startsWith('/') || /^[a-zA-Z]:/.test(normalized) || normalized.includes('\0') || normalized.split('/').some(seg => !seg || seg === '.' || seg === '..')) {
+    throw new Error('Invalid relative backup path')
+  }
+  return normalized
 }
 
 /**
@@ -78,6 +87,13 @@ function confineToBase(base: string, relPath: string): string {
   const full = resolve(join(resolvedBase, sanitizePath(relPath)))
   if (full !== resolvedBase && !full.startsWith(resolvedBase + '/')) {
     throw new Error('Path traversal not allowed')
+  }
+  let parent = full
+  while (!existsSync(parent) && parent !== resolvedBase && dirname(parent) !== parent) parent = dirname(parent)
+  if (existsSync(parent) && existsSync(resolvedBase)) {
+    const realBase = realpathSync(resolvedBase)
+    const realParent = realpathSync(parent)
+    if (realParent !== realBase && !realParent.startsWith(realBase + '/')) throw new Error('Symlink escapes backup root')
   }
   return full
 }
@@ -92,6 +108,10 @@ function generateToken(): string {
 
 export function createActiveBackupService(db: Database) {
   const repo = createActiveBackupRepo(db)
+  function expirePushSessions(deviceId: number): void {
+    db.prepare(`UPDATE ab_backup_runs SET status = 'error', finished_at = unixepoch(), error_message = 'Backup session expired' WHERE device_id = ? AND status = 'running' AND id IN (SELECT run_id FROM ab_sessions WHERE expires_at <= unixepoch())`).run(deviceId)
+    db.prepare('DELETE FROM ab_sessions WHERE device_id = ? AND expires_at <= unixepoch()').run(deviceId)
+  }
 
   return {
     // ── Device management ──────────────────────────────────────────────────
@@ -161,15 +181,12 @@ export function createActiveBackupService(db: Database) {
         return { status: 'pending' }
       }
 
-      // Check if there is already a running run for this device (triggered by admin)
-      const runningRun = repo.getRunningRunForDevice(device.id)
-      if (!runningRun) {
-        return { status: 'waiting' }
-      }
-
+      const queued = getSetting(db, `ab_trigger_${device.id}`)
+      if (!queued) return { status: 'waiting' }
+      deleteSetting(db, `ab_trigger_${device.id}`)
       return {
         status: 'backup',
-        run_id: runningRun.id,
+        run_id: Number(queued),
         backup_path: device.backup_path ?? '/home',
         retention_days: device.retention_days,
       }
@@ -209,9 +226,19 @@ export function createActiveBackupService(db: Database) {
       if (!device) throw new Error('Device not found')
       if (device.status === 'pending') throw new Error('Device not yet approved')
 
-      if (runningBackups.has(deviceId)) {
+      if (runningBackups.has(deviceId) || repo.getRunningRunForDevice(deviceId)) {
         throw new Error('A backup is already running for this device')
       }
+
+      if (device.backup_paths !== null) {
+        const run = repo.createRun(deviceId, 'queued')
+        setSetting(db, `ab_trigger_${deviceId}`, String(run.id))
+        return { run_id: run.id }
+      }
+
+      const remoteHost = device.hostname ?? device.name
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(remoteHost)) throw new Error('Invalid SSH backup hostname')
+      if (device.backup_path && (!device.backup_path.startsWith('/') || /[\r\n\0]/.test(device.backup_path))) throw new Error('Invalid SSH backup source path')
 
       // Determine next version number
       const root = deviceRoot(deviceId)
@@ -251,6 +278,7 @@ export function createActiveBackupService(db: Database) {
 
       const rsyncArgs = [
         '--archive',
+        '--protect-args',
         '--delete',
         '--stats',
         '--human-readable',
@@ -293,6 +321,7 @@ export function createActiveBackupService(db: Database) {
 
       // Handle completion
       void proc.then((result) => {
+        if (runningBackups.get(deviceId)?.process !== proc) return
         const exitCode = result.exitCode ?? 1
         const success = exitCode === 0
 
@@ -342,8 +371,11 @@ export function createActiveBackupService(db: Database) {
     },
 
     getRunProgress(deviceId: number): AbProgress {
+      expirePushSessions(deviceId)
       const running = runningBackups.get(deviceId)
       if (!running) {
+        const push = repo.getRunningRunForDevice(deviceId)
+        if (push) return { deviceId, running: true, runId: push.id, progress: 0, status: 'running', output: [], error: null }
         return {
           deviceId: null,
           running: false,
@@ -378,7 +410,17 @@ export function createActiveBackupService(db: Database) {
 
     cancelBackup(deviceId: number): void {
       const running = runningBackups.get(deviceId)
-      if (!running) throw new Error('No backup is running for this device')
+      if (!running) {
+        const push = repo.getRunningRunForDevice(deviceId)
+        if (!push) throw new Error('No backup is running for this device')
+        const sessions = db.prepare('SELECT id FROM ab_sessions WHERE device_id = ?').all(deviceId) as { id: string }[]
+        if (sessions.some(s => busySessions.has(s.id))) throw new Error('Backup session is busy; retry cancellation after current upload')
+        repo.finishRun(push.id, { status: 'cancelled', error_message: 'Cancelled by admin' })
+        db.prepare('DELETE FROM ab_sessions WHERE device_id = ?').run(deviceId)
+        deleteSetting(db, `ab_trigger_${deviceId}`)
+        repo.updateDeviceStatus(deviceId, 'error')
+        return
+      }
 
       try { running.process.kill('SIGTERM') } catch { /* ignore */ }
 
@@ -470,6 +512,10 @@ export function createActiveBackupService(db: Database) {
       if (!device) throw new Error('Unknown token')
       if (device.status === 'pending') throw new Error('Device not yet approved')
 
+      expirePushSessions(device.id)
+      const queuedRun = repo.getRunningRunForDevice(device.id)
+      if (queuedRun && queuedRun.version !== 'queued') throw new Error('A backup is already running for this device')
+
       // Update device name/hostname from agent registration data
       if (input.hostname && input.hostname !== device.hostname) {
         repo.updateDevice(device.id, { hostname: input.hostname })
@@ -486,13 +532,17 @@ export function createActiveBackupService(db: Database) {
         }
       }
       const version = `v${nextNum}`
-      const prevVersion = nextNum > 1 ? `v${nextNum - 1}` : null
+      const latest = join(root, 'latest')
+      const prevVersion = existsSync(latest) ? basename(realpathSync(latest)) : null
+      if (prevVersion && !/^v\d+$/.test(prevVersion)) throw new Error('Invalid latest backup version')
 
       // Create destination directory
       mkdirSync(join(root, version, 'files'), { recursive: true })
 
       // Create the run record
-      const run = repo.createRun(device.id, version)
+      const run = queuedRun ?? repo.createRun(device.id, version)
+      if (queuedRun) db.prepare('UPDATE ab_backup_runs SET version = ? WHERE id = ?').run(version, run.id)
+      deleteSetting(db, `ab_trigger_${device.id}`)
       repo.updateDeviceStatus(device.id, 'active')
 
       // Create session
@@ -516,6 +566,8 @@ export function createActiveBackupService(db: Database) {
       const session = repo.getSession(sessionId)
       if (!session || session.device_id !== device.id) throw new Error('Invalid session')
 
+      files = files.map(f => ManifestEntrySchema.parse(f))
+      for (const f of files) sanitizePath(f.path)
       const already_have: string[] = []
 
       if (session.previous_version) {
@@ -525,7 +577,8 @@ export function createActiveBackupService(db: Database) {
           try { prevManifest = JSON.parse(readFileSync(manifestPath, 'utf8')) } catch { prevManifest = [] }
           const prevMap = new Map(prevManifest.map(e => [e.path, e.hash]))
           for (const f of files) {
-            if (prevMap.get(f.path) === f.hash) {
+            const prevFile = confineToBase(join(deviceRoot(device.id), session.previous_version, 'files'), f.path)
+            if (prevMap.get(f.path) === f.hash && existsSync(prevFile) && lstatSync(prevFile).isFile() && lstatSync(prevFile).size === f.size) {
               already_have.push(f.path)
             }
           }
@@ -550,12 +603,14 @@ export function createActiveBackupService(db: Database) {
       totalChunks: number
       dataStream: Readable
     }): Promise<{ ok: boolean; received_chunk: number }> {
+      return withSessionLock(sessionId, async () => {
       const device = repo.getDeviceByToken(token)
       if (!device) throw new Error('Unknown token')
       const session = repo.getSession(sessionId)
       if (!session || session.device_id !== device.id) throw new Error('Invalid session')
 
-      const tmpDir = join(deviceRoot(device.id), '.tmp', sessionId, sanitizePath(opts.path))
+      if (!Number.isSafeInteger(opts.chunkIndex) || !Number.isSafeInteger(opts.totalChunks) || opts.totalChunks < 1 || opts.chunkIndex < 0 || opts.chunkIndex >= opts.totalChunks || !Number.isSafeInteger(opts.size) || opts.size < 0 || !Number.isFinite(opts.mtime) || !/^[a-fA-F0-9]{64}$/.test(opts.hash)) throw new Error('Invalid chunk metadata')
+      const tmpDir = confineToBase(join(deviceRoot(device.id), '.tmp', sessionId), opts.path)
       mkdirSync(tmpDir, { recursive: true })
 
       const chunkPath = join(tmpDir, `chunk_${opts.chunkIndex}`)
@@ -569,33 +624,41 @@ export function createActiveBackupService(db: Database) {
         const finalPath = confineToBase(join(deviceRoot(device.id), session.version, 'files'), opts.path)
         mkdirSync(dirname(finalPath), { recursive: true })
 
-        const writer = createWriteStream(finalPath)
+        // Assemble into a private sibling first; never truncate an existing
+        // version file (which may be a hardlink into an earlier backup).
+        const assembled = join(tmpDir, 'assembled')
         const hasher = createHash('sha256')
-
-        for (let i = 0; i < opts.totalChunks; i++) {
-          const cp = join(tmpDir, `chunk_${i}`)
-          const data = readFileSync(cp)
-          hasher.update(data)
-          writer.write(data)
+        let bytes = 0
+        async function* chunks() {
+          for (let i = 0; i < opts.totalChunks; i++) {
+            const cp = join(tmpDir, `chunk_${i}`)
+            const data = readFileSync(cp)
+            bytes += data.length
+            hasher.update(data)
+            yield data
+          }
         }
-        await new Promise<void>((resolve, reject) => {
-          writer.on('finish', resolve)
-          writer.on('error', reject)
-          writer.end()
-        })
-
+        const { Readable } = await import('node:stream')
+        try {
+          await pipeline(Readable.from(chunks()), createWriteStream(assembled, { flags: 'wx' }))
+        } catch (error) {
+          rmSync(assembled, { force: true })
+          throw error
+        }
         const actualHash = hasher.digest('hex')
-        if (actualHash !== opts.hash) {
-          // Hash mismatch — remove corrupted file
-          try { rmSync(finalPath) } catch { /* ignore */ }
-          throw new Error(`Hash mismatch for ${opts.path}: expected ${opts.hash}, got ${actualHash}`)
+        if (actualHash !== opts.hash.toLowerCase() || bytes !== opts.size) {
+          rmSync(assembled, { force: true })
+          throw new Error(`Hash or size mismatch for ${opts.path}`)
         }
+        renameSync(assembled, finalPath)
+        utimesSync(finalPath, opts.mtime, opts.mtime)
 
         // Cleanup tmp chunks
         try { rmSync(tmpDir, { recursive: true, force: true }) } catch { /* non-fatal */ }
       }
 
       return { ok: true, received_chunk: opts.chunkIndex }
+      })
     },
 
     // ── Push-based backup: finalize session ────────────────────────────────
@@ -607,6 +670,7 @@ export function createActiveBackupService(db: Database) {
       error_message: string | null
       manifest: ManifestEntry[]
     }): Promise<{ ok: boolean; version: string }> {
+      return withSessionLock(sessionId, async () => {
       const device = repo.getDeviceByToken(token)
       if (!device) throw new Error('Unknown token')
       const session = repo.getSession(sessionId)
@@ -615,20 +679,35 @@ export function createActiveBackupService(db: Database) {
       const root = deviceRoot(device.id)
 
       if (opts.status === 'success') {
+        opts.manifest = opts.manifest.map(f => ManifestEntrySchema.parse(f))
+        const names = opts.manifest.map(f => sanitizePath(f.path))
+        if (new Set(names).size !== names.length || opts.files_count !== names.length || opts.size_bytes !== opts.manifest.reduce((sum, f) => sum + f.size, 0)) throw new Error('Manifest totals or paths are invalid')
         // Hardlink unchanged files from previous version
         if (session.previous_version && session.already_have.length > 0) {
           const prevFilesRoot = join(root, session.previous_version, 'files')
           const curFilesRoot = join(root, session.version, 'files')
           for (const relPath of session.already_have) {
-            const src = join(prevFilesRoot, relPath)
-            const dst = join(curFilesRoot, relPath)
+            if (!names.includes(sanitizePath(relPath))) continue
+            const src = confineToBase(prevFilesRoot, relPath)
+            const dst = confineToBase(curFilesRoot, relPath)
             if (existsSync(src) && !existsSync(dst)) {
               try {
                 mkdirSync(dirname(dst), { recursive: true })
                 linkSync(src, dst)
-              } catch { /* non-fatal: file may already exist */ }
+              } catch (error) { throw new Error(`Cannot preserve unchanged file ${relPath}: ${String(error)}`) }
             }
           }
+        }
+
+        // Do not publish a successful version until every manifest file exists
+        // and matches its contents. Missing chunks/failed dedup remain retryable.
+        for (const entry of opts.manifest) {
+          const file = confineToBase(join(root, session.version, 'files'), entry.path)
+          if (!existsSync(file) || !lstatSync(file).isFile() || lstatSync(file).size !== entry.size) throw new Error(`Incomplete backup: ${entry.path}`)
+          const hash = createHash('sha256')
+          const { createReadStream } = await import('node:fs')
+          for await (const chunk of createReadStream(file)) hash.update(chunk)
+          if (hash.digest('hex') !== entry.hash.toLowerCase()) throw new Error(`Invalid backup contents: ${entry.path}`)
         }
 
         // Write manifest
@@ -637,10 +716,9 @@ export function createActiveBackupService(db: Database) {
 
         // Update latest symlink
         const latestLink = join(root, 'latest')
-        try {
-          if (existsSync(latestLink)) unlinkSync(latestLink)
-          symlinkSync(session.version, latestLink)
-        } catch { /* non-fatal */ }
+        const nextLink = `${latestLink}.${sessionId}`
+        symlinkSync(session.version, nextLink)
+        renameSync(nextLink, latestLink)
 
         // Prune old versions
         pruneOldVersions(device.id, device.retention_days)
@@ -661,6 +739,7 @@ export function createActiveBackupService(db: Database) {
       repo.deleteSession(sessionId)
 
       return { ok: true, version: session.version }
+      })
     },
 
     // ── Restore: browse manifest ───────────────────────────────────────────
